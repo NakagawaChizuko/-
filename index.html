@@ -231,7 +231,12 @@
           <section class="diagram-upload-wrap">
             <h3>産出状況断面図添付</h3>
             <p class="hint-text">産出状況断面図を追加します。</p>
-            <input id="section-diagram-input" type="file" accept="image/*" capture="environment" multiple />
+            <div class="upload-picker-row">
+              <label class="upload-picker-label" for="section-diagram-camera-input">カメラで撮影</label>
+              <label class="upload-picker-label secondary" for="section-diagram-input">保存フォルダから選択</label>
+            </div>
+            <input id="section-diagram-camera-input" class="upload-file-input" type="file" accept="image/*" capture="environment" multiple />
+            <input id="section-diagram-input" class="upload-file-input" type="file" accept="image/*" multiple />
             <div id="section-diagram-list" class="photo-list"></div>
           </section>
 
@@ -239,7 +244,12 @@
             <h3>写真添付</h3>
             <p class="hint-text">この記録に紐づける写真を追加します。</p>
             <p class="hint-text">撮影時は、クリノメーター（方位の分かるもの）と定規を一緒に写してください。</p>
-            <input id="photo-input" type="file" accept="image/*" capture="environment" multiple />
+            <div class="upload-picker-row">
+              <label class="upload-picker-label" for="photo-camera-input">カメラで撮影</label>
+              <label class="upload-picker-label secondary" for="photo-input">保存フォルダから選択</label>
+            </div>
+            <input id="photo-camera-input" class="upload-file-input" type="file" accept="image/*" capture="environment" multiple />
+            <input id="photo-input" class="upload-file-input" type="file" accept="image/*" multiple />
             <div id="photo-list" class="photo-list"></div>
           </section>
 

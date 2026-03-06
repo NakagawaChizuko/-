@@ -3,6 +3,7 @@ const CLOUD_ENDPOINT_KEY = "nojiri-kaseki-cloud-endpoint-v1";
 const CLOUD_CLIENT_ID_KEY = "nojiri-kaseki-cloud-client-id-v1";
 const CLOUD_PULL_INTERVAL_MS = 20000;
 const CLOUD_SAVE_DEBOUNCE_MS = 900;
+const CLOUD_AUTO_PULL_ENABLED = false;
 const DEFAULT_SPECIMEN_PREFIX = "m";
 const SPECIMEN_CATEGORY_MAP = {
   m: "哺乳類",
@@ -124,8 +125,10 @@ const layerNameInput = document.getElementById("layer-name-input");
 const layerOtherInput = document.getElementById("layer-other-input");
 const teamOtherInput = document.getElementById("team-other-input");
 
+const sectionDiagramCameraInput = document.getElementById("section-diagram-camera-input");
 const sectionDiagramInput = document.getElementById("section-diagram-input");
 const sectionDiagramList = document.getElementById("section-diagram-list");
+const photoCameraInput = document.getElementById("photo-camera-input");
 const photoInput = document.getElementById("photo-input");
 const photoList = document.getElementById("photo-list");
 
@@ -570,30 +573,12 @@ function bindEvents() {
     });
   }
 
-  sectionDiagramInput.addEventListener("change", async (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) {
-      return;
-    }
-
-    for (const file of files) {
-      try {
-        const dataUrl = await resizeImage(file, 1280, 0.72);
-        currentSectionDiagrams.push({
-          id: newId("diagram"),
-          name: file.name || "diagram.jpg",
-          dataUrl,
-          caption: "",
-          createdAt: new Date().toISOString(),
-        });
-      } catch (_error) {
-        showToast(`断面図追加に失敗: ${file.name}`);
-      }
-    }
-
-    sectionDiagramInput.value = "";
-    renderSectionDiagramList();
-    persist();
+  const sectionDiagramInputs = [sectionDiagramCameraInput, sectionDiagramInput].filter(Boolean);
+  sectionDiagramInputs.forEach((input) => {
+    input.addEventListener("change", async (event) => {
+      await addSectionDiagramsFromFiles(event.target.files);
+      event.target.value = "";
+    });
   });
 
   sectionDiagramList.addEventListener("input", (event) => {
@@ -619,30 +604,12 @@ function bindEvents() {
     persist("断面図を削除しました");
   });
 
-  photoInput.addEventListener("change", async (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) {
-      return;
-    }
-
-    for (const file of files) {
-      try {
-        const dataUrl = await resizeImage(file, 1280, 0.72);
-        currentPhotos.push({
-          id: newId("photo"),
-          name: file.name || "photo.jpg",
-          dataUrl,
-          caption: "",
-          createdAt: new Date().toISOString(),
-        });
-      } catch (_error) {
-        showToast(`写真追加に失敗: ${file.name}`);
-      }
-    }
-
-    photoInput.value = "";
-    renderPhotoList();
-    persist();
+  const photoInputs = [photoCameraInput, photoInput].filter(Boolean);
+  photoInputs.forEach((input) => {
+    input.addEventListener("change", async (event) => {
+      await addPhotosFromFiles(event.target.files);
+      event.target.value = "";
+    });
   });
 
   photoList.addEventListener("input", (event) => {
@@ -708,6 +675,66 @@ function bindEvents() {
   });
 }
 
+async function addSectionDiagramsFromFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) {
+    return;
+  }
+
+  let added = false;
+  for (const file of files) {
+    try {
+      const dataUrl = await resizeImage(file, 1280, 0.72);
+      currentSectionDiagrams.push({
+        id: newId("diagram"),
+        name: file.name || "diagram.jpg",
+        dataUrl,
+        caption: "",
+        createdAt: new Date().toISOString(),
+      });
+      added = true;
+    } catch (_error) {
+      showToast(`断面図追加に失敗: ${file.name}`);
+    }
+  }
+
+  if (!added) {
+    return;
+  }
+  renderSectionDiagramList();
+  persist();
+}
+
+async function addPhotosFromFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) {
+    return;
+  }
+
+  let added = false;
+  for (const file of files) {
+    try {
+      const dataUrl = await resizeImage(file, 1280, 0.72);
+      currentPhotos.push({
+        id: newId("photo"),
+        name: file.name || "photo.jpg",
+        dataUrl,
+        caption: "",
+        createdAt: new Date().toISOString(),
+      });
+      added = true;
+    } catch (_error) {
+      showToast(`写真追加に失敗: ${file.name}`);
+    }
+  }
+
+  if (!added) {
+    return;
+  }
+  renderPhotoList();
+  persist();
+}
+
 function setActiveTab(tabId) {
   tabButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === tabId);
@@ -716,7 +743,7 @@ function setActiveTab(tabId) {
     panel.classList.toggle("active", panel.id === tabId);
   });
   syncRecordFormPlacement(tabId);
-  if (cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab")) {
+  if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
   }
 }
@@ -2009,9 +2036,13 @@ async function bootstrapCloudSync() {
     const remoteState = normalizeState(response.state);
     const remoteHasData = hasAnyStateData(remoteState);
     const localHasData = hasAnyStateData(state);
+    const activeTabId = getActiveTabId();
+    const canApplyRemote = activeTabId === "output-tab" || activeTabId === "plan-tab";
     if (remoteHasData) {
-      applyStateSnapshot(remoteState);
       cloudLastPulledAt = value(response.updatedAt) || nowIso();
+      if (canApplyRemote) {
+        applyStateSnapshot(remoteState);
+      }
     } else if (localHasData) {
       await pushStateToCloud({ showToastOnSuccess: false, silentOnError: true });
     }
@@ -2054,14 +2085,14 @@ async function handleCloudConnect() {
         await pushStateToCloud({ showToastOnSuccess: false });
         showToast("共有保存を有効化し、端末データをクラウドへ保存しました");
       } else {
-        applyStateSnapshot(remoteState);
+        const applied = applyStateSnapshot(remoteState);
         cloudLastPulledAt = remoteUpdatedAt || nowIso();
-        showToast("共有保存を有効化し、クラウドデータを読み込みました");
+        showToast(applied ? "共有保存を有効化し、クラウドデータを読み込みました" : "共有保存を有効化しました");
       }
     } else if (remoteHasData) {
-      applyStateSnapshot(remoteState);
+      const applied = applyStateSnapshot(remoteState);
       cloudLastPulledAt = remoteUpdatedAt || nowIso();
-      showToast("共有保存を有効化し、クラウドデータを読み込みました");
+      showToast(applied ? "共有保存を有効化し、クラウドデータを読み込みました" : "共有保存を有効化しました");
     } else {
       await pushStateToCloud({ showToastOnSuccess: false });
       showToast("共有保存を有効化しました");
@@ -2112,7 +2143,7 @@ function disableCloudSync({ showToastMessage } = { showToastMessage: false }) {
 
 function startCloudPullTimer() {
   stopCloudPullTimer();
-  if (!cloudEndpoint) {
+  if (!cloudEndpoint || !CLOUD_AUTO_PULL_ENABLED) {
     return;
   }
   cloudPullTimer = window.setInterval(() => {
@@ -2148,6 +2179,10 @@ async function pullStateFromCloud({ force = false, showToastOnSuccess = false, s
   if (!cloudEndpoint || cloudPullInProgress) {
     return false;
   }
+  const tabAtRequest = getActiveTabId();
+  if (!force && tabAtRequest !== "output-tab" && tabAtRequest !== "plan-tab") {
+    return false;
+  }
   cloudPullInProgress = true;
   try {
     const response = await requestCloud("load");
@@ -2167,8 +2202,15 @@ async function pullStateFromCloud({ force = false, showToastOnSuccess = false, s
       updateCloudStatus();
       return false;
     }
+    const tabBeforeApply = getActiveTabId();
+    if (!force && (tabBeforeApply === "input-tab" || tabBeforeApply === "edit-tab")) {
+      return false;
+    }
 
-    applyStateSnapshot(remoteState);
+    const applied = applyStateSnapshot(remoteState, { force });
+    if (!applied) {
+      return false;
+    }
     cloudLastPulledAt = remoteUpdatedAt || nowIso();
     updateCloudStatus();
     if (showToastOnSuccess) {
@@ -2252,12 +2294,17 @@ async function requestCloud(action, payload = null) {
   return body;
 }
 
-function applyStateSnapshot(nextStateRaw) {
+function applyStateSnapshot(nextStateRaw, { force = false } = {}) {
+  const activeTabId = getActiveTabId();
+  if (!force && (activeTabId === "input-tab" || activeTabId === "edit-tab")) {
+    return false;
+  }
   state = normalizeState(nextStateRaw);
   hydrateSiteForm();
   resetRecordForm({ showMessage: false });
   renderRecordTable();
   renderOutputs();
+  return true;
 }
 
 function updateCloudStatus(statusNote = "") {
