@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>第24次野尻湖湖底発掘　化石・遺物 入力</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>第24次野尻湖湖底発掘　化石・遺物 入力</h1>
+      </div>
+      <div class="header-actions">
+        <button id="export-list-csv-btn" type="button">リストCSV</button>
+        <button id="export-card-csv-btn" type="button">カードCSV</button>
+        <button id="export-json-btn" type="button">JSON書き出し</button>
+        <label class="import-label" for="import-json-input">JSON読み込み</label>
+        <input id="import-json-input" type="file" accept="application/json" />
+        <div class="cloud-controls">
+          <input id="cloud-endpoint-input" type="url" placeholder="Google Apps Script WebアプリURL" />
+          <button id="cloud-connect-btn" type="button">共有保存を設定</button>
+          <button id="cloud-sync-btn" type="button">クラウド再読込</button>
+          <button id="cloud-disable-btn" class="danger" type="button">共有保存OFF</button>
+          <span id="cloud-status" class="cloud-status">保存先: 端末内のみ</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="入力セクション">
+      <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
+      <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
+      <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
+    </nav>
+
+    <main>
+      <section id="input-tab" class="tab-panel">
+        <form id="site-form" class="panel">
+          <h2>区画（グリッド）情報</h2>
+          <div class="grid cols-3">
+            <label class="span-2">区画　例：（24-Ⅰ-C-4）
+              <div class="kuwaku-input">
+                <span class="fixed-chip">24</span>
+                <span class="sep">-</span>
+                <span class="fixed-chip">Ⅰ</span>
+                <span class="sep">-</span>
+                <input name="kuwakuBlock" type="text" maxlength="3" />
+                <span class="sep">-</span>
+                <input name="kuwakuNo" type="text" inputmode="numeric" />
+              </div>
+            </label>
+            <label>レベル高
+              <div class="inline-cm-row">
+                <input name="levelHeight" type="text" />
+                <span>m</span>
+              </div>
+            </label>
+            <label>日付
+              <input name="date" type="date" />
+            </label>
+            <label>発掘班
+              <div class="team-select-row">
+                <select name="team">
+                  <option value="">未設定</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="その他">その他</option>
+                </select>
+                <input id="team-other-input" name="teamOther" type="text" class="hidden" placeholder="その他の班名を入力" />
+              </div>
+            </label>
+            <label class="span-3 large-input">班長
+              <input name="teamLead" type="text" />
+            </label>
+            <label class="span-3 large-input">記載係
+              <input name="recorder" type="text" />
+            </label>
+          </div>
+          <div class="panel-actions">
+            <button type="submit">区画（グリッド）情報を保存</button>
+          </div>
+        </form>
+
+        <div id="record-form-host">
+          <form id="record-form" class="panel">
+            <h2>詳細情報入力</h2>
+            <input id="record-id-input" type="hidden" />
+
+          <div class="grid cols-3">
+            <fieldset class="inline-fieldset span-3">
+              <legend>標本番号 <span class="required">*</span></legend>
+              <div id="specimen-tabs" class="specimen-tabs" role="tablist" aria-label="標本番号の区分">
+                <button class="specimen-tab active" data-prefix="m" type="button">m:哺乳類</button>
+                <button class="specimen-tab" data-prefix="b" type="button">b:植物</button>
+                <button class="specimen-tab" data-prefix="l" type="button">l:生痕</button>
+                <button class="specimen-tab" data-prefix="s" type="button">s:貝類</button>
+                <button class="specimen-tab" data-prefix="i" type="button">i:昆虫</button>
+                <button class="specimen-tab" data-prefix="g" type="button">g:人類考古</button>
+                <button class="specimen-tab" data-prefix="h" type="button">h:その他</button>
+              </div>
+              <div class="specimen-number-row">
+                <span id="specimen-prefix-label" class="specimen-prefix-chip">m</span>
+                <input
+                  id="specimen-serial-input"
+                  name="specimenSerial"
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]+"
+                  placeholder="番号（例: 1）"
+                  required
+                />
+              </div>
+              <input id="specimen-prefix-input" name="specimenPrefix" type="hidden" value="m" />
+              <input id="specimen-no-input" name="specimenNo" type="hidden" />
+            </fieldset>
+
+            <label>化石・遺物名称
+              <input name="nameMemo" type="text" />
+            </label>
+            <label>重要品指定
+              <select name="importantFlag">
+                <option value="">未設定</option>
+                <option value="有">有</option>
+                <option value="無">無</option>
+              </select>
+            </label>
+            <label>簡易記載（専門班の指示による）
+              <select name="simpleRecordFlag">
+                <option value="-">-</option>
+                <option value="○">○</option>
+              </select>
+            </label>
+            <div class="two-inline-labels span-2">
+              <label>発見者氏名
+                <input name="discoverer" type="text" />
+              </label>
+              <label>判定者氏名
+                <input name="identifier" type="text" />
+              </label>
+            </div>
+            <fieldset class="inline-fieldset span-2">
+              <legend>レベル読値</legend>
+              <div class="level-read-grid">
+                <label class="level-read-item">（上面）
+                  <div class="inline-cm-row">
+                    <input name="levelUpperCm" type="text" />
+                    <span>cm</span>
+                  </div>
+                </label>
+                <label class="level-read-item">（下底）
+                  <div class="inline-cm-row">
+                    <input name="levelLowerCm" type="text" />
+                    <span>cm</span>
+                  </div>
+                </label>
+              </div>
+            </fieldset>
+            <label>産出状況断面
+              <select name="occurrenceSection">
+                <option value="要">要</option>
+                <option value="否">否</option>
+              </select>
+            </label>
+            <label>産状スケッチ
+              <select name="occurrenceSketch">
+                <option value="要">要</option>
+                <option value="否">否</option>
+              </select>
+            </label>
+
+            <fieldset class="inline-fieldset">
+              <legend>平面位置 [北から・南から]</legend>
+              <div class="dir-tabs" role="tablist" aria-label="北南方向">
+                <button class="dir-tab active" data-group="ns" data-value="北から" type="button">北から</button>
+                <button class="dir-tab" data-group="ns" data-value="南から" type="button">南から</button>
+              </div>
+              <input id="ns-dir-input" name="nsDir" type="hidden" value="北から" />
+              <div class="inline-cm-row">
+                <input name="nsCm" type="text" />
+                <span>cm</span>
+              </div>
+            </fieldset>
+
+            <fieldset class="inline-fieldset">
+              <legend>平面位置 [東から・西から]</legend>
+              <div class="dir-tabs" role="tablist" aria-label="東西方向">
+                <button class="dir-tab active" data-group="ew" data-value="東から" type="button">東から</button>
+                <button class="dir-tab" data-group="ew" data-value="西から" type="button">西から</button>
+              </div>
+              <input id="ew-dir-input" name="ewDir" type="hidden" value="東から" />
+              <div class="inline-cm-row">
+                <input name="ewCm" type="text" />
+                <span>cm</span>
+              </div>
+            </fieldset>
+
+            <fieldset class="inline-fieldset span-3">
+              <legend>地層名</legend>
+              <div id="layer-tabs" class="layer-tabs" role="tablist" aria-label="地層名">
+                <button class="layer-tab active" data-layer="1.芙蓉湖砂シルト部層" type="button">1.芙蓉湖砂シルト部層</button>
+                <button class="layer-tab" data-layer="2.立が花砂部層" type="button">2.立が花砂部層</button>
+                <button class="layer-tab" data-layer="3.海端砂シルト部層" type="button">3.海端砂シルト部層</button>
+                <button class="layer-tab" data-layer="4.その他" type="button">4.その他</button>
+              </div>
+              <input id="layer-name-input" name="layerName" type="hidden" value="1.芙蓉湖砂シルト部層" />
+              <input id="layer-other-input" type="text" class="hidden" placeholder="4.その他 の内容を入力" />
+            </fieldset>
+            <label>ユニット
+              <input name="unit" type="text" />
+            </label>
+            <label>細別
+              <input name="detail" type="text" />
+            </label>
+            <fieldset class="inline-fieldset span-2">
+              <legend>地層中の位置</legend>
+              <div class="layer-position-row">
+                <input name="layerRef" type="text" placeholder="層理面もしくは鍵層名" />
+                <span>から</span>
+                <input name="layerFromCm" type="text" />
+                <span>cm</span>
+              </div>
+            </fieldset>
+          </div>
+
+          <label>備考（観察事項など）
+            <textarea name="notes" rows="4"></textarea>
+          </label>
+
+          <section class="diagram-upload-wrap">
+            <h3>産出状況断面図添付</h3>
+            <p class="hint-text">産出状況断面図を追加します。</p>
+            <input id="section-diagram-input" type="file" accept="image/*" capture="environment" multiple />
+            <div id="section-diagram-list" class="photo-list"></div>
+          </section>
+
+          <section class="photo-upload-wrap">
+            <h3>写真添付</h3>
+            <p class="hint-text">この記録に紐づける写真を追加します。</p>
+            <p class="hint-text">撮影時は、クリノメーター（方位の分かるもの）と定規を一緒に写してください。</p>
+            <input id="photo-input" type="file" accept="image/*" capture="environment" multiple />
+            <div id="photo-list" class="photo-list"></div>
+          </section>
+
+            <div class="panel-actions">
+              <button id="record-submit-btn" type="submit">記録を保存</button>
+              <button id="record-reset-btn" type="button">入力クリア</button>
+            </div>
+          </form>
+        </div>
+
+        <section class="panel">
+          <h2>入力済みデータ</h2>
+          <div class="table-wrap">
+            <table id="record-table">
+              <thead>
+                <tr>
+                  <th>区画</th>
+                  <th>発掘班</th>
+                  <th>標本番号</th>
+                  <th>分類</th>
+                  <th>名称</th>
+                  <th>発見者</th>
+                  <th>レベル読値(上面/下底)</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="record-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="output-tab" class="tab-panel active">
+        <section class="panel">
+          <h2>リスト形式プレビュー</h2>
+          <label class="output-grid-row">
+            区画（グリッド）
+            <select id="output-kuwaku-select"></select>
+          </label>
+          <div class="table-wrap">
+            <table id="output-list-table">
+              <thead>
+                <tr>
+                  <th>区画</th>
+                  <th>発掘班</th>
+                  <th>標本番号</th>
+                  <th>分類</th>
+                  <th>名称</th>
+                  <th>発見者</th>
+                  <th>判定者</th>
+                  <th>レベル読値(上面/下底)</th>
+                  <th>産出状況断面</th>
+                  <th>産状スケッチ</th>
+                  <th>平面位置</th>
+                  <th>備考（観察事項など）</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="output-list-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>カード形式プレビュー</h2>
+          <div id="card-output-list" class="card-output-list"></div>
+        </section>
+      </section>
+
+      <section id="plan-tab" class="tab-panel">
+        <section class="panel">
+          <div class="plan-title-row">
+            <h2>ユニット別 平面位置（4m × 4m）</h2>
+            <p id="plan-kuwaku-info" class="plan-kuwaku-info"></p>
+          </div>
+          <div class="plan-filter-row">
+            <label class="plan-grid-row">
+              区画（グリッド）
+              <select id="plan-kuwaku-select"></select>
+            </label>
+            <label class="plan-unit-row">
+              ユニット
+              <select id="plan-unit-select"></select>
+            </label>
+          </div>
+          <div id="plan-map-legend" class="plan-map-legend"></div>
+          <div id="plan-map-wrap"></div>
+        </section>
+      </section>
+
+      <section id="edit-tab" class="tab-panel">
+        <section class="panel">
+          <h2>編集画面</h2>
+          <p class="hint-text">リストから選んだ記録を上書き保存します（区画情報の単独保存はしません）。</p>
+          <div class="grid cols-3">
+            <label class="span-2">区画　例：（24-Ⅰ-C-4）
+              <div class="kuwaku-input">
+                <span class="fixed-chip">24</span>
+                <span class="sep">-</span>
+                <span class="fixed-chip">Ⅰ</span>
+                <span class="sep">-</span>
+                <input id="edit-kuwaku-block" type="text" maxlength="3" placeholder="C" />
+                <span class="sep">-</span>
+                <input id="edit-kuwaku-no" type="text" inputmode="numeric" placeholder="4" />
+              </div>
+            </label>
+            <label>レベル高
+              <div class="inline-cm-row">
+                <input id="edit-level-height" type="text" />
+                <span>m</span>
+              </div>
+            </label>
+            <label>日付
+              <input id="edit-date" type="date" />
+            </label>
+            <label>発掘班
+              <div class="team-select-row">
+                <select id="edit-team">
+                  <option value="">未設定</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="その他">その他</option>
+                </select>
+                <input id="edit-team-other" type="text" class="hidden" placeholder="その他の班名を入力" />
+              </div>
+            </label>
+            <label class="span-3 large-input">班長
+              <input id="edit-team-lead" type="text" />
+            </label>
+            <label class="span-3 large-input">記載係
+              <input id="edit-recorder" type="text" />
+            </label>
+          </div>
+        </section>
+        <div id="edit-record-form-host"></div>
+      </section>
+    </main>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
