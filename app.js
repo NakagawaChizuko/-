@@ -686,6 +686,13 @@ function bindEvents() {
       ...recordBase,
       history: buildNextRecordHistory(previousRecord, recordBase, historyAction),
     };
+    const missingRequiredKeys = getMissingRequiredKeys(record);
+    if (missingRequiredKeys.size > 0) {
+      const keepSavingIncomplete = window.confirm("未記入がありますが保存しますか？");
+      if (!keepSavingIncomplete) {
+        return;
+      }
+    }
 
     if (targetIndex >= 0) {
       state.records[targetIndex] = record;
