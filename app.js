@@ -30,13 +30,47 @@ const ANALYSIS_TYPE_MAP = {
   H: "その他",
   MG: "はぎとり資料",
 };
+const REQUIRED_FIELD_LABELS = {
+  kuwakuHeadA: "区画（グリッド）1番目",
+  kuwakuHeadB: "区画（グリッド）2番目",
+  kuwakuBlock: "区画（グリッド）英字",
+  kuwakuNo: "区画（グリッド）番号",
+  levelHeight: "レベル高",
+  date: "日付",
+  team: "発掘班",
+  teamOther: "発掘班（その他）",
+  teamLead: "班長",
+  recorder: "記載係",
+  specimenSerial: "標本番号",
+  analysisType: "分析用試料の区分",
+  nameMemo: "化石・遺物名称",
+  importantFlag: "重要品指定",
+  simpleRecordFlag: "簡易記載",
+  discoverer: "発見者氏名",
+  identifier: "判定者氏名",
+  levelUpperCm: "レベル読値（上面）",
+  levelLowerCm: "レベル読値（下底）",
+  occurrenceSection: "産出状況断面",
+  occurrenceSketch: "産状スケッチ",
+  sectionDiagrams: "産出状況断面図添付",
+  nsDir: "平面位置（北から/南から）",
+  nsCm: "平面位置（北から/南からの距離）",
+  ewDir: "平面位置（東から/西から）",
+  ewCm: "平面位置（東から/西からの距離）",
+  layerName: "地層名",
+  layerOther: "地層名（その他）",
+  unit: "ユニット",
+  layerRef: "地層中の位置（層理面や鍵層名）",
+  layerRelative: "地層中の位置（上/下）",
+  layerFromCm: "地層中の位置（cm）",
+};
 const HISTORY_SNAPSHOT_FIELDS = [
   { key: "specimenNo", label: "標本番号" },
   { key: "nameMemo", label: "名称" },
   { key: "category", label: "分類" },
   { key: "layerName", label: "地層名" },
   { key: "unit", label: "ユニット" },
-  { key: "detail", label: "細別" },
+  { key: "detail", label: "サブユニット" },
   { key: "layerPosition", label: "地層中の位置" },
 ];
 const HISTORY_SNAPSHOT_FIELD_KEYS = new Set(HISTORY_SNAPSHOT_FIELDS.map((field) => field.key));
@@ -144,6 +178,7 @@ const siteForm = document.getElementById("site-form");
 const recordForm = document.getElementById("record-form");
 const recordFormHost = document.getElementById("record-form-host");
 const editRecordFormHost = document.getElementById("edit-record-form-host");
+const editTabPanel = document.getElementById("edit-tab");
 const editHistoryPanel = document.getElementById("edit-history-panel");
 const editHistoryList = document.getElementById("edit-history-list");
 const editKuwakuHeadAInput = document.getElementById("edit-kuwaku-head-a");
@@ -259,6 +294,24 @@ function bindEvents() {
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
+  if (editTabPanel) {
+    editTabPanel.addEventListener("input", () => {
+      updateEditMissingRequiredHighlights();
+    });
+    editTabPanel.addEventListener("change", () => {
+      updateEditMissingRequiredHighlights();
+    });
+    editTabPanel.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (!target.closest(".dir-tab, .layer-tab, .specimen-tab, [data-remove-diagram-id], [data-remove-photo-id]")) {
+        return;
+      }
+      updateEditMissingRequiredHighlights();
+    });
+  }
 
   siteForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -395,11 +448,6 @@ function bindEvents() {
 
     const formData = new FormData(recordForm);
     if (!isEditTab) {
-      const validationMessage = validateInputRequiredFields(siteSnapshot, formData);
-      if (validationMessage) {
-        showToast(validationMessage);
-        return;
-      }
       state.site = {
         kuwaku: siteSnapshot.kuwaku,
         kuwakuHeadA: siteSnapshot.kuwakuHeadA,
@@ -532,6 +580,7 @@ function bindEvents() {
       markOverwriteUpdatedState(found, record, value(found?.kuwaku), recordKuwaku);
       overwriteOriginalRecord = { ...record };
       renderEditHistory(record);
+      updateEditMissingRequiredHighlights();
       return;
     }
 
@@ -881,6 +930,7 @@ async function addSectionDiagramsFromFiles(fileList) {
     return;
   }
   renderSectionDiagramList();
+  updateEditMissingRequiredHighlights();
   persist();
 }
 
@@ -924,6 +974,11 @@ function setActiveTab(tabId) {
   syncRecordFormPlacement(tabId);
   syncEditHistoryVisibility(tabId);
   updateDuplicateSpecimenWarning();
+  if (tabId === "edit-tab") {
+    updateEditMissingRequiredHighlights();
+  } else {
+    clearEditMissingRequiredHighlights();
+  }
   if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
   }
@@ -1431,6 +1486,7 @@ function handleRecordFormFieldEdit(event) {
       target.name === "layerRelative");
   if (isCarryField) {
     target.classList.remove("saved-carry-value");
+    updateEditMissingRequiredHighlights();
     return;
   }
 
@@ -1438,6 +1494,7 @@ function handleRecordFormFieldEdit(event) {
     layerOtherInput.classList.remove("saved-carry-value");
     clearLayerSavedTabState();
   }
+  updateEditMissingRequiredHighlights();
 }
 
 function resetRecordForm({ showMessage }) {
@@ -1473,6 +1530,7 @@ function resetRecordForm({ showMessage }) {
   renderSectionDiagramList();
   renderPhotoList();
   clearEditHistory();
+  clearEditMissingRequiredHighlights();
 
   if (showMessage) {
     showToast("入力をクリアしました");
@@ -1523,6 +1581,7 @@ function populateRecordForm(record) {
   renderSectionDiagramList();
   currentPhotos = clonePhotos(record.photos || []);
   renderPhotoList();
+  updateEditMissingRequiredHighlights();
 }
 
 function openRecordForEdit(recordId, preferredKuwaku = "") {
@@ -1574,6 +1633,204 @@ function openRecordForEdit(recordId, preferredKuwaku = "") {
   populateRecordForm(record);
   renderEditHistory(record);
   setActiveTab("edit-tab");
+  updateEditMissingRequiredHighlights();
+}
+
+function buildCurrentEditDraftRecord() {
+  if (!recordForm) {
+    return null;
+  }
+  const formData = new FormData(recordForm);
+  const teamState = normalizeTeamState(value(editTeamInput?.value), value(editTeamOtherInput?.value));
+  const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
+  const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
+  return {
+    kuwaku: buildKuwaku(
+      normalizeKuwakuHeadA(editKuwakuHeadAInput?.value),
+      normalizeKuwakuHeadB(editKuwakuHeadBInput?.value),
+      normalizeKuwakuBlock(editKuwakuBlockInput?.value),
+      normalizeKuwakuNo(editKuwakuNoInput?.value)
+    ),
+    levelHeight: value(editLevelHeightInput?.value),
+    date: value(editDateInput?.value),
+    team: teamState.team,
+    teamOther: teamState.teamOther,
+    teamLead: value(editTeamLeadInput?.value),
+    recorder: value(editRecorderInput?.value),
+    specimenPrefix,
+    specimenSerial,
+    specimenNo: buildSpecimenNo(specimenPrefix, specimenSerial),
+    analysisType: specimenPrefix === "a" ? normalizeAnalysisType(value(formData.get("analysisType"))) : "",
+    nameMemo: value(formData.get("nameMemo")),
+    importantFlag: value(formData.get("importantFlag")),
+    simpleRecordFlag: value(formData.get("simpleRecordFlag")),
+    discoverer: value(formData.get("discoverer")),
+    identifier: value(formData.get("identifier")),
+    levelUpperCm: value(formData.get("levelUpperCm")),
+    levelLowerCm: value(formData.get("levelLowerCm")),
+    occurrenceSection: value(formData.get("occurrenceSection")),
+    occurrenceSketch: value(formData.get("occurrenceSketch")),
+    nsDir: value(formData.get("nsDir")),
+    nsCm: value(formData.get("nsCm")),
+    ewDir: value(formData.get("ewDir")),
+    ewCm: value(formData.get("ewCm")),
+    layerName: getSelectedLayerName(),
+    unit: compactNoSpaceValue(formData.get("unit")),
+    detail: compactNoSpaceValue(formData.get("detail")),
+    detailSub: value(formData.get("detailSub")),
+    layerRef: value(formData.get("layerRef")),
+    layerRelative: value(formData.get("layerRelative")),
+    layerFromCm: value(formData.get("layerFromCm")),
+    notes: value(formData.get("notes")),
+    sectionDiagrams: clonePhotos(currentSectionDiagrams),
+    photos: clonePhotos(currentPhotos),
+  };
+}
+
+function getRecordFormFieldByName(name) {
+  if (!recordForm?.elements) {
+    return null;
+  }
+  const field = recordForm.elements.namedItem(name);
+  if (field instanceof Element) {
+    return field;
+  }
+  if (field instanceof RadioNodeList && field.length > 0 && field[0] instanceof Element) {
+    return field[0];
+  }
+  return null;
+}
+
+function markEditMissingFieldByName(name) {
+  const field = getRecordFormFieldByName(name);
+  if (field) {
+    field.classList.add("edit-missing-field");
+  }
+}
+
+function markEditMissingGroupByName(name) {
+  const field = getRecordFormFieldByName(name);
+  const group = field?.closest(".inline-fieldset");
+  if (group) {
+    group.classList.add("edit-missing-group");
+  }
+}
+
+function clearEditMissingRequiredHighlights() {
+  document.querySelectorAll(".edit-missing-field").forEach((element) => {
+    element.classList.remove("edit-missing-field");
+  });
+  document.querySelectorAll(".edit-missing-group").forEach((element) => {
+    element.classList.remove("edit-missing-group");
+  });
+}
+
+function updateEditMissingRequiredHighlights() {
+  clearEditMissingRequiredHighlights();
+  if (getActiveTabId() !== "edit-tab") {
+    return;
+  }
+  const draftRecord = buildCurrentEditDraftRecord();
+  const missingKeys = getMissingRequiredKeys(draftRecord);
+  if (!missingKeys.size) {
+    return;
+  }
+
+  if (hasAnyMissingRequiredKey(missingKeys, ["kuwakuHeadA", "kuwakuHeadB", "kuwakuBlock", "kuwakuNo"])) {
+    [editKuwakuHeadAInput, editKuwakuHeadBInput, editKuwakuBlockInput, editKuwakuNoInput].forEach((input) => {
+      if (input) {
+        input.classList.add("edit-missing-field");
+      }
+    });
+  }
+  if (missingKeys.has("levelHeight") && editLevelHeightInput) {
+    editLevelHeightInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("date") && editDateInput) {
+    editDateInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("team") && editTeamInput) {
+    editTeamInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("teamOther") && editTeamOtherInput) {
+    editTeamOtherInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("teamLead") && editTeamLeadInput) {
+    editTeamLeadInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("recorder") && editRecorderInput) {
+    editRecorderInput.classList.add("edit-missing-field");
+  }
+
+  if (missingKeys.has("specimenSerial")) {
+    specimenSerialInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("analysisType") && analysisTypeSelect) {
+    analysisTypeSelect.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("nameMemo")) {
+    markEditMissingFieldByName("nameMemo");
+  }
+  if (missingKeys.has("importantFlag")) {
+    markEditMissingGroupByName("importantFlag");
+  }
+  if (missingKeys.has("simpleRecordFlag")) {
+    markEditMissingGroupByName("simpleRecordFlag");
+  }
+  if (missingKeys.has("discoverer")) {
+    markEditMissingFieldByName("discoverer");
+  }
+  if (missingKeys.has("identifier")) {
+    markEditMissingFieldByName("identifier");
+  }
+  if (missingKeys.has("levelUpperCm")) {
+    markEditMissingFieldByName("levelUpperCm");
+  }
+  if (missingKeys.has("levelLowerCm")) {
+    markEditMissingFieldByName("levelLowerCm");
+  }
+  if (missingKeys.has("occurrenceSection")) {
+    markEditMissingGroupByName("occurrenceSection");
+  }
+  if (missingKeys.has("occurrenceSketch")) {
+    markEditMissingGroupByName("occurrenceSketch");
+  }
+  if (missingKeys.has("nsDir")) {
+    markEditMissingGroupByName("nsDir");
+  }
+  if (missingKeys.has("nsCm")) {
+    markEditMissingFieldByName("nsCm");
+  }
+  if (missingKeys.has("ewDir")) {
+    markEditMissingGroupByName("ewDir");
+  }
+  if (missingKeys.has("ewCm")) {
+    markEditMissingFieldByName("ewCm");
+  }
+  if (missingKeys.has("layerName")) {
+    markEditMissingGroupByName("layerName");
+  }
+  if (missingKeys.has("layerOther")) {
+    layerOtherInput.classList.add("edit-missing-field");
+  }
+  if (missingKeys.has("unit")) {
+    markEditMissingFieldByName("unit");
+  }
+  if (missingKeys.has("layerRef")) {
+    markEditMissingFieldByName("layerRef");
+  }
+  if (missingKeys.has("layerRelative")) {
+    markEditMissingGroupByName("layerRelative");
+  }
+  if (missingKeys.has("layerFromCm")) {
+    markEditMissingFieldByName("layerFromCm");
+  }
+  if (missingKeys.has("sectionDiagrams")) {
+    const sectionWrap = recordForm?.querySelector(".diagram-upload-wrap");
+    if (sectionWrap) {
+      sectionWrap.classList.add("edit-missing-group");
+    }
+  }
 }
 
 function syncEditHistoryVisibility(activeTabId = getActiveTabId()) {
@@ -1681,13 +1938,13 @@ function renderListOutput() {
   updateOutputListSortHeader();
   if (!state.records.length) {
     syncOutputKuwakuSelect([]);
-    outputListBody.innerHTML = "<tr><td colspan=\"16\">出力対象データがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"17\">出力対象データがありません。</td></tr>";
     return;
   }
 
   const filteredRecords = getFilteredOutputRecords();
   if (!filteredRecords.length) {
-    outputListBody.innerHTML = "<tr><td colspan=\"16\">選択した区画のデータがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"17\">選択した区画のデータがありません。</td></tr>";
     return;
   }
 
@@ -1701,28 +1958,49 @@ function renderListOutput() {
       const categoryBackground = toRgbaColor(categoryColor, 0.2);
       const categoryBorderColor = toRgbaColor(categoryColor, 0.45);
       const unitStyle = getUnitCellStyle(record.unit);
+      const missingRequiredKeys = getMissingRequiredKeys(record);
+      const dataComplete = missingRequiredKeys.size === 0;
+      const missingTitle = formatMissingRequiredTooltip(missingRequiredKeys);
+      const kuwakuMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["kuwakuHeadA", "kuwakuHeadB", "kuwakuBlock", "kuwakuNo"]);
+      const teamMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["team", "teamOther"]);
+      const specimenMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["specimenSerial"]);
+      const categoryMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["analysisType"]);
+      const nameMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["nameMemo"]);
+      const importantMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["importantFlag"]);
+      const unitMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["unit"]);
+      const discovererMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["discoverer"]);
+      const identifierMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["identifier"]);
+      const levelReadMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["levelUpperCm", "levelLowerCm"]);
+      const sectionMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["occurrenceSection", "sectionDiagrams"]);
+      const sketchMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["occurrenceSketch"]);
+      const positionMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["nsDir", "nsCm", "ewDir", "ewCm"]);
       return `
       <tr class="${selectedClass}">
-        <td class="kuwaku-color-cell" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};">${escapeHtml(
+        <td class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
           kuwakuText
         )}</td>
-        <td>${escapeHtml(getRecordTeamValue(record))}</td>
-        <td>${escapeHtml(record.specimenNo)}</td>
-        <td class="category-color-cell" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};">${escapeHtml(
+        <td class="${listCellClass("", teamMissing)}" ${missingTitle}>${escapeHtml(getRecordTeamValue(record))}</td>
+        <td class="${listCellClass(dataComplete ? "data-status-complete" : "data-status-incomplete", !dataComplete)}" ${missingTitle}>${
+          dataComplete ? "○" : "未記入"
+        }</td>
+        <td class="${listCellClass("", specimenMissing)}" ${missingTitle}>${escapeHtml(record.specimenNo)}</td>
+        <td class="${listCellClass("category-color-cell", categoryMissing)}" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};" ${missingTitle}>${escapeHtml(
           formatCategoryForRecord(record)
         )}</td>
-        <td>${escapeHtml(record.nameMemo || "")}</td>
-        <td class="${record.importantFlag === "有" ? "important-cell-important" : ""}">${escapeHtml(record.importantFlag || "")}</td>
-        <td class="unit-color-cell" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};">${escapeHtml(
+        <td class="${listCellClass("", nameMissing)}" ${missingTitle}>${escapeHtml(record.nameMemo || "")}</td>
+        <td class="${listCellClass(record.importantFlag === "有" ? "important-cell-important" : "", importantMissing)}" ${missingTitle}>${escapeHtml(
+          record.importantFlag || ""
+        )}</td>
+        <td class="${listCellClass("unit-color-cell", unitMissing)}" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};" ${missingTitle}>${escapeHtml(
           record.unit || ""
         )}</td>
         <td>${escapeHtml(formatDetailForRecord(record))}</td>
-        <td>${escapeHtml(record.discoverer || "")}</td>
-        <td>${escapeHtml(record.identifier || "")}</td>
-        <td>${escapeHtml(formatLevelRead(record))}</td>
-        <td>${escapeHtml(record.occurrenceSection || "")}</td>
-        <td>${escapeHtml(record.occurrenceSketch || "")}</td>
-        <td>${escapeHtml(formatPlanPosition(record))}</td>
+        <td class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
+        <td class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
+        <td class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
+        <td class="${listCellClass("", sectionMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSection || "")}</td>
+        <td class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
+        <td class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
         <td>${escapeHtml(record.notes || "")}</td>
         <td>
           <div class="row-actions">
@@ -1737,6 +2015,32 @@ function renderListOutput() {
       `;
     })
     .join("");
+}
+
+function listCellClass(baseClass, isMissing) {
+  const classes = [];
+  if (value(baseClass)) {
+    classes.push(value(baseClass));
+  }
+  if (isMissing) {
+    classes.push("missing-required-cell");
+  }
+  return classes.join(" ");
+}
+
+function hasAnyMissingRequiredKey(missingKeys, keys) {
+  if (!(missingKeys instanceof Set)) {
+    return false;
+  }
+  return keys.some((key) => missingKeys.has(key));
+}
+
+function formatMissingRequiredTooltip(missingKeys) {
+  if (!(missingKeys instanceof Set) || missingKeys.size === 0) {
+    return "";
+  }
+  const labels = Array.from(missingKeys).map((key) => REQUIRED_FIELD_LABELS[key] || key);
+  return `title="${escapeHtml(`未記入: ${labels.join(" / ")}`)}"`;
 }
 
 function updateOutputListSortHeader() {
@@ -1771,6 +2075,9 @@ function compareOutputRecordsForList(a, b) {
       break;
     case "specimenNo":
       compared = compareRecordsBySpecimenNo(a, b);
+      break;
+    case "dataStatus":
+      compared = compareSortText(dataStatusSortText(a), dataStatusSortText(b));
       break;
     case "category":
       compared = compareSortText(formatCategoryForRecord(a), formatCategoryForRecord(b));
@@ -1819,6 +2126,10 @@ function compareOutputRecordsForList(a, b) {
 
 function compareSortText(a, b) {
   return value(a).localeCompare(value(b), "ja", { numeric: true, sensitivity: "base" });
+}
+
+function dataStatusSortText(record) {
+  return isRecordDataComplete(record) ? "0-○" : "1-未記入";
 }
 
 function formatPlanPosition(record) {
@@ -1882,7 +2193,7 @@ function renderCardOutput() {
         <div><span>簡易記載</span><strong>${escapeHtml(selectedRecord.simpleRecordFlag || "-")}</strong></div>
         <div><span>地層名</span><strong>${escapeHtml(selectedRecord.layerName || "")}</strong></div>
         <div><span>ユニット</span><strong>${escapeHtml(selectedRecord.unit || "")}</strong></div>
-        <div><span>細別</span><strong>${escapeHtml(formatDetailForRecord(selectedRecord))}</strong></div>
+        <div><span>サブユニット</span><strong>${escapeHtml(formatDetailForRecord(selectedRecord))}</strong></div>
         <div><span>地層中の位置</span><strong>${escapeHtml(formatLayerPosition(selectedRecord))}</strong></div>
         <div><span>発見者</span><strong>${escapeHtml(selectedRecord.discoverer || "")}</strong></div>
         <div><span>判定者</span><strong>${escapeHtml(selectedRecord.identifier || "")}</strong></div>
@@ -2038,7 +2349,7 @@ function renderPlanOutput() {
 
   if (!points.length) {
     planMapWrap.innerHTML =
-      "<p class=\"muted\">このユニット/細別/細別（上下など）は、平面位置の数値が未入力のため点を表示できません。</p>";
+      "<p class=\"muted\">このユニット/サブユニット/細分は、平面位置の数値が未入力のため点を表示できません。</p>";
     return;
   }
 
@@ -2052,7 +2363,7 @@ function renderPlanOutput() {
         `標本番号 ${point.label || "未設定"}`,
         `化石・遺物名称 ${point.nameMemo || "未設定"}`,
         `ユニット ${point.unit || "未設定"}`,
-        `細別 ${point.detail || "未設定"}`,
+        `サブユニット ${point.detail || "未設定"}`,
       ].join(" / ");
       return `
       <g
@@ -2158,7 +2469,7 @@ function collectPlanDetails(records) {
       value: detailValue,
       label: detailLabelForSelect(detailValue),
     }));
-  return [{ value: ALL_DETAILS_VALUE, label: "全細別" }, ...detailOptions];
+  return [{ value: ALL_DETAILS_VALUE, label: "全サブユニット" }, ...detailOptions];
 }
 
 function collectPlanDetailSubs(records) {
@@ -2171,7 +2482,7 @@ function collectPlanDetailSubs(records) {
       value: detailSubValue,
       label: detailSubLabelForSelect(detailSubValue),
     }));
-  return [{ value: ALL_DETAIL_SUBS_VALUE, label: "全細別（上下など）" }, ...detailSubOptions];
+  return [{ value: ALL_DETAIL_SUBS_VALUE, label: "全細分" }, ...detailSubOptions];
 }
 
 function buildDetailText(detailRaw, detailSubRaw = "") {
@@ -2463,7 +2774,7 @@ function attachPlanMapTooltips() {
       <div><strong>標本番号:</strong> ${escapeHtml(specimenNo)}</div>
       <div><strong>化石・遺物名称:</strong> ${escapeHtml(nameMemo)}</div>
       <div><strong>ユニット:</strong> ${escapeHtml(unit)}</div>
-      <div><strong>細別:</strong> ${escapeHtml(detail)}</div>
+      <div><strong>サブユニット:</strong> ${escapeHtml(detail)}</div>
     `;
     tooltip.hidden = false;
     positionTooltip(pointEl, mouseEvent, shell, svg, tooltip);
@@ -3496,8 +3807,8 @@ function buildCardCsv() {
     "重要品指定",
     "簡易記載",
     "地層名",
-    "細別",
-    "細別（上下など）",
+    "サブユニット",
+    "細分",
     "層理面もしくは鍵層名",
     "地層中の位置_から(cm)",
     "地層中の位置_上もしくは下",
@@ -3922,8 +4233,8 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     ["平面位置（東から/西からの距離）", recordFormData.get("ewCm")],
     ["地層名", selectedLayerName],
     ["ユニット", recordFormData.get("unit")],
-    ["細別", recordFormData.get("detail")],
     ["層理面や鍵層名", recordFormData.get("layerRef")],
+    ["地層中の位置（上/下）", recordFormData.get("layerRelative")],
     ["地層中の位置（cm）", recordFormData.get("layerFromCm")],
   ];
   for (const [label, fieldValue] of recordRequiredFields) {
@@ -3938,8 +4249,134 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   if (specimenPrefix === "a" && !normalizeAnalysisType(value(recordFormData.get("analysisType")))) {
     return "a: 分析用試料を選んだ場合は、区分を選択してください";
   }
+  if (normalizeNeedFlag(value(recordFormData.get("occurrenceSection"))) === "要" && currentSectionDiagrams.length === 0) {
+    return "産出状況断面が「要」の場合は、産出状況断面図添付を追加してください";
+  }
 
   return "";
+}
+
+function isRecordDataComplete(record) {
+  return getMissingRequiredKeys(record).size === 0;
+}
+
+function getMissingRequiredKeys(record) {
+  const missing = new Set();
+  if (!record) {
+    return missing;
+  }
+
+  const kuwaku = parseKuwaku(value(record.kuwaku));
+  if (!value(kuwaku.headA)) {
+    missing.add("kuwakuHeadA");
+  }
+  if (!value(kuwaku.headB)) {
+    missing.add("kuwakuHeadB");
+  }
+  if (!value(kuwaku.block)) {
+    missing.add("kuwakuBlock");
+  }
+  if (!value(kuwaku.no)) {
+    missing.add("kuwakuNo");
+  }
+
+  if (!value(record.levelHeight)) {
+    missing.add("levelHeight");
+  }
+  if (!value(record.date)) {
+    missing.add("date");
+  }
+  if (!value(record.team)) {
+    missing.add("team");
+  }
+  if (!value(record.teamLead)) {
+    missing.add("teamLead");
+  }
+  if (!value(record.recorder)) {
+    missing.add("recorder");
+  }
+
+  const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+  if (!value(specimen.serial)) {
+    missing.add("specimenSerial");
+  }
+  if (!value(record.nameMemo)) {
+    missing.add("nameMemo");
+  }
+  if (!value(record.importantFlag)) {
+    missing.add("importantFlag");
+  }
+  if (!value(record.simpleRecordFlag)) {
+    missing.add("simpleRecordFlag");
+  }
+  if (!value(record.discoverer)) {
+    missing.add("discoverer");
+  }
+  if (!value(record.identifier)) {
+    missing.add("identifier");
+  }
+  if (!value(record.levelUpperCm)) {
+    missing.add("levelUpperCm");
+  }
+  if (!value(record.levelLowerCm)) {
+    missing.add("levelLowerCm");
+  }
+  if (!value(record.occurrenceSection)) {
+    missing.add("occurrenceSection");
+  }
+  if (!value(record.occurrenceSketch)) {
+    missing.add("occurrenceSketch");
+  }
+  if (!value(record.nsDir)) {
+    missing.add("nsDir");
+  }
+  if (!value(record.nsCm)) {
+    missing.add("nsCm");
+  }
+  if (!value(record.ewDir)) {
+    missing.add("ewDir");
+  }
+  if (!value(record.ewCm)) {
+    missing.add("ewCm");
+  }
+
+  const layerName = normalizeLayerName(value(record.layerName));
+  if (!value(layerName)) {
+    missing.add("layerName");
+  }
+  if (!value(record.unit)) {
+    missing.add("unit");
+  }
+  if (!value(record.layerRef)) {
+    missing.add("layerRef");
+  }
+  if (!value(record.layerRelative)) {
+    missing.add("layerRelative");
+  }
+  if (!value(record.layerFromCm)) {
+    missing.add("layerFromCm");
+  }
+
+  if (value(record.team) === OTHER_TEAM_NAME && !value(record.teamOther)) {
+    missing.add("teamOther");
+  }
+  if (layerName === OTHER_LAYER_NAME && !value(extractOtherLayerText(layerName))) {
+    missing.add("layerOther");
+  }
+
+  const specimenPrefix = normalizeSpecimenPrefix(value(record.specimenPrefix));
+  if (specimenPrefix === "a" && !normalizeAnalysisType(value(record.analysisType))) {
+    missing.add("analysisType");
+  }
+
+  if (normalizeNeedFlag(value(record.occurrenceSection)) === "要") {
+    const sectionDiagrams = Array.isArray(record.sectionDiagrams) ? record.sectionDiagrams : [];
+    if (!sectionDiagrams.length) {
+      missing.add("sectionDiagrams");
+    }
+  }
+
+  return missing;
 }
 
 function normalizeNeedFlag(valueRaw) {

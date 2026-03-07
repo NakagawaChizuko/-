@@ -39,9 +39,9 @@
     <main>
       <section id="input-tab" class="tab-panel">
         <form id="site-form" class="panel">
-          <h2>区画（グリッド）情報</h2>
+          <h2>区画（グリッド）情報（<span class="required-note">*は必須項目です</span>）</h2>
           <div class="grid cols-3">
-            <label class="span-2">区画（グリッド）名　　　　例：（24 - Ⅰ - C - 4 )
+            <label class="span-2"><span class="label-title">区画（グリッド）名<span class="required">*</span>　　　　例：（24 - Ⅰ - C - 4 )</span>
               <div class="kuwaku-input">
                 <input name="kuwakuHeadA" type="text" value="24" />
                 <span class="sep">-</span>
@@ -52,16 +52,16 @@
                 <input name="kuwakuNo" type="text" inputmode="numeric" />
               </div>
             </label>
-            <label>レベル高
+            <label><span class="label-title">レベル高<span class="required">*</span></span>
               <div class="inline-cm-row">
                 <input name="levelHeight" type="text" />
                 <span>m</span>
               </div>
             </label>
-            <label>日付
+            <label><span class="label-title">日付<span class="required">*</span></span>
               <input name="date" type="date" />
             </label>
-            <label>発掘班
+            <label><span class="label-title">発掘班<span class="required">*</span></span>
               <div class="team-select-row">
                 <select name="team">
                   <option value="">未設定</option>
@@ -74,10 +74,10 @@
                 <input id="team-other-input" name="teamOther" type="text" class="hidden" placeholder="その他の班名を入力" />
               </div>
             </label>
-            <label class="span-3 large-input">班長
+            <label class="span-3 large-input"><span class="label-title">班長<span class="required">*</span></span>
               <input name="teamLead" type="text" />
             </label>
-            <label class="span-3 large-input">記載係
+            <label class="span-3 large-input"><span class="label-title">記載係<span class="required">*</span></span>
               <input name="recorder" type="text" />
             </label>
           </div>
@@ -88,12 +88,12 @@
 
         <div id="record-form-host">
           <form id="record-form" class="panel">
-            <h2>詳細情報入力</h2>
+            <h2>詳細情報入力（<span class="required-note">*は必須項目です</span>）</h2>
             <input id="record-id-input" type="hidden" />
 
           <div class="grid cols-3">
             <fieldset class="inline-fieldset span-3">
-              <legend>標本番号 <span class="required">*</span></legend>
+              <legend>標本番号<span class="required">*</span></legend>
               <div id="specimen-tabs" class="specimen-tabs" role="tablist" aria-label="標本番号の区分">
                 <button class="specimen-tab active" data-prefix="m" type="button">m: 哺乳類</button>
                 <button class="specimen-tab" data-prefix="b" type="button">b: 植物</button>
@@ -138,11 +138,11 @@
               <input id="specimen-no-input" name="specimenNo" type="hidden" />
             </fieldset>
 
-            <label>化石・遺物名称
+            <label><span class="label-title">化石・遺物名称<span class="required">*</span></span>
               <input name="nameMemo" type="text" />
             </label>
             <fieldset class="inline-fieldset">
-              <legend>重要品指定</legend>
+              <legend>重要品指定<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="重要品指定">
                 <button class="dir-tab active" data-group="importantFlag" data-value="無" type="button">無</button>
                 <button class="dir-tab danger-option" data-group="importantFlag" data-value="有" type="button">有</button>
@@ -150,7 +150,7 @@
               <input id="important-flag-input" name="importantFlag" type="hidden" value="無" />
             </fieldset>
             <fieldset class="inline-fieldset">
-              <legend>簡易記載（専門班の指示による）</legend>
+              <legend>簡易記載（専門班の指示による）<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="簡易記載（専門班の指示による）">
                 <button class="dir-tab active" data-group="simpleRecordFlag" data-value="-" type="button">-</button>
                 <button class="dir-tab" data-group="simpleRecordFlag" data-value="○" type="button">○</button>
@@ -158,23 +158,23 @@
               <input id="simple-record-flag-input" name="simpleRecordFlag" type="hidden" value="-" />
             </fieldset>
             <div class="two-inline-labels span-2">
-              <label>発見者氏名
+              <label><span class="label-title">発見者氏名<span class="required">*</span></span>
                 <input name="discoverer" type="text" />
               </label>
-              <label>判定者氏名
+              <label><span class="label-title">判定者氏名<span class="required">*</span></span>
                 <input name="identifier" type="text" />
               </label>
             </div>
             <fieldset class="inline-fieldset span-2">
-              <legend>レベル読値</legend>
+              <legend>レベル読値<span class="required">*</span></legend>
               <div class="level-read-grid">
-                <label class="level-read-item">（上面）
+                <label class="level-read-item"><span class="label-title">（上面）<span class="required">*</span></span>
                   <div class="inline-cm-row">
                     <input name="levelUpperCm" type="text" />
                     <span>cm</span>
                   </div>
                 </label>
-                <label class="level-read-item">（下底）
+                <label class="level-read-item"><span class="label-title">（下底）<span class="required">*</span></span>
                   <div class="inline-cm-row">
                     <input name="levelLowerCm" type="text" />
                     <span>cm</span>
@@ -183,7 +183,7 @@
               </div>
             </fieldset>
             <fieldset class="inline-fieldset">
-              <legend>産出状況断面</legend>
+              <legend>産出状況断面<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="産出状況断面">
                 <button class="dir-tab active" data-group="occurrenceSection" data-value="要" type="button">要</button>
                 <button class="dir-tab" data-group="occurrenceSection" data-value="否" type="button">否</button>
@@ -191,7 +191,7 @@
               <input id="occurrence-section-input" name="occurrenceSection" type="hidden" value="要" />
             </fieldset>
             <fieldset class="inline-fieldset">
-              <legend>産状スケッチ</legend>
+              <legend>産状スケッチ<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="産状スケッチ">
                 <button class="dir-tab active" data-group="occurrenceSketch" data-value="要" type="button">要</button>
                 <button class="dir-tab" data-group="occurrenceSketch" data-value="否" type="button">否</button>
@@ -200,7 +200,7 @@
             </fieldset>
 
             <fieldset class="inline-fieldset">
-              <legend>平面位置 [北から・南から]</legend>
+              <legend>平面位置 [北から・南から]<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="北南方向">
                 <button class="dir-tab active" data-group="ns" data-value="北から" type="button">北から</button>
                 <button class="dir-tab" data-group="ns" data-value="南から" type="button">南から</button>
@@ -208,12 +208,12 @@
               <input id="ns-dir-input" name="nsDir" type="hidden" value="北から" />
               <div class="inline-cm-row">
                 <input name="nsCm" type="text" />
-                <span>cm</span>
+                <span>cm<span class="required">*</span></span>
               </div>
             </fieldset>
 
             <fieldset class="inline-fieldset">
-              <legend>平面位置 [東から・西から]</legend>
+              <legend>平面位置 [東から・西から]<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="東西方向">
                 <button class="dir-tab active" data-group="ew" data-value="東から" type="button">東から</button>
                 <button class="dir-tab" data-group="ew" data-value="西から" type="button">西から</button>
@@ -221,12 +221,12 @@
               <input id="ew-dir-input" name="ewDir" type="hidden" value="東から" />
               <div class="inline-cm-row">
                 <input name="ewCm" type="text" />
-                <span>cm</span>
+                <span>cm<span class="required">*</span></span>
               </div>
             </fieldset>
 
             <fieldset class="inline-fieldset span-3">
-              <legend>地層名</legend>
+              <legend>地層名<span class="required">*</span></legend>
               <div id="layer-tabs" class="layer-tabs" role="tablist" aria-label="地層名">
                 <button class="layer-tab active" data-layer="1.芙蓉湖砂シルト部層" type="button">1.芙蓉湖砂シルト部層</button>
                 <button class="layer-tab" data-layer="2.立が鼻砂部層" type="button">2.立が鼻砂部層</button>
@@ -237,21 +237,21 @@
               <input id="layer-other-input" type="text" class="hidden" placeholder="4.その他 の内容を入力" />
             </fieldset>
             <div class="unit-detail-inline span-3">
-              <label class="compact-input-group">ユニット
+              <label class="compact-input-group"><span class="label-title">ユニット<span class="required">*</span></span>
                 <input name="unit" type="text" placeholder="T2, T3, T4　など" />
               </label>
-              <label class="compact-input-group">細別
+              <label class="compact-input-group">サブユニット
                 <input name="detail" type="text" placeholder="a, b, c, d, など" />
               </label>
-              <label class="compact-input-group no-caption">
-                <input name="detailSub" type="text" placeholder="上, 下 など" aria-label="細別（上下など）" />
+              <label class="compact-input-group"><span class="label-title">細分</span>
+                <input class="detail-sub-input" name="detailSub" type="text" placeholder="上，下など" aria-label="細分" />
               </label>
             </div>
             <fieldset class="inline-fieldset span-2">
-              <legend>地層中の位置</legend>
+              <legend>地層中の位置<span class="required">*</span></legend>
               <div class="layer-position-row top">
                 <input name="layerRef" type="text" placeholder="層理面や鍵層名" />
-                <span>から</span>
+                <span>から<span class="required">*</span></span>
               </div>
               <div class="layer-position-row bottom">
                 <div class="dir-tabs" role="tablist" aria-label="地層中の位置（上/下）">
@@ -259,9 +259,9 @@
                   <button class="dir-tab" data-group="layerRelative" data-value="下" type="button">下</button>
                 </div>
                 <input id="layer-relative-input" name="layerRelative" type="hidden" value="" />
-                <span>に</span>
+                <span>に<span class="required">*</span></span>
                 <input name="layerFromCm" type="text" />
-                <span>cm</span>
+                <span>cm<span class="required">*</span></span>
               </div>
             </fieldset>
           </div>
@@ -337,12 +337,13 @@
                 <tr>
                   <th data-sort-key="kuwaku" tabindex="0">区画</th>
                   <th data-sort-key="team" tabindex="0">発掘班</th>
+                  <th data-sort-key="dataStatus" tabindex="0">データ</th>
                   <th data-sort-key="specimenNo" tabindex="0">標本番号</th>
                   <th data-sort-key="category" tabindex="0">分類</th>
                   <th data-sort-key="nameMemo" tabindex="0">名称</th>
                   <th data-sort-key="importantFlag" tabindex="0">重要品指定</th>
                   <th data-sort-key="unit" tabindex="0">ユニット</th>
-                  <th data-sort-key="detail" tabindex="0">細別</th>
+                  <th data-sort-key="detail" tabindex="0">サブユニット</th>
                   <th data-sort-key="discoverer" tabindex="0">発見者</th>
                   <th data-sort-key="identifier" tabindex="0">判定者</th>
                   <th data-sort-key="levelRead" tabindex="0">レベル読値(上面/下底)</th>
@@ -380,11 +381,11 @@
               <select id="plan-unit-select"></select>
             </label>
             <label class="plan-detail-row">
-              細別
+              サブユニット
               <select id="plan-detail-select"></select>
             </label>
             <label class="plan-detail-sub-row">
-              細別（上下など）
+              細分
               <select id="plan-detail-sub-select"></select>
             </label>
           </div>
