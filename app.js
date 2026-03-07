@@ -97,6 +97,7 @@ const createInitialState = () => ({
   records: [],
 });
 
+let stateNeedsRewriteAfterLoad = false;
 let state = loadState();
 let editingRecordId = null;
 let currentSectionDiagrams = [];
@@ -106,6 +107,8 @@ let selectedOutputKuwaku = ALL_GRIDS_VALUE;
 let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
+let outputListSortKey = "kuwaku";
+let outputListSortDirection = "asc";
 let isOverwriteMode = false;
 let overwriteOriginalRecord = null;
 let toastTimer = null;
@@ -143,6 +146,7 @@ const recordSubmitBtn = document.getElementById("record-submit-btn");
 const recordResetBtn = document.getElementById("record-reset-btn");
 const recordTableBody = document.getElementById("record-table-body");
 const outputListBody = document.getElementById("output-list-body");
+const outputListTable = document.getElementById("output-list-table");
 const cardOutputList = document.getElementById("card-output-list");
 const outputKuwakuSelect = document.getElementById("output-kuwaku-select");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
@@ -157,6 +161,7 @@ const specimenPrefixInput = document.getElementById("specimen-prefix-input");
 const specimenSerialInput = document.getElementById("specimen-serial-input");
 const specimenNoInput = document.getElementById("specimen-no-input");
 const specimenPrefixLabel = document.getElementById("specimen-prefix-label");
+const specimenDuplicateWarning = document.getElementById("specimen-duplicate-warning");
 const analysisTypeRow = document.getElementById("analysis-type-row");
 const analysisTypeSelect = document.getElementById("analysis-type-select");
 
@@ -190,6 +195,10 @@ initialize();
 
 function initialize() {
   bindEvents();
+  if (stateNeedsRewriteAfterLoad) {
+    persist();
+    stateNeedsRewriteAfterLoad = false;
+  }
   initCloudControls();
   hydrateSiteForm();
   resetRecordForm({ showMessage: false });
@@ -233,19 +242,20 @@ function bindEvents() {
   siteForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(siteForm);
-    const kuwakuHeadA = value(formData.get("kuwakuHeadA"));
-    const kuwakuHeadB = value(formData.get("kuwakuHeadB"));
-    const kuwakuBlock = value(formData.get("kuwakuBlock"));
-    const kuwakuNo = value(formData.get("kuwakuNo"));
+    const kuwakuHeadA = normalizeKuwakuHeadA(formData.get("kuwakuHeadA"));
+    const kuwakuHeadB = normalizeKuwakuHeadB(formData.get("kuwakuHeadB"));
+    const kuwakuBlock = normalizeKuwakuBlock(formData.get("kuwakuBlock"));
+    const kuwakuNo = normalizeKuwakuNo(formData.get("kuwakuNo"));
     const teamState = normalizeTeamState(value(formData.get("team")), value(formData.get("teamOther")));
     const nextSiteKuwaku = buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo);
+    const normalizedKuwaku = parseKuwaku(nextSiteKuwaku);
 
     state.site = {
       kuwaku: nextSiteKuwaku,
-      kuwakuHeadA,
-      kuwakuHeadB,
-      kuwakuBlock,
-      kuwakuNo,
+      kuwakuHeadA: normalizedKuwaku.headA,
+      kuwakuHeadB: normalizedKuwaku.headB,
+      kuwakuBlock: normalizedKuwaku.block,
+      kuwakuNo: normalizedKuwaku.no,
       levelHeight: value(formData.get("levelHeight")),
       date: value(formData.get("date")),
       team: teamState.team,
@@ -263,6 +273,14 @@ function bindEvents() {
 
   siteForm.elements.team.addEventListener("change", () => {
     syncTeamOtherInput(siteForm.elements.team.value);
+  });
+  ["kuwakuHeadA", "kuwakuHeadB", "kuwakuBlock", "kuwakuNo"].forEach((name) => {
+    const input = siteForm.elements[name];
+    if (!(input instanceof Element)) {
+      return;
+    }
+    input.addEventListener("input", updateDuplicateSpecimenWarning);
+    input.addEventListener("change", updateDuplicateSpecimenWarning);
   });
   if (editTeamInput) {
     editTeamInput.addEventListener("change", () => {
@@ -314,10 +332,10 @@ function bindEvents() {
     let editSiteSnapshot = null;
 
     if (isEditTab) {
-      const headA = value(editKuwakuHeadAInput?.value);
-      const headB = value(editKuwakuHeadBInput?.value);
-      const block = value(editKuwakuBlockInput?.value);
-      const no = value(editKuwakuNoInput?.value);
+      const headA = normalizeKuwakuHeadA(editKuwakuHeadAInput?.value);
+      const headB = normalizeKuwakuHeadB(editKuwakuHeadBInput?.value);
+      const block = normalizeKuwakuBlock(editKuwakuBlockInput?.value);
+      const no = normalizeKuwakuNo(editKuwakuNoInput?.value);
       recordKuwaku = buildKuwaku(headA, headB, block, no);
       const editTeamState = normalizeTeamState(value(editTeamInput?.value), value(editTeamOtherInput?.value));
       editSiteSnapshot = {
@@ -331,18 +349,19 @@ function bindEvents() {
     } else {
       // 入力画面は従来どおり、区画（グリッド）情報フォームの現在値を反映。
       const siteFormData = new FormData(siteForm);
-      const siteKuwakuHeadA = value(siteFormData.get("kuwakuHeadA"));
-      const siteKuwakuHeadB = value(siteFormData.get("kuwakuHeadB"));
-      const siteKuwakuBlock = value(siteFormData.get("kuwakuBlock"));
-      const siteKuwakuNo = value(siteFormData.get("kuwakuNo"));
+      const siteKuwakuHeadA = normalizeKuwakuHeadA(siteFormData.get("kuwakuHeadA"));
+      const siteKuwakuHeadB = normalizeKuwakuHeadB(siteFormData.get("kuwakuHeadB"));
+      const siteKuwakuBlock = normalizeKuwakuBlock(siteFormData.get("kuwakuBlock"));
+      const siteKuwakuNo = normalizeKuwakuNo(siteFormData.get("kuwakuNo"));
       const siteTeamState = normalizeTeamState(value(siteFormData.get("team")), value(siteFormData.get("teamOther")));
       const nextSiteKuwaku = buildKuwaku(siteKuwakuHeadA, siteKuwakuHeadB, siteKuwakuBlock, siteKuwakuNo);
+      const normalizedKuwaku = parseKuwaku(nextSiteKuwaku);
       siteSnapshot = {
         kuwaku: nextSiteKuwaku,
-        kuwakuHeadA: siteKuwakuHeadA,
-        kuwakuHeadB: siteKuwakuHeadB,
-        kuwakuBlock: siteKuwakuBlock,
-        kuwakuNo: siteKuwakuNo,
+        kuwakuHeadA: normalizedKuwaku.headA,
+        kuwakuHeadB: normalizedKuwaku.headB,
+        kuwakuBlock: normalizedKuwaku.block,
+        kuwakuNo: normalizedKuwaku.no,
         levelHeight: value(siteFormData.get("levelHeight")),
         date: value(siteFormData.get("date")),
         team: siteTeamState.team,
@@ -379,7 +398,7 @@ function bindEvents() {
     }
 
     const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
-    const specimenSerial = value(formData.get("specimenSerial"));
+    const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
     if (!specimenSerial) {
       showToast("標本番号は必須です");
       return;
@@ -402,6 +421,15 @@ function bindEvents() {
       return;
     }
     const specimenNo = buildSpecimenNo(specimenPrefix, specimenSerial);
+    const duplicateRecord = findDuplicateRecordByKuwakuAndSpecimen(
+      recordKuwaku,
+      specimenNo,
+      found?.id || editingId || ""
+    );
+    if (duplicateRecord) {
+      showToast(`警告: 同じ区画で標本番号 ${specimenNo} はすでに登録されています`);
+      return;
+    }
     const saveAnswer = window.confirm(
       isEditTab ? `${specimenNo}の情報を上書き保存しますか？` : `${specimenNo}の情報を保存しますか？`
     );
@@ -444,7 +472,7 @@ function bindEvents() {
       teamLead: recordSiteSnapshot.teamLead,
       recorder: recordSiteSnapshot.recorder,
       nameMemo: value(formData.get("nameMemo")),
-      unit: value(formData.get("unit")),
+      unit: compactNoSpaceValue(formData.get("unit")),
       discoverer: value(formData.get("discoverer")),
       identifier: value(formData.get("identifier")),
       levelUpperCm: value(formData.get("levelUpperCm")),
@@ -458,7 +486,7 @@ function bindEvents() {
       importantFlag: normalizeHasFlag(value(formData.get("importantFlag"))),
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
-      detail: value(formData.get("detail")),
+      detail: compactNoSpaceValue(formData.get("detail")),
       detailSub: value(formData.get("detailSub")),
       layerRef: value(formData.get("layerRef")),
       layerFromCm: value(formData.get("layerFromCm")),
@@ -594,6 +622,40 @@ function bindEvents() {
     }
   });
 
+  if (outputListTable) {
+    const handleSortHeader = (target) => {
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const header = target.closest("th[data-sort-key]");
+      if (!header || !outputListTable.contains(header)) {
+        return;
+      }
+      const sortKey = value(header.dataset.sortKey);
+      if (!sortKey) {
+        return;
+      }
+      if (outputListSortKey === sortKey) {
+        outputListSortDirection = outputListSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        outputListSortKey = sortKey;
+        outputListSortDirection = "asc";
+      }
+      renderListOutput();
+    };
+
+    outputListTable.addEventListener("click", (event) => {
+      handleSortHeader(event.target);
+    });
+    outputListTable.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      event.preventDefault();
+      handleSortHeader(event.target);
+    });
+  }
+
   if (outputKuwakuSelect) {
     outputKuwakuSelect.addEventListener("change", () => {
       selectedOutputKuwaku = value(outputKuwakuSelect.value) || ALL_GRIDS_VALUE;
@@ -625,21 +687,25 @@ function bindEvents() {
   if (editKuwakuHeadAInput) {
     editKuwakuHeadAInput.addEventListener("input", () => {
       editKuwakuHeadAInput.classList.remove("overwrite-updated");
+      updateDuplicateSpecimenWarning();
     });
   }
   if (editKuwakuHeadBInput) {
     editKuwakuHeadBInput.addEventListener("input", () => {
       editKuwakuHeadBInput.classList.remove("overwrite-updated");
+      updateDuplicateSpecimenWarning();
     });
   }
   if (editKuwakuBlockInput) {
     editKuwakuBlockInput.addEventListener("input", () => {
       editKuwakuBlockInput.classList.remove("overwrite-updated");
+      updateDuplicateSpecimenWarning();
     });
   }
   if (editKuwakuNoInput) {
     editKuwakuNoInput.addEventListener("input", () => {
       editKuwakuNoInput.classList.remove("overwrite-updated");
+      updateDuplicateSpecimenWarning();
     });
   }
   if (editLevelHeightInput) {
@@ -839,6 +905,7 @@ function setActiveTab(tabId) {
   });
   syncRecordFormPlacement(tabId);
   syncEditHistoryVisibility(tabId);
+  updateDuplicateSpecimenWarning();
   if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
   }
@@ -907,6 +974,70 @@ function updateSpecimenNoFromParts() {
   const serial = value(specimenSerialInput.value);
   specimenPrefixInput.value = prefix;
   specimenNoInput.value = buildSpecimenNo(prefix, serial);
+  updateDuplicateSpecimenWarning();
+}
+
+function updateDuplicateSpecimenWarning() {
+  if (!specimenDuplicateWarning) {
+    return;
+  }
+  const activeTabId = getActiveTabId();
+  if (activeTabId !== "input-tab" && activeTabId !== "edit-tab") {
+    hideDuplicateSpecimenWarning();
+    return;
+  }
+
+  const specimenSerial = compactNoSpaceValue(specimenSerialInput?.value);
+  const specimenPrefix = normalizeSpecimenPrefix(specimenPrefixInput?.value);
+  const specimenNo = buildSpecimenNo(specimenPrefix, specimenSerial);
+  if (!specimenNo || !specimenSerial) {
+    hideDuplicateSpecimenWarning();
+    return;
+  }
+
+  const kuwaku = currentKuwakuForDuplicateWarning(activeTabId);
+  if (!kuwaku) {
+    hideDuplicateSpecimenWarning();
+    return;
+  }
+  const excludeRecordId = activeTabId === "edit-tab" ? value(editingRecordId || recordIdInput?.value) : "";
+  const duplicate = findDuplicateRecordByKuwakuAndSpecimen(kuwaku, specimenNo, excludeRecordId);
+  if (!duplicate) {
+    hideDuplicateSpecimenWarning();
+    return;
+  }
+  specimenDuplicateWarning.textContent = `警告: この区画には ${specimenNo} がすでにあります`;
+  specimenDuplicateWarning.classList.remove("hidden");
+}
+
+function currentKuwakuForDuplicateWarning(activeTabId = getActiveTabId()) {
+  if (activeTabId === "edit-tab") {
+    const headA = normalizeKuwakuHeadA(editKuwakuHeadAInput?.value);
+    const headB = normalizeKuwakuHeadB(editKuwakuHeadBInput?.value);
+    const block = normalizeKuwakuBlock(editKuwakuBlockInput?.value);
+    const no = normalizeKuwakuNo(editKuwakuNoInput?.value);
+    if (!block || !no) {
+      return "";
+    }
+    return buildKuwaku(headA, headB, block, no);
+  }
+
+  const headA = normalizeKuwakuHeadA(siteForm?.elements?.kuwakuHeadA?.value);
+  const headB = normalizeKuwakuHeadB(siteForm?.elements?.kuwakuHeadB?.value);
+  const block = normalizeKuwakuBlock(siteForm?.elements?.kuwakuBlock?.value);
+  const no = normalizeKuwakuNo(siteForm?.elements?.kuwakuNo?.value);
+  if (!block || !no) {
+    return "";
+  }
+  return buildKuwaku(headA, headB, block, no);
+}
+
+function hideDuplicateSpecimenWarning() {
+  if (!specimenDuplicateWarning) {
+    return;
+  }
+  specimenDuplicateWarning.textContent = "";
+  specimenDuplicateWarning.classList.add("hidden");
 }
 
 function syncAnalysisTypeInput(prefixRaw) {
@@ -1462,23 +1593,21 @@ function renderOutputs() {
 }
 
 function renderListOutput() {
+  updateOutputListSortHeader();
   if (!state.records.length) {
     syncOutputKuwakuSelect([]);
-    outputListBody.innerHTML = "<tr><td colspan=\"13\">出力対象データがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"16\">出力対象データがありません。</td></tr>";
     return;
   }
 
   const filteredRecords = getFilteredOutputRecords();
   if (!filteredRecords.length) {
-    outputListBody.innerHTML = "<tr><td colspan=\"13\">選択した区画のデータがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"16\">選択した区画のデータがありません。</td></tr>";
     return;
   }
 
-  outputListBody.innerHTML = filteredRecords
+  outputListBody.innerHTML = sortOutputRecordsForList(filteredRecords)
     .map((record) => {
-      const positionText = `${record.nsDir || ""}${record.nsCm || ""}cm / ${record.ewDir || ""}${
-        record.ewCm || ""
-      }cm`;
       const selectedClass = record.id === selectedCardRecordId ? "selected-card-row" : "";
       const cardButtonLabel = record.id === selectedCardRecordId ? "プレビュー表示中" : "カード";
       return `
@@ -1488,12 +1617,15 @@ function renderListOutput() {
         <td>${escapeHtml(record.specimenNo)}</td>
         <td>${escapeHtml(formatCategoryForRecord(record))}</td>
         <td>${escapeHtml(record.nameMemo || "")}</td>
+        <td>${escapeHtml(record.importantFlag || "")}</td>
+        <td>${escapeHtml(record.unit || "")}</td>
+        <td>${escapeHtml(formatDetailForRecord(record))}</td>
         <td>${escapeHtml(record.discoverer || "")}</td>
         <td>${escapeHtml(record.identifier || "")}</td>
         <td>${escapeHtml(formatLevelRead(record))}</td>
         <td>${escapeHtml(record.occurrenceSection || "")}</td>
         <td>${escapeHtml(record.occurrenceSketch || "")}</td>
-        <td>${escapeHtml(positionText)}</td>
+        <td>${escapeHtml(formatPlanPosition(record))}</td>
         <td>${escapeHtml(record.notes || "")}</td>
         <td>
           <div class="row-actions">
@@ -1508,6 +1640,92 @@ function renderListOutput() {
       `;
     })
     .join("");
+}
+
+function updateOutputListSortHeader() {
+  if (!outputListTable) {
+    return;
+  }
+  const headers = outputListTable.querySelectorAll("th[data-sort-key]");
+  headers.forEach((header) => {
+    const sortKey = value(header.dataset.sortKey);
+    const isActive = sortKey === outputListSortKey;
+    header.classList.add("sortable-header");
+    header.classList.toggle("sort-asc", isActive && outputListSortDirection === "asc");
+    header.classList.toggle("sort-desc", isActive && outputListSortDirection === "desc");
+    header.setAttribute("aria-sort", isActive ? (outputListSortDirection === "asc" ? "ascending" : "descending") : "none");
+  });
+}
+
+function sortOutputRecordsForList(records) {
+  const list = [...records];
+  list.sort(compareOutputRecordsForList);
+  return list;
+}
+
+function compareOutputRecordsForList(a, b) {
+  let compared = 0;
+  switch (outputListSortKey) {
+    case "kuwaku":
+      compared = compareRecordsByKuwakuThenSpecimen(a, b);
+      break;
+    case "team":
+      compared = compareSortText(getRecordTeamValue(a), getRecordTeamValue(b));
+      break;
+    case "specimenNo":
+      compared = compareRecordsBySpecimenNo(a, b);
+      break;
+    case "category":
+      compared = compareSortText(formatCategoryForRecord(a), formatCategoryForRecord(b));
+      break;
+    case "nameMemo":
+      compared = compareSortText(a?.nameMemo, b?.nameMemo);
+      break;
+    case "importantFlag":
+      compared = compareSortText(a?.importantFlag, b?.importantFlag);
+      break;
+    case "discoverer":
+      compared = compareSortText(a?.discoverer, b?.discoverer);
+      break;
+    case "identifier":
+      compared = compareSortText(a?.identifier, b?.identifier);
+      break;
+    case "levelRead":
+      compared = compareSortText(formatLevelRead(a), formatLevelRead(b));
+      break;
+    case "occurrenceSection":
+      compared = compareSortText(a?.occurrenceSection, b?.occurrenceSection);
+      break;
+    case "occurrenceSketch":
+      compared = compareSortText(a?.occurrenceSketch, b?.occurrenceSketch);
+      break;
+    case "position":
+      compared = compareSortText(formatPlanPosition(a), formatPlanPosition(b));
+      break;
+    case "unit":
+      compared = compareSortText(a?.unit, b?.unit);
+      break;
+    case "detail":
+      compared = compareSortText(formatDetailForRecord(a), formatDetailForRecord(b));
+      break;
+    case "notes":
+      compared = compareSortText(a?.notes, b?.notes);
+      break;
+    default:
+      compared = compareRecordsByKuwakuThenSpecimen(a, b);
+      break;
+  }
+  const fallback = compareRecordsByKuwakuThenSpecimen(a, b);
+  const direction = outputListSortDirection === "desc" ? -1 : 1;
+  return (compared || fallback) * direction;
+}
+
+function compareSortText(a, b) {
+  return value(a).localeCompare(value(b), "ja", { numeric: true, sensitivity: "base" });
+}
+
+function formatPlanPosition(record) {
+  return `${value(record?.nsDir)}${value(record?.nsCm)}cm / ${value(record?.ewDir)}${value(record?.ewCm)}cm`;
 }
 
 function renderCardOutput() {
@@ -1847,7 +2065,7 @@ function detailLabelForSelect(detailValue) {
 }
 
 function getRecordKuwaku(record) {
-  return value(record?.kuwaku);
+  return normalizeKuwakuText(record?.kuwaku);
 }
 
 function getRecordTeamValue(record) {
@@ -1875,7 +2093,7 @@ function getRecordRecorder(record) {
 }
 
 function kuwakuValueForSelect(kuwakuRaw) {
-  const kuwaku = value(kuwakuRaw);
+  const kuwaku = normalizeKuwakuText(kuwakuRaw);
   return kuwaku || EMPTY_KUWAKU_VALUE;
 }
 
@@ -1884,7 +2102,7 @@ function kuwakuLabelForSelect(kuwakuValue) {
 }
 
 function isDefaultKuwaku(kuwakuRaw) {
-  return value(kuwakuRaw) === DEFAULT_KUWAKU;
+  return normalizeKuwakuText(kuwakuRaw) === DEFAULT_KUWAKU;
 }
 
 function buildPlanPoint(record) {
@@ -2134,12 +2352,55 @@ function renderSectionDiagramList() {
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
+    stateNeedsRewriteAfterLoad = false;
     return createInitialState();
   }
   try {
-    return normalizeState(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    const normalized = normalizeState(parsed);
+    stateNeedsRewriteAfterLoad = hasSpacingNormalizationDiff(parsed, normalized);
+    return normalized;
   } catch (_error) {
+    stateNeedsRewriteAfterLoad = false;
     return createInitialState();
+  }
+}
+
+function buildSpacingNormalizationFingerprint(candidateState) {
+  const stateCandidate = candidateState && typeof candidateState === "object" ? candidateState : {};
+  const site = stateCandidate.site && typeof stateCandidate.site === "object" ? stateCandidate.site : {};
+  const records = Array.isArray(stateCandidate.records) ? stateCandidate.records : [];
+
+  return {
+    site: {
+      kuwaku: value(site.kuwaku),
+      kuwakuHeadA: value(site.kuwakuHeadA),
+      kuwakuHeadB: value(site.kuwakuHeadB),
+      kuwakuBlock: value(site.kuwakuBlock),
+      kuwakuNo: value(site.kuwakuNo),
+    },
+    records: records.map((record) => {
+      return {
+        id: value(record?.id),
+        kuwaku: value(record?.kuwaku),
+        specimenNo: value(record?.specimenNo),
+        specimenPrefix: value(record?.specimenPrefix),
+        specimenSerial: value(record?.specimenSerial),
+        unit: value(record?.unit),
+        detail: value(record?.detail),
+      };
+    }),
+  };
+}
+
+function hasSpacingNormalizationDiff(beforeState, afterState) {
+  try {
+    return (
+      JSON.stringify(buildSpacingNormalizationFingerprint(beforeState)) !==
+      JSON.stringify(buildSpacingNormalizationFingerprint(afterState))
+    );
+  } catch (_error) {
+    return false;
   }
 }
 
@@ -2150,10 +2411,10 @@ function normalizeState(candidate) {
   }
 
   const kuwakuParts = parseKuwaku(value(candidate.site?.kuwaku));
-  const kuwakuHeadA = value(candidate.site?.kuwakuHeadA) || kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
-  const kuwakuHeadB = value(candidate.site?.kuwakuHeadB) || kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
-  const kuwakuBlock = value(candidate.site?.kuwakuBlock) || kuwakuParts.block;
-  const kuwakuNo = value(candidate.site?.kuwakuNo) || kuwakuParts.no;
+  const kuwakuHeadA = normalizeKuwakuHeadA(value(candidate.site?.kuwakuHeadA) || kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A);
+  const kuwakuHeadB = normalizeKuwakuHeadB(value(candidate.site?.kuwakuHeadB) || kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B);
+  const kuwakuBlock = normalizeKuwakuBlock(value(candidate.site?.kuwakuBlock) || kuwakuParts.block);
+  const kuwakuNo = normalizeKuwakuNo(value(candidate.site?.kuwakuNo) || kuwakuParts.no);
   const teamState = normalizeTeamState(value(candidate.site?.team), value(candidate.site?.teamOther));
 
   safe.site = {
@@ -2258,8 +2519,11 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     value(item.team) || value(fallbackSite.team),
     value(item.teamOther) || value(fallbackSite.teamOther)
   );
-  const rawKuwaku = value(item.kuwaku);
-  const kuwaku = !rawKuwaku || isDefaultKuwaku(rawKuwaku) ? value(fallbackSite.kuwaku) : rawKuwaku;
+  const rawKuwaku = normalizeKuwakuText(item.kuwaku);
+  const fallbackKuwaku = normalizeKuwakuText(
+    value(fallbackSite.kuwaku) || buildKuwaku(fallbackSite.kuwakuHeadA, fallbackSite.kuwakuHeadB, fallbackSite.kuwakuBlock, fallbackSite.kuwakuNo)
+  );
+  const kuwaku = !rawKuwaku || isDefaultKuwaku(rawKuwaku) ? fallbackKuwaku : rawKuwaku;
 
   return {
     id,
@@ -2276,7 +2540,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     teamLead: value(item.teamLead) || value(fallbackSite.teamLead),
     recorder: value(item.recorder) || value(fallbackSite.recorder),
     nameMemo: value(item.nameMemo),
-    unit: value(item.unit),
+    unit: compactNoSpaceValue(item.unit),
     discoverer: value(item.discoverer),
     identifier: value(item.identifier),
     levelUpperCm: value(item.levelUpperCm) || value(item.levelRead) || value(item.levelError),
@@ -2290,7 +2554,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),
-    detail: value(item.detail),
+    detail: compactNoSpaceValue(item.detail),
     detailSub: value(item.detailSub),
     layerRef: value(item.layerRef) || value(item.layerPosition),
     layerFromCm: value(item.layerFromCm),
@@ -2500,6 +2764,28 @@ function normalizePhotos(photosRaw) {
 
 function findRecord(recordId) {
   return state.records.find((item) => item.id === recordId);
+}
+
+function findDuplicateRecordByKuwakuAndSpecimen(kuwakuRaw, specimenNoRaw, excludeRecordIdRaw = "") {
+  const kuwaku = normalizeKuwakuText(kuwakuRaw);
+  const specimenNo = parseSpecimenNo(specimenNoRaw).specimenNo;
+  const excludeRecordId = value(excludeRecordIdRaw);
+  if (!kuwaku || !specimenNo) {
+    return null;
+  }
+  return (
+    state.records.find((item) => {
+      if (!item || value(item.id) === excludeRecordId) {
+        return false;
+      }
+      const itemKuwaku = normalizeKuwakuText(getRecordKuwaku(item));
+      if (itemKuwaku !== kuwaku) {
+        return false;
+      }
+      const itemSpecimenNo = parseSpecimenNo(item.specimenNo, item.specimenPrefix, item.specimenSerial).specimenNo;
+      return itemSpecimenNo === specimenNo;
+    }) || null
+  );
 }
 
 function persist(successMessage) {
@@ -3043,11 +3329,45 @@ function csvCell(valueRaw) {
   return `"${escaped}"`;
 }
 
+function compactNoSpaceValue(inputRaw) {
+  return value(inputRaw).replace(/\s+/g, "");
+}
+
+function normalizeKuwakuHeadA(headARaw) {
+  return compactNoSpaceValue(headARaw);
+}
+
+function normalizeKuwakuHeadB(headBRaw) {
+  const headB = compactNoSpaceValue(headBRaw);
+  const upper = headB.toUpperCase();
+  if (upper === "I" || upper === "1" || upper === "Ⅰ") {
+    return "Ⅰ";
+  }
+  return headB;
+}
+
+function normalizeKuwakuBlock(blockRaw) {
+  return compactNoSpaceValue(blockRaw).toUpperCase();
+}
+
+function normalizeKuwakuNo(noRaw) {
+  return compactNoSpaceValue(noRaw);
+}
+
+function normalizeKuwakuText(kuwakuRaw) {
+  const kuwaku = value(kuwakuRaw);
+  if (!kuwaku) {
+    return "";
+  }
+  const parts = parseKuwaku(kuwaku);
+  return buildKuwaku(parts.headA, parts.headB, parts.block, parts.no);
+}
+
 function buildKuwaku(headARaw, headBRaw, blockRaw, noRaw) {
-  const headA = value(headARaw) || DEFAULT_KUWAKU_HEAD_A;
-  const headB = value(headBRaw) || DEFAULT_KUWAKU_HEAD_B;
-  const block = value(blockRaw);
-  const no = value(noRaw);
+  const headA = normalizeKuwakuHeadA(headARaw) || DEFAULT_KUWAKU_HEAD_A;
+  const headB = normalizeKuwakuHeadB(headBRaw) || DEFAULT_KUWAKU_HEAD_B;
+  const block = normalizeKuwakuBlock(blockRaw);
+  const no = normalizeKuwakuNo(noRaw);
   return `${headA}-${headB}-${block}-${no}`;
 }
 
@@ -3057,13 +3377,13 @@ function parseKuwaku(kuwakuText) {
     .replaceAll("―", "-")
     .replaceAll("ー", "-")
     .replaceAll("−", "-");
-  const parts = text.split("-").map((part) => part.trim());
+  const parts = text.split("-").map((part) => compactNoSpaceValue(part));
   if (parts.length >= 4) {
     return {
-      headA: parts[0] || DEFAULT_KUWAKU_HEAD_A,
-      headB: parts[1] || DEFAULT_KUWAKU_HEAD_B,
-      block: parts[2] || "",
-      no: parts[3] || "",
+      headA: normalizeKuwakuHeadA(parts[0]) || DEFAULT_KUWAKU_HEAD_A,
+      headB: normalizeKuwakuHeadB(parts[1]) || DEFAULT_KUWAKU_HEAD_B,
+      block: normalizeKuwakuBlock(parts[2]),
+      no: normalizeKuwakuNo(parts[3]),
     };
   }
   return {
@@ -3075,7 +3395,7 @@ function parseKuwaku(kuwakuText) {
 }
 
 function normalizeSpecimenPrefix(prefixRaw) {
-  let prefix = value(prefixRaw).toLowerCase();
+  let prefix = compactNoSpaceValue(prefixRaw).toLowerCase();
   if (prefix === "ii") {
     prefix = "i";
   }
@@ -3084,13 +3404,13 @@ function normalizeSpecimenPrefix(prefixRaw) {
 
 function buildSpecimenNo(prefixRaw, serialRaw) {
   const prefix = normalizeSpecimenPrefix(prefixRaw);
-  const serial = value(serialRaw);
+  const serial = compactNoSpaceValue(serialRaw);
   return serial ? `${prefix}-${serial}` : "";
 }
 
 function parseSpecimenNo(specimenNoRaw, prefixRaw = "", serialRaw = "") {
-  const directPrefix = normalizeSpecimenPrefix(prefixRaw);
-  const directSerial = value(serialRaw);
+  const directPrefix = normalizeSpecimenPrefix(compactNoSpaceValue(prefixRaw));
+  const directSerial = compactNoSpaceValue(serialRaw);
   if (directSerial) {
     return {
       prefix: directPrefix,
@@ -3099,11 +3419,11 @@ function parseSpecimenNo(specimenNoRaw, prefixRaw = "", serialRaw = "") {
     };
   }
 
-  const specimenNo = value(specimenNoRaw);
+  const specimenNo = compactNoSpaceValue(specimenNoRaw);
   const hyphenMatched = specimenNo.match(/^([A-Za-z]{1,2})-(.+)$/);
   if (hyphenMatched) {
     const prefix = normalizeSpecimenPrefix(hyphenMatched[1]);
-    const serial = value(hyphenMatched[2]);
+    const serial = compactNoSpaceValue(hyphenMatched[2]);
     return {
       prefix,
       serial,
@@ -3114,7 +3434,7 @@ function parseSpecimenNo(specimenNoRaw, prefixRaw = "", serialRaw = "") {
   const compactMatched = specimenNo.match(/^([A-Za-z]{1,2})(\d.+)$/);
   if (compactMatched) {
     const prefix = normalizeSpecimenPrefix(compactMatched[1]);
-    const serial = value(compactMatched[2]);
+    const serial = compactNoSpaceValue(compactMatched[2]);
     return {
       prefix,
       serial,
@@ -3122,7 +3442,7 @@ function parseSpecimenNo(specimenNoRaw, prefixRaw = "", serialRaw = "") {
     };
   }
 
-  const fallbackPrefix = normalizeSpecimenPrefix(prefixRaw);
+  const fallbackPrefix = normalizeSpecimenPrefix(compactNoSpaceValue(prefixRaw));
   return {
     prefix: fallbackPrefix,
     serial: specimenNo,

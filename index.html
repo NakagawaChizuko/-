@@ -113,6 +113,7 @@
                   required
                 />
               </div>
+              <p id="specimen-duplicate-warning" class="duplicate-warning hidden" role="alert" aria-live="polite"></p>
               <label id="analysis-type-row" class="hidden">分析用資料の区分
                 <select id="analysis-type-select" name="analysisType">
                   <option value="">選択してください</option>
@@ -320,18 +321,21 @@
             <table id="output-list-table">
               <thead>
                 <tr>
-                  <th>区画</th>
-                  <th>発掘班</th>
-                  <th>標本番号</th>
-                  <th>分類</th>
-                  <th>名称</th>
-                  <th>発見者</th>
-                  <th>判定者</th>
-                  <th>レベル読値(上面/下底)</th>
-                  <th>産出状況断面</th>
-                  <th>産状スケッチ</th>
-                  <th>平面位置</th>
-                  <th>備考（観察事項など）</th>
+                  <th data-sort-key="kuwaku" tabindex="0">区画</th>
+                  <th data-sort-key="team" tabindex="0">発掘班</th>
+                  <th data-sort-key="specimenNo" tabindex="0">標本番号</th>
+                  <th data-sort-key="category" tabindex="0">分類</th>
+                  <th data-sort-key="nameMemo" tabindex="0">名称</th>
+                  <th data-sort-key="importantFlag" tabindex="0">重要品指定</th>
+                  <th data-sort-key="unit" tabindex="0">ユニット</th>
+                  <th data-sort-key="detail" tabindex="0">細別</th>
+                  <th data-sort-key="discoverer" tabindex="0">発見者</th>
+                  <th data-sort-key="identifier" tabindex="0">判定者</th>
+                  <th data-sort-key="levelRead" tabindex="0">レベル読値(上面/下底)</th>
+                  <th data-sort-key="occurrenceSection" tabindex="0">産出状況断面</th>
+                  <th data-sort-key="occurrenceSketch" tabindex="0">産状スケッチ</th>
+                  <th data-sort-key="position" tabindex="0">平面位置</th>
+                  <th data-sort-key="notes" tabindex="0">備考（観察事項など）</th>
                   <th>操作</th>
                 </tr>
               </thead>

@@ -542,6 +542,13 @@ textarea {
   font-weight: 700;
 }
 
+.duplicate-warning {
+  margin: 4px 0 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .hint-text {
   margin: 0;
   font-size: 0.83rem;
@@ -820,6 +827,10 @@ table {
   min-width: 780px;
 }
 
+#output-list-table {
+  min-width: 1380px;
+}
+
 th,
 td {
   border: 1px solid var(--line);
@@ -831,6 +842,26 @@ td {
 th {
   background: var(--accent-weak);
   font-weight: 600;
+}
+
+th.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+th.sortable-header.sort-asc::after {
+  content: " ▲";
+  font-size: 0.72rem;
+}
+
+th.sortable-header.sort-desc::after {
+  content: " ▼";
+  font-size: 0.72rem;
 }
 
 #output-list-body tr.selected-card-row td {
