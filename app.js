@@ -53,10 +53,29 @@ const REQUIRED_FIELD_LABELS = {
   occurrenceSection: "産出状況断面",
   occurrenceSketch: "産状スケッチ",
   sectionDiagrams: "産出状況断面図添付",
+  sectionDiagramDistanceChecked: "断面図確認: 垂直距離記入",
+  sectionDiagramHorizonChecked: "断面図確認: 産出層準記入",
+  sectionDiagramLayerFaciesChecked: "断面図確認: 層相記入",
+  photoClinometerChecked: "写真確認: クリノメーター",
+  photoRulerChecked: "写真確認: 定規",
   nsDir: "平面位置（北から/南から）",
   nsCm: "平面位置（北から/南からの距離）",
   ewDir: "平面位置（東から/西から）",
   ewCm: "平面位置（東から/西からの距離）",
+  largeShapeType: "大きなもの形状",
+  largeAxisDirection: "長軸・長辺・長半径方向（例:N30W）",
+  line1NsDir: "直線状 端点1（北から/南から）",
+  line1NsCm: "直線状 端点1（北から/南からの距離）",
+  line1EwDir: "直線状 端点1（東から/西から）",
+  line1EwCm: "直線状 端点1（東から/西からの距離）",
+  line2NsDir: "直線状 端点2（北から/南から）",
+  line2NsCm: "直線状 端点2（北から/南からの距離）",
+  line2EwDir: "直線状 端点2（東から/西から）",
+  line2EwCm: "直線状 端点2（東から/西からの距離）",
+  rectSide1Cm: "長方形 辺1",
+  rectSide2Cm: "長方形 辺2",
+  ellipseLongRadiusCm: "楕円 長半径",
+  ellipseShortRadiusCm: "楕円 短半径",
   layerName: "地層名",
   layerOther: "地層名（その他）",
   unit: "ユニット",
@@ -98,6 +117,7 @@ const ALL_DETAILS_VALUE = "__DETAIL_ALL__";
 const EMPTY_DETAIL_VALUE = "__DETAIL_EMPTY__";
 const ALL_DETAIL_SUBS_VALUE = "__DETAIL_SUB_ALL__";
 const EMPTY_DETAIL_SUB_VALUE = "__DETAIL_SUB_EMPTY__";
+const EXPORT_CATEGORY_ALL_VALUE = "__EXPORT_CATEGORY_ALL__";
 const SPECIMEN_POINT_COLORS = {
   m: "#d62828",
   a: "#5b21b6",
@@ -156,6 +176,31 @@ let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
 let selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
+let exportListRangeKuwaku = ALL_GRIDS_VALUE;
+let exportListRangeCategory = EXPORT_CATEGORY_ALL_VALUE;
+let exportListRangeStatus = "all";
+let exportListRangeSpecimenFrom = "";
+let exportListRangeSpecimenTo = "";
+let exportListRangeDateFrom = "";
+let exportListRangeDateTo = "";
+let exportCardRangeKuwaku = ALL_GRIDS_VALUE;
+let exportCardRangeCategory = EXPORT_CATEGORY_ALL_VALUE;
+let exportCardRangeStatus = "all";
+let exportCardRangeDateFrom = "";
+let exportCardRangeDateTo = "";
+let exportPlanKuwaku = "";
+let exportPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
+let exportPlanDateFrom = "";
+let exportPlanDateTo = "";
+let exportPlanModeUnitEnabled = true;
+let exportPlanModeDetailEnabled = false;
+let exportPlanModeDetailSubEnabled = false;
+let exportPlanModeUnitValues = new Set();
+let exportPlanModeDetailUnitValues = new Set();
+let exportPlanModeDetailValues = new Set();
+let exportPlanModeDetailSubUnitValues = new Set();
+let exportPlanModeDetailSubDetailValues = new Set();
+let exportPlanModeDetailSubValues = new Set();
 let outputListSortKey = "kuwaku";
 let outputListSortDirection = "asc";
 let isOverwriteMode = false;
@@ -193,6 +238,7 @@ const editTeamLeadInput = document.getElementById("edit-team-lead");
 const editRecorderInput = document.getElementById("edit-recorder");
 const recordIdInput = document.getElementById("record-id-input");
 const recordSubmitBtn = document.getElementById("record-submit-btn");
+const recordCopyToInputBtn = document.getElementById("record-copy-to-input-btn");
 const recordResetBtn = document.getElementById("record-reset-btn");
 const recordTableBody = document.getElementById("record-table-body");
 const outputListBody = document.getElementById("output-list-body");
@@ -206,6 +252,37 @@ const planDetailSubSelect = document.getElementById("plan-detail-sub-select");
 const planMapLegend = document.getElementById("plan-map-legend");
 const planMapWrap = document.getElementById("plan-map-wrap");
 const planKuwakuInfo = document.getElementById("plan-kuwaku-info");
+const exportListRangeKuwakuSelect = document.getElementById("export-range-kuwaku-select");
+const exportListRangeCategorySelect = document.getElementById("export-range-category-select");
+const exportListRangeStatusSelect = document.getElementById("export-range-status-select");
+const exportListRangeSpecimenFromInput = document.getElementById("export-range-specimen-from");
+const exportListRangeSpecimenToInput = document.getElementById("export-range-specimen-to");
+const exportListRangeDateFromInput = document.getElementById("export-range-date-from");
+const exportListRangeDateToInput = document.getElementById("export-range-date-to");
+const exportListRangeSummaryEl = document.getElementById("export-range-summary");
+const exportCardRangeKuwakuSelect = document.getElementById("export-card-kuwaku-select");
+const exportCardRangeCategorySelect = document.getElementById("export-card-category-select");
+const exportCardRangeStatusSelect = document.getElementById("export-card-status-select");
+const exportCardRangeDateFromInput = document.getElementById("export-card-date-from");
+const exportCardRangeDateToInput = document.getElementById("export-card-date-to");
+const exportCardRangeSummaryEl = document.getElementById("export-card-summary");
+const exportPlanKuwakuSelect = document.getElementById("export-plan-kuwaku-select");
+const exportPlanCategorySelect = document.getElementById("export-plan-category-select");
+const exportPlanDateFromInput = document.getElementById("export-plan-date-from");
+const exportPlanDateToInput = document.getElementById("export-plan-date-to");
+const exportPlanModeUnitCheck = document.getElementById("export-plan-mode-unit-check");
+const exportPlanModeUnitButtons = document.getElementById("export-plan-mode-unit-buttons");
+const exportPlanModeUnitStats = document.getElementById("export-plan-mode-unit-stats");
+const exportPlanModeDetailCheck = document.getElementById("export-plan-mode-detail-check");
+const exportPlanModeDetailUnitChecks = document.getElementById("export-plan-mode-detail-unit-checks");
+const exportPlanModeDetailButtons = document.getElementById("export-plan-mode-detail-buttons");
+const exportPlanModeDetailStats = document.getElementById("export-plan-mode-detail-stats");
+const exportPlanModeDetailSubCheck = document.getElementById("export-plan-mode-detail-sub-check");
+const exportPlanModeDetailSubUnitChecks = document.getElementById("export-plan-mode-detail-sub-unit-checks");
+const exportPlanModeDetailSubDetailChecks = document.getElementById("export-plan-mode-detail-sub-detail-checks");
+const exportPlanModeDetailSubButtons = document.getElementById("export-plan-mode-detail-sub-buttons");
+const exportPlanModeDetailSubStats = document.getElementById("export-plan-mode-detail-sub-stats");
+const exportPlanSummaryEl = document.getElementById("export-plan-summary");
 
 const specimenTabButtons = document.querySelectorAll(".specimen-tab");
 const specimenPrefixInput = document.getElementById("specimen-prefix-input");
@@ -224,6 +301,15 @@ const simpleRecordFlagInput = document.getElementById("simple-record-flag-input"
 const occurrenceSectionInput = document.getElementById("occurrence-section-input");
 const occurrenceSketchInput = document.getElementById("occurrence-sketch-input");
 const layerRelativeInput = document.getElementById("layer-relative-input");
+const planSizeModeInput = document.getElementById("plan-size-mode-input");
+const largeShapeTypeInput = document.getElementById("large-shape-type-input");
+const largeAxisDirectionInput = document.getElementById("large-axis-direction-input");
+const line1NsDirInput = document.getElementById("line1-ns-dir-input");
+const line1EwDirInput = document.getElementById("line1-ew-dir-input");
+const line2NsDirInput = document.getElementById("line2-ns-dir-input");
+const line2EwDirInput = document.getElementById("line2-ew-dir-input");
+const largeShapeSection = document.getElementById("large-shape-section");
+const largeShapePanels = document.querySelectorAll(".large-shape-panel[data-large-shape-panel]");
 const layerTabButtons = document.querySelectorAll(".layer-tab");
 const layerNameInput = document.getElementById("layer-name-input");
 const layerOtherInput = document.getElementById("layer-other-input");
@@ -238,6 +324,9 @@ const photoList = document.getElementById("photo-list");
 
 const exportListCsvBtn = document.getElementById("export-list-csv-btn");
 const exportCardCsvBtn = document.getElementById("export-card-csv-btn");
+const exportListPdfBtn = document.getElementById("export-list-pdf-btn");
+const exportCardPdfBtn = document.getElementById("export-card-pdf-btn");
+const exportPlanPdfBtn = document.getElementById("export-plan-pdf-btn");
 const exportJsonBtn = document.getElementById("export-json-btn");
 const importJsonInput = document.getElementById("import-json-input");
 const cloudEndpointInput = document.getElementById("cloud-endpoint-input");
@@ -481,6 +570,11 @@ function bindEvents() {
       showToast("a: 分析用試料を選んだ場合は、区分を選択してください");
       return;
     }
+    const attachmentChecklistError = validateAttachmentChecklistForSave(formData);
+    if (attachmentChecklistError) {
+      showToast(attachmentChecklistError);
+      return;
+    }
 
     const nowIsoValue = new Date().toISOString();
     const editingId = editingRecordId || recordIdInput.value;
@@ -516,6 +610,21 @@ function bindEvents() {
           recorder: value(siteSnapshot?.recorder),
         };
     const recordTeamState = normalizeTeamState(recordSiteSnapshot.team, recordSiteSnapshot.teamOther);
+    const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+    const largeShapeType = planSizeMode === "大きなもの" ? normalizeLargeShapeType(value(formData.get("largeShapeType"))) : "";
+    const largeAxisDirection = planSizeMode === "大きなもの" ? normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))) : "";
+    const line1NsDir = normalizeNsDir(value(formData.get("line1NsDir")));
+    const line1EwDir = normalizeEwDir(value(formData.get("line1EwDir")));
+    const line2NsDir = normalizeNsDir(value(formData.get("line2NsDir")));
+    const line2EwDir = normalizeEwDir(value(formData.get("line2EwDir")));
+    const line1NsCm = value(formData.get("line1NsCm"));
+    const line1EwCm = value(formData.get("line1EwCm"));
+    const line2NsCm = value(formData.get("line2NsCm"));
+    const line2EwCm = value(formData.get("line2EwCm"));
+    const rectSide1Cm = value(formData.get("rectSide1Cm"));
+    const rectSide2Cm = value(formData.get("rectSide2Cm"));
+    const ellipseLongRadiusCm = value(formData.get("ellipseLongRadiusCm"));
+    const ellipseShortRadiusCm = value(formData.get("ellipseShortRadiusCm"));
 
     const recordBase = {
       id: recordId,
@@ -539,10 +648,30 @@ function bindEvents() {
       levelLowerCm: value(formData.get("levelLowerCm")),
       occurrenceSection: normalizeNeedFlag(value(formData.get("occurrenceSection"))),
       occurrenceSketch: normalizeNeedFlag(value(formData.get("occurrenceSketch"))),
+      sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
+      sectionDiagramHorizonChecked: normalizeChecklistChecked(formData.get("sectionDiagramHorizonChecked")),
+      sectionDiagramLayerFaciesChecked: normalizeChecklistChecked(formData.get("sectionDiagramLayerFaciesChecked")),
+      photoClinometerChecked: normalizeChecklistChecked(formData.get("photoClinometerChecked")),
+      photoRulerChecked: normalizeChecklistChecked(formData.get("photoRulerChecked")),
       nsDir: normalizeNsDir(value(formData.get("nsDir"))),
       nsCm: value(formData.get("nsCm")),
       ewDir: normalizeEwDir(value(formData.get("ewDir"))),
       ewCm: value(formData.get("ewCm")),
+      planSizeMode,
+      largeShapeType,
+      largeAxisDirection,
+      line1NsDir: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line1NsDir : "",
+      line1NsCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line1NsCm : "",
+      line1EwDir: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line1EwDir : "",
+      line1EwCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line1EwCm : "",
+      line2NsDir: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line2NsDir : "",
+      line2NsCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line2NsCm : "",
+      line2EwDir: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line2EwDir : "",
+      line2EwCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? line2EwCm : "",
+      rectSide1Cm: planSizeMode === "大きなもの" && largeShapeType === "長方形" ? rectSide1Cm : "",
+      rectSide2Cm: planSizeMode === "大きなもの" && largeShapeType === "長方形" ? rectSide2Cm : "",
+      ellipseLongRadiusCm: planSizeMode === "大きなもの" && largeShapeType === "楕円" ? ellipseLongRadiusCm : "",
+      ellipseShortRadiusCm: planSizeMode === "大きなもの" && largeShapeType === "楕円" ? ellipseShortRadiusCm : "",
       importantFlag: normalizeHasFlag(value(formData.get("importantFlag"))),
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
@@ -605,6 +734,11 @@ function bindEvents() {
   recordResetBtn.addEventListener("click", () => {
     resetRecordForm({ showMessage: true });
   });
+  if (recordCopyToInputBtn) {
+    recordCopyToInputBtn.addEventListener("click", () => {
+      copyCurrentEditToInput();
+    });
+  }
 
   recordTableBody.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
@@ -656,6 +790,11 @@ function bindEvents() {
     if (action === "edit") {
       const rowKuwaku = value(button.dataset.kuwaku);
       openRecordForEdit(recordId, rowKuwaku);
+      return;
+    }
+    if (action === "copy-to-input") {
+      const rowKuwaku = value(button.dataset.kuwaku);
+      copySavedRecordToInput(recordId, rowKuwaku);
       return;
     }
     if (action === "card") {
@@ -725,6 +864,79 @@ function bindEvents() {
     });
   }
 
+  if (exportListRangeKuwakuSelect) {
+    exportListRangeKuwakuSelect.addEventListener("change", () => {
+      exportListRangeKuwaku = value(exportListRangeKuwakuSelect.value) || ALL_GRIDS_VALUE;
+      renderExportOutput();
+    });
+  }
+  if (exportListRangeCategorySelect) {
+    exportListRangeCategorySelect.addEventListener("change", () => {
+      exportListRangeCategory = value(exportListRangeCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
+      renderExportOutput();
+    });
+  }
+  if (exportListRangeStatusSelect) {
+    exportListRangeStatusSelect.addEventListener("change", () => {
+      exportListRangeStatus = value(exportListRangeStatusSelect.value) || "all";
+      renderExportOutput();
+    });
+  }
+  if (exportListRangeSpecimenFromInput) {
+    exportListRangeSpecimenFromInput.addEventListener("input", () => {
+      exportListRangeSpecimenFrom = value(exportListRangeSpecimenFromInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportListRangeSpecimenToInput) {
+    exportListRangeSpecimenToInput.addEventListener("input", () => {
+      exportListRangeSpecimenTo = value(exportListRangeSpecimenToInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportListRangeDateFromInput) {
+    exportListRangeDateFromInput.addEventListener("input", () => {
+      exportListRangeDateFrom = value(exportListRangeDateFromInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportListRangeDateToInput) {
+    exportListRangeDateToInput.addEventListener("input", () => {
+      exportListRangeDateTo = value(exportListRangeDateToInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportCardRangeKuwakuSelect) {
+    exportCardRangeKuwakuSelect.addEventListener("change", () => {
+      exportCardRangeKuwaku = value(exportCardRangeKuwakuSelect.value) || ALL_GRIDS_VALUE;
+      renderExportOutput();
+    });
+  }
+  if (exportCardRangeCategorySelect) {
+    exportCardRangeCategorySelect.addEventListener("change", () => {
+      exportCardRangeCategory = value(exportCardRangeCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
+      renderExportOutput();
+    });
+  }
+  if (exportCardRangeStatusSelect) {
+    exportCardRangeStatusSelect.addEventListener("change", () => {
+      exportCardRangeStatus = value(exportCardRangeStatusSelect.value) || "all";
+      renderExportOutput();
+    });
+  }
+  if (exportCardRangeDateFromInput) {
+    exportCardRangeDateFromInput.addEventListener("input", () => {
+      exportCardRangeDateFrom = value(exportCardRangeDateFromInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportCardRangeDateToInput) {
+    exportCardRangeDateToInput.addEventListener("input", () => {
+      exportCardRangeDateTo = value(exportCardRangeDateToInput.value);
+      renderExportOutput();
+    });
+  }
+
   if (planKuwakuSelect) {
     planKuwakuSelect.addEventListener("change", () => {
       selectedPlanKuwaku = value(planKuwakuSelect.value);
@@ -748,6 +960,109 @@ function bindEvents() {
     planDetailSubSelect.addEventListener("change", () => {
       selectedPlanDetailSub = value(planDetailSubSelect.value) || ALL_DETAIL_SUBS_VALUE;
       renderPlanOutput();
+    });
+  }
+
+  if (exportPlanKuwakuSelect) {
+    exportPlanKuwakuSelect.addEventListener("change", () => {
+      exportPlanKuwaku = value(exportPlanKuwakuSelect.value);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanCategorySelect) {
+    exportPlanCategorySelect.addEventListener("change", () => {
+      exportPlanCategory = value(exportPlanCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
+      renderExportOutput();
+    });
+  }
+  if (exportPlanDateFromInput) {
+    exportPlanDateFromInput.addEventListener("input", () => {
+      exportPlanDateFrom = value(exportPlanDateFromInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanDateToInput) {
+    exportPlanDateToInput.addEventListener("input", () => {
+      exportPlanDateTo = value(exportPlanDateToInput.value);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeUnitCheck) {
+    exportPlanModeUnitCheck.addEventListener("change", () => {
+      exportPlanModeUnitEnabled = Boolean(exportPlanModeUnitCheck.checked);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeUnitButtons) {
+    exportPlanModeUnitButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-value]");
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      toggleSelectionInSet(exportPlanModeUnitValues, value(button.dataset.value));
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailCheck) {
+    exportPlanModeDetailCheck.addEventListener("change", () => {
+      exportPlanModeDetailEnabled = Boolean(exportPlanModeDetailCheck.checked);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailUnitChecks) {
+    exportPlanModeDetailUnitChecks.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") {
+        return;
+      }
+      toggleSelectionInSet(exportPlanModeDetailUnitValues, value(target.value), target.checked);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailButtons) {
+    exportPlanModeDetailButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-value]");
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      toggleSelectionInSet(exportPlanModeDetailValues, value(button.dataset.value));
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailSubCheck) {
+    exportPlanModeDetailSubCheck.addEventListener("change", () => {
+      exportPlanModeDetailSubEnabled = Boolean(exportPlanModeDetailSubCheck.checked);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailSubUnitChecks) {
+    exportPlanModeDetailSubUnitChecks.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") {
+        return;
+      }
+      toggleSelectionInSet(exportPlanModeDetailSubUnitValues, value(target.value), target.checked);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailSubDetailChecks) {
+    exportPlanModeDetailSubDetailChecks.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") {
+        return;
+      }
+      toggleSelectionInSet(exportPlanModeDetailSubDetailValues, value(target.value), target.checked);
+      renderExportOutput();
+    });
+  }
+  if (exportPlanModeDetailSubButtons) {
+    exportPlanModeDetailSubButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-value]");
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      toggleSelectionInSet(exportPlanModeDetailSubValues, value(button.dataset.value));
+      renderExportOutput();
     });
   }
 
@@ -864,16 +1179,42 @@ function bindEvents() {
   });
 
   exportListCsvBtn.addEventListener("click", () => {
+    if (!getListExportRecords().length) {
+      showToast("CSV出力対象データがありません");
+      return;
+    }
     const csv = buildListCsv();
     downloadFile(`nojiri-kaseki-list-${timestamp()}.csv`, csv, "text/csv;charset=utf-8");
     showToast("リストCSVを書き出しました");
   });
 
   exportCardCsvBtn.addEventListener("click", () => {
+    if (!getCardExportRecords().length) {
+      showToast("カードCSVの出力対象データがありません");
+      return;
+    }
     const csv = buildCardCsv();
     downloadFile(`nojiri-kaseki-card-${timestamp()}.csv`, csv, "text/csv;charset=utf-8");
     showToast("カードCSVを書き出しました");
   });
+
+  if (exportListPdfBtn) {
+    exportListPdfBtn.addEventListener("click", () => {
+      exportListPdf();
+    });
+  }
+
+  if (exportCardPdfBtn) {
+    exportCardPdfBtn.addEventListener("click", () => {
+      exportCardPdf();
+    });
+  }
+
+  if (exportPlanPdfBtn) {
+    exportPlanPdfBtn.addEventListener("click", () => {
+      exportPlanPdf();
+    });
+  }
 
   exportJsonBtn.addEventListener("click", () => {
     const json = JSON.stringify(state, null, 2);
@@ -979,7 +1320,7 @@ function setActiveTab(tabId) {
   } else {
     clearEditMissingRequiredHighlights();
   }
-  if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab")) {
+  if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab" || tabId === "export-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
   }
 }
@@ -994,11 +1335,17 @@ function syncRecordFormPlacement(tabId) {
       editRecordFormHost.appendChild(recordForm);
     }
     recordSubmitBtn.textContent = "上書き保存";
+    if (recordCopyToInputBtn) {
+      recordCopyToInputBtn.classList.remove("hidden");
+    }
     return;
   }
 
   if (recordForm.parentElement !== recordFormHost) {
     recordFormHost.appendChild(recordForm);
+  }
+  if (recordCopyToInputBtn) {
+    recordCopyToInputBtn.classList.add("hidden");
   }
 
   if (tabId === "input-tab") {
@@ -1145,11 +1492,18 @@ function activateDirectionTab(group, valueRaw) {
 function syncDirectionTabsFromForm() {
   setDirectionGroupValue("ns", nsDirInput?.value);
   setDirectionGroupValue("ew", ewDirInput?.value);
+  setDirectionGroupValue("line1Ns", line1NsDirInput?.value);
+  setDirectionGroupValue("line1Ew", line1EwDirInput?.value);
+  setDirectionGroupValue("line2Ns", line2NsDirInput?.value);
+  setDirectionGroupValue("line2Ew", line2EwDirInput?.value);
   setDirectionGroupValue("importantFlag", importantFlagInput?.value);
   setDirectionGroupValue("simpleRecordFlag", simpleRecordFlagInput?.value);
   setDirectionGroupValue("occurrenceSection", occurrenceSectionInput?.value);
   setDirectionGroupValue("occurrenceSketch", occurrenceSketchInput?.value);
   setDirectionGroupValue("layerRelative", layerRelativeInput?.value);
+  setDirectionGroupValue("planSizeMode", planSizeModeInput?.value);
+  setDirectionGroupValue("largeShapeType", largeShapeTypeInput?.value);
+  syncLargeShapeSectionFromForm();
 
   dirTabButtons.forEach((button) => {
     const group = value(button.dataset.group);
@@ -1166,6 +1520,22 @@ function setDirectionGroupValue(group, valueRaw) {
   }
   if (group === "ew" && ewDirInput) {
     ewDirInput.value = normalized;
+    return;
+  }
+  if (group === "line1Ns" && line1NsDirInput) {
+    line1NsDirInput.value = normalized;
+    return;
+  }
+  if (group === "line1Ew" && line1EwDirInput) {
+    line1EwDirInput.value = normalized;
+    return;
+  }
+  if (group === "line2Ns" && line2NsDirInput) {
+    line2NsDirInput.value = normalized;
+    return;
+  }
+  if (group === "line2Ew" && line2EwDirInput) {
+    line2EwDirInput.value = normalized;
     return;
   }
   if (group === "importantFlag" && importantFlagInput) {
@@ -1186,6 +1556,14 @@ function setDirectionGroupValue(group, valueRaw) {
   }
   if (group === "layerRelative" && layerRelativeInput) {
     layerRelativeInput.value = normalized;
+    return;
+  }
+  if (group === "planSizeMode" && planSizeModeInput) {
+    planSizeModeInput.value = normalized;
+    return;
+  }
+  if (group === "largeShapeType" && largeShapeTypeInput) {
+    largeShapeTypeInput.value = normalized;
   }
 }
 
@@ -1195,6 +1573,18 @@ function getDirectionGroupValue(group) {
   }
   if (group === "ew") {
     return normalizeDirectionValue(group, ewDirInput?.value);
+  }
+  if (group === "line1Ns") {
+    return normalizeDirectionValue(group, line1NsDirInput?.value);
+  }
+  if (group === "line1Ew") {
+    return normalizeDirectionValue(group, line1EwDirInput?.value);
+  }
+  if (group === "line2Ns") {
+    return normalizeDirectionValue(group, line2NsDirInput?.value);
+  }
+  if (group === "line2Ew") {
+    return normalizeDirectionValue(group, line2EwDirInput?.value);
   }
   if (group === "importantFlag") {
     return normalizeDirectionValue(group, importantFlagInput?.value);
@@ -1211,7 +1601,49 @@ function getDirectionGroupValue(group) {
   if (group === "layerRelative") {
     return normalizeDirectionValue(group, layerRelativeInput?.value);
   }
+  if (group === "planSizeMode") {
+    return normalizeDirectionValue(group, planSizeModeInput?.value);
+  }
+  if (group === "largeShapeType") {
+    return normalizeDirectionValue(group, largeShapeTypeInput?.value);
+  }
   return "";
+}
+
+function syncLargeShapeSectionFromForm() {
+  if (!largeShapeSection) {
+    return;
+  }
+  const mode = normalizePlanSizeMode(planSizeModeInput?.value);
+  if (planSizeModeInput) {
+    planSizeModeInput.value = mode;
+  }
+  const isLarge = mode === "大きなもの";
+  largeShapeSection.classList.toggle("hidden", !isLarge);
+  if (!isLarge) {
+    if (largeShapeTypeInput) {
+      largeShapeTypeInput.value = "";
+    }
+    if (largeAxisDirectionInput) {
+      largeAxisDirectionInput.value = "";
+    }
+    largeShapePanels.forEach((panel) => {
+      panel.classList.add("hidden");
+    });
+    return;
+  }
+
+  const shapeTypeRaw = normalizeLargeShapeType(largeShapeTypeInput?.value);
+  const shapeType = shapeTypeRaw || "直線状";
+  if (largeShapeTypeInput) {
+    largeShapeTypeInput.value = shapeType;
+  }
+  if (largeAxisDirectionInput) {
+    largeAxisDirectionInput.value = normalizeLargeAxisDirection(largeAxisDirectionInput.value);
+  }
+  largeShapePanels.forEach((panel) => {
+    panel.classList.toggle("hidden", value(panel.dataset.largeShapePanel) !== shapeType);
+  });
 }
 
 function activateLayerTab(layerRaw) {
@@ -1519,6 +1951,27 @@ function resetRecordForm({ showMessage }) {
   recordForm.elements.importantFlag.value = "無";
   recordForm.elements.simpleRecordFlag.value = "-";
   recordForm.elements.layerRelative.value = "";
+  if (recordForm.elements.planSizeMode) {
+    recordForm.elements.planSizeMode.value = "通常";
+  }
+  if (recordForm.elements.largeShapeType) {
+    recordForm.elements.largeShapeType.value = "";
+  }
+  if (recordForm.elements.largeAxisDirection) {
+    recordForm.elements.largeAxisDirection.value = "";
+  }
+  if (recordForm.elements.line1NsDir) {
+    recordForm.elements.line1NsDir.value = "北から";
+  }
+  if (recordForm.elements.line1EwDir) {
+    recordForm.elements.line1EwDir.value = "東から";
+  }
+  if (recordForm.elements.line2NsDir) {
+    recordForm.elements.line2NsDir.value = "北から";
+  }
+  if (recordForm.elements.line2EwDir) {
+    recordForm.elements.line2EwDir.value = "東から";
+  }
   setLayerFromValue(PRESET_LAYER_NAMES[0]);
 
   nsDirInput.value = "北から";
@@ -1559,9 +2012,46 @@ function populateRecordForm(record) {
   recordForm.elements.levelLowerCm.value = record.levelLowerCm || "";
   recordForm.elements.occurrenceSection.value = normalizeNeedFlag(record.occurrenceSection);
   recordForm.elements.occurrenceSketch.value = normalizeNeedFlag(record.occurrenceSketch);
+  if (recordForm.elements.sectionDiagramDistanceChecked) {
+    recordForm.elements.sectionDiagramDistanceChecked.checked = normalizeChecklistChecked(record.sectionDiagramDistanceChecked) === "1";
+  }
+  if (recordForm.elements.sectionDiagramHorizonChecked) {
+    recordForm.elements.sectionDiagramHorizonChecked.checked = normalizeChecklistChecked(record.sectionDiagramHorizonChecked) === "1";
+  }
+  if (recordForm.elements.sectionDiagramLayerFaciesChecked) {
+    recordForm.elements.sectionDiagramLayerFaciesChecked.checked =
+      normalizeChecklistChecked(record.sectionDiagramLayerFaciesChecked) === "1";
+  }
+  if (recordForm.elements.photoClinometerChecked) {
+    recordForm.elements.photoClinometerChecked.checked = normalizeChecklistChecked(record.photoClinometerChecked) === "1";
+  }
+  if (recordForm.elements.photoRulerChecked) {
+    recordForm.elements.photoRulerChecked.checked = normalizeChecklistChecked(record.photoRulerChecked) === "1";
+  }
   recordForm.elements.importantFlag.value = normalizeHasFlag(record.importantFlag);
   recordForm.elements.simpleRecordFlag.value = normalizeCircleDashFlag(record.simpleRecordFlag);
   recordForm.elements.layerRelative.value = normalizeLayerRelative(record.layerRelative);
+  if (recordForm.elements.planSizeMode) {
+    recordForm.elements.planSizeMode.value = normalizePlanSizeMode(record.planSizeMode);
+  }
+  if (recordForm.elements.largeShapeType) {
+    recordForm.elements.largeShapeType.value = normalizeLargeShapeType(record.largeShapeType);
+  }
+  if (recordForm.elements.largeAxisDirection) {
+    recordForm.elements.largeAxisDirection.value = normalizeLargeAxisDirection(record.largeAxisDirection);
+  }
+  if (recordForm.elements.line1NsDir) {
+    recordForm.elements.line1NsDir.value = normalizeNsDir(record.line1NsDir);
+  }
+  if (recordForm.elements.line1EwDir) {
+    recordForm.elements.line1EwDir.value = normalizeEwDir(record.line1EwDir);
+  }
+  if (recordForm.elements.line2NsDir) {
+    recordForm.elements.line2NsDir.value = normalizeNsDir(record.line2NsDir);
+  }
+  if (recordForm.elements.line2EwDir) {
+    recordForm.elements.line2EwDir.value = normalizeEwDir(record.line2EwDir);
+  }
 
   nsDirInput.value = normalizeNsDir(record.nsDir);
   recordForm.elements.nsCm.value = record.nsCm || "";
@@ -1572,6 +2062,14 @@ function populateRecordForm(record) {
   setLayerFromValue(record.layerName);
   recordForm.elements.detail.value = record.detail || "";
   recordForm.elements.detailSub.value = record.detailSub || "";
+  recordForm.elements.line1NsCm.value = record.line1NsCm || "";
+  recordForm.elements.line1EwCm.value = record.line1EwCm || "";
+  recordForm.elements.line2NsCm.value = record.line2NsCm || "";
+  recordForm.elements.line2EwCm.value = record.line2EwCm || "";
+  recordForm.elements.rectSide1Cm.value = record.rectSide1Cm || "";
+  recordForm.elements.rectSide2Cm.value = record.rectSide2Cm || "";
+  recordForm.elements.ellipseLongRadiusCm.value = record.ellipseLongRadiusCm || "";
+  recordForm.elements.ellipseShortRadiusCm.value = record.ellipseShortRadiusCm || "";
   recordForm.elements.layerRef.value = record.layerRef || "";
   recordForm.elements.layerFromCm.value = record.layerFromCm || "";
   recordForm.elements.notes.value = record.notes || "";
@@ -1670,10 +2168,30 @@ function buildCurrentEditDraftRecord() {
     levelLowerCm: value(formData.get("levelLowerCm")),
     occurrenceSection: value(formData.get("occurrenceSection")),
     occurrenceSketch: value(formData.get("occurrenceSketch")),
+    sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
+    sectionDiagramHorizonChecked: normalizeChecklistChecked(formData.get("sectionDiagramHorizonChecked")),
+    sectionDiagramLayerFaciesChecked: normalizeChecklistChecked(formData.get("sectionDiagramLayerFaciesChecked")),
+    photoClinometerChecked: normalizeChecklistChecked(formData.get("photoClinometerChecked")),
+    photoRulerChecked: normalizeChecklistChecked(formData.get("photoRulerChecked")),
     nsDir: value(formData.get("nsDir")),
     nsCm: value(formData.get("nsCm")),
     ewDir: value(formData.get("ewDir")),
     ewCm: value(formData.get("ewCm")),
+    planSizeMode: normalizePlanSizeMode(value(formData.get("planSizeMode"))),
+    largeShapeType: normalizeLargeShapeType(value(formData.get("largeShapeType"))),
+    largeAxisDirection: normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
+    line1NsDir: normalizeNsDir(value(formData.get("line1NsDir"))),
+    line1NsCm: value(formData.get("line1NsCm")),
+    line1EwDir: normalizeEwDir(value(formData.get("line1EwDir"))),
+    line1EwCm: value(formData.get("line1EwCm")),
+    line2NsDir: normalizeNsDir(value(formData.get("line2NsDir"))),
+    line2NsCm: value(formData.get("line2NsCm")),
+    line2EwDir: normalizeEwDir(value(formData.get("line2EwDir"))),
+    line2EwCm: value(formData.get("line2EwCm")),
+    rectSide1Cm: value(formData.get("rectSide1Cm")),
+    rectSide2Cm: value(formData.get("rectSide2Cm")),
+    ellipseLongRadiusCm: value(formData.get("ellipseLongRadiusCm")),
+    ellipseShortRadiusCm: value(formData.get("ellipseShortRadiusCm")),
     layerName: getSelectedLayerName(),
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
@@ -1685,6 +2203,114 @@ function buildCurrentEditDraftRecord() {
     sectionDiagrams: clonePhotos(currentSectionDiagrams),
     photos: clonePhotos(currentPhotos),
   };
+}
+
+function copyCurrentEditToInput() {
+  if (getActiveTabId() !== "edit-tab") {
+    return;
+  }
+  const draft = buildCurrentEditDraftRecord();
+  if (!draft) {
+    showToast("編集内容のコピーに失敗しました");
+    return;
+  }
+
+  const kuwakuParts = parseKuwaku(draft.kuwaku);
+  const teamState = normalizeTeamState(draft.team, draft.teamOther);
+  if (siteForm?.elements) {
+    siteForm.elements.kuwakuHeadA.value = kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
+    siteForm.elements.kuwakuHeadB.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
+    siteForm.elements.kuwakuBlock.value = kuwakuParts.block || "";
+    siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
+    siteForm.elements.levelHeight.value = value(draft.levelHeight);
+    siteForm.elements.date.value = value(draft.date);
+    siteForm.elements.team.value = teamState.team;
+    siteForm.elements.teamOther.value = teamState.teamOther;
+    siteForm.elements.teamLead.value = value(draft.teamLead);
+    siteForm.elements.recorder.value = value(draft.recorder);
+    syncTeamOtherInput(siteForm.elements.team.value);
+  }
+
+  isOverwriteMode = false;
+  overwriteOriginalRecord = null;
+  clearOverwriteUpdatedState();
+  clearEditHistory();
+  editingRecordId = null;
+  if (recordIdInput) {
+    recordIdInput.value = "";
+  }
+
+  setActiveTab("input-tab");
+  populateRecordForm({
+    ...draft,
+    id: "",
+    sectionDiagrams: [],
+    photos: [],
+    sectionDiagramDistanceChecked: "",
+    sectionDiagramHorizonChecked: "",
+    sectionDiagramLayerFaciesChecked: "",
+    photoClinometerChecked: "",
+    photoRulerChecked: "",
+  });
+  editingRecordId = null;
+  if (recordIdInput) {
+    recordIdInput.value = "";
+  }
+  updateDuplicateSpecimenWarning();
+  showToast("コピーして新規入力を作成しました");
+}
+
+function copySavedRecordToInput(recordId, preferredKuwaku = "") {
+  const record = findRecord(recordId);
+  if (!record) {
+    showToast("対象データが見つかりません");
+    return;
+  }
+
+  const kuwakuSource = value(preferredKuwaku) || value(record.kuwaku) || getRecordKuwaku(record);
+  const kuwakuParts = parseKuwaku(kuwakuSource);
+  const teamState = normalizeTeamState(value(record.team), value(record.teamOther));
+  if (siteForm?.elements) {
+    siteForm.elements.kuwakuHeadA.value = kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
+    siteForm.elements.kuwakuHeadB.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
+    siteForm.elements.kuwakuBlock.value = kuwakuParts.block || "";
+    siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
+    siteForm.elements.levelHeight.value = value(record.levelHeight);
+    siteForm.elements.date.value = value(record.date);
+    siteForm.elements.team.value = teamState.team;
+    siteForm.elements.teamOther.value = teamState.teamOther;
+    siteForm.elements.teamLead.value = value(record.teamLead);
+    siteForm.elements.recorder.value = value(record.recorder);
+    syncTeamOtherInput(siteForm.elements.team.value);
+  }
+
+  isOverwriteMode = false;
+  overwriteOriginalRecord = null;
+  clearOverwriteUpdatedState();
+  clearEditHistory();
+  editingRecordId = null;
+  if (recordIdInput) {
+    recordIdInput.value = "";
+  }
+
+  setActiveTab("input-tab");
+  populateRecordForm({
+    ...record,
+    id: "",
+    sectionDiagrams: [],
+    photos: [],
+    sectionDiagramDistanceChecked: "",
+    sectionDiagramHorizonChecked: "",
+    sectionDiagramLayerFaciesChecked: "",
+    photoClinometerChecked: "",
+    photoRulerChecked: "",
+  });
+  editingRecordId = null;
+  if (recordIdInput) {
+    recordIdInput.value = "";
+  }
+  updateDuplicateSpecimenWarning();
+  showToast("コピーして新規入力を作成しました");
 }
 
 function getRecordFormFieldByName(name) {
@@ -1807,6 +2433,48 @@ function updateEditMissingRequiredHighlights() {
   if (missingKeys.has("ewCm")) {
     markEditMissingFieldByName("ewCm");
   }
+  if (missingKeys.has("largeShapeType")) {
+    markEditMissingGroupByName("planSizeMode");
+  }
+  if (missingKeys.has("largeAxisDirection")) {
+    markEditMissingFieldByName("largeAxisDirection");
+  }
+  if (missingKeys.has("line1NsDir")) {
+    markEditMissingGroupByName("line1NsDir");
+  }
+  if (missingKeys.has("line1NsCm")) {
+    markEditMissingFieldByName("line1NsCm");
+  }
+  if (missingKeys.has("line1EwDir")) {
+    markEditMissingGroupByName("line1EwDir");
+  }
+  if (missingKeys.has("line1EwCm")) {
+    markEditMissingFieldByName("line1EwCm");
+  }
+  if (missingKeys.has("line2NsDir")) {
+    markEditMissingGroupByName("line2NsDir");
+  }
+  if (missingKeys.has("line2NsCm")) {
+    markEditMissingFieldByName("line2NsCm");
+  }
+  if (missingKeys.has("line2EwDir")) {
+    markEditMissingGroupByName("line2EwDir");
+  }
+  if (missingKeys.has("line2EwCm")) {
+    markEditMissingFieldByName("line2EwCm");
+  }
+  if (missingKeys.has("rectSide1Cm")) {
+    markEditMissingFieldByName("rectSide1Cm");
+  }
+  if (missingKeys.has("rectSide2Cm")) {
+    markEditMissingFieldByName("rectSide2Cm");
+  }
+  if (missingKeys.has("ellipseLongRadiusCm")) {
+    markEditMissingFieldByName("ellipseLongRadiusCm");
+  }
+  if (missingKeys.has("ellipseShortRadiusCm")) {
+    markEditMissingFieldByName("ellipseShortRadiusCm");
+  }
   if (missingKeys.has("layerName")) {
     markEditMissingGroupByName("layerName");
   }
@@ -1825,10 +2493,23 @@ function updateEditMissingRequiredHighlights() {
   if (missingKeys.has("layerFromCm")) {
     markEditMissingFieldByName("layerFromCm");
   }
-  if (missingKeys.has("sectionDiagrams")) {
+  if (
+    hasAnyMissingRequiredKey(missingKeys, [
+      "sectionDiagrams",
+      "sectionDiagramDistanceChecked",
+      "sectionDiagramHorizonChecked",
+      "sectionDiagramLayerFaciesChecked",
+    ])
+  ) {
     const sectionWrap = recordForm?.querySelector(".diagram-upload-wrap");
     if (sectionWrap) {
       sectionWrap.classList.add("edit-missing-group");
+    }
+  }
+  if (hasAnyMissingRequiredKey(missingKeys, ["photoClinometerChecked", "photoRulerChecked"])) {
+    const photoWrap = recordForm?.querySelector(".photo-upload-wrap");
+    if (photoWrap) {
+      photoWrap.classList.add("edit-missing-group");
     }
   }
 }
@@ -1932,6 +2613,683 @@ function renderOutputs() {
   renderCardOutput();
   renderListOutput();
   renderPlanOutput();
+  renderExportOutput();
+}
+
+function renderExportOutput() {
+  renderExportListRangeControls();
+  renderExportCardRangeControls();
+  renderExportPlanControls();
+  updateExportButtonAvailability();
+}
+
+function renderExportListRangeControls() {
+  const kuwakuScopedSource = getRecordsByExportRangeFilters({
+    kuwakuValue: ALL_GRIDS_VALUE,
+    categoryValue: exportListRangeCategory,
+    statusValue: exportListRangeStatus,
+    specimenFromRaw: exportListRangeSpecimenFrom,
+    specimenToRaw: exportListRangeSpecimenTo,
+    dateFromRaw: exportListRangeDateFrom,
+    dateToRaw: exportListRangeDateTo,
+  });
+  const kuwakuOptions = collectExportKuwakuOptionsWithCounts(kuwakuScopedSource);
+  if (!kuwakuOptions.some((item) => item.value === exportListRangeKuwaku)) {
+    exportListRangeKuwaku = ALL_GRIDS_VALUE;
+  }
+  if (exportListRangeKuwakuSelect) {
+    exportListRangeKuwakuSelect.innerHTML = kuwakuOptions
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.value)}" ${item.value === exportListRangeKuwaku ? "selected" : ""}>${escapeHtml(
+            item.label
+          )}</option>`
+      )
+      .join("");
+  }
+
+  const categoryScopedSource = getRecordsByExportRangeFilters({
+    kuwakuValue: exportListRangeKuwaku,
+    categoryValue: EXPORT_CATEGORY_ALL_VALUE,
+    statusValue: exportListRangeStatus,
+    specimenFromRaw: exportListRangeSpecimenFrom,
+    specimenToRaw: exportListRangeSpecimenTo,
+    dateFromRaw: exportListRangeDateFrom,
+    dateToRaw: exportListRangeDateTo,
+  });
+  const categoryOptions = collectExportCategoryOptions(categoryScopedSource);
+  if (!categoryOptions.some((item) => item.value === exportListRangeCategory)) {
+    exportListRangeCategory = EXPORT_CATEGORY_ALL_VALUE;
+  }
+  if (exportListRangeCategorySelect) {
+    exportListRangeCategorySelect.innerHTML = categoryOptions
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.value)}" ${item.value === exportListRangeCategory ? "selected" : ""}>${escapeHtml(
+            item.label
+          )}</option>`
+      )
+      .join("");
+  }
+  if (exportListRangeStatusSelect) {
+    if (!["all", "complete", "incomplete"].includes(exportListRangeStatus)) {
+      exportListRangeStatus = "all";
+    }
+    exportListRangeStatusSelect.value = exportListRangeStatus;
+  }
+  if (exportListRangeSpecimenFromInput) {
+    exportListRangeSpecimenFromInput.value = exportListRangeSpecimenFrom;
+  }
+  if (exportListRangeSpecimenToInput) {
+    exportListRangeSpecimenToInput.value = exportListRangeSpecimenTo;
+  }
+  if (exportListRangeDateFromInput) {
+    exportListRangeDateFromInput.value = exportListRangeDateFrom;
+  }
+  if (exportListRangeDateToInput) {
+    exportListRangeDateToInput.value = exportListRangeDateTo;
+  }
+
+  const filteredRecords = getListExportRecords();
+  if (exportListRangeSummaryEl) {
+    const hasData = filteredRecords.length > 0;
+    exportListRangeSummaryEl.textContent = `対象件数: ${filteredRecords.length}件（${hasData ? "対象あり" : "対象なし"}）`;
+    setAvailabilityClass(exportListRangeSummaryEl, hasData);
+  }
+}
+
+function renderExportCardRangeControls() {
+  const kuwakuScopedSource = getRecordsByExportRangeFilters({
+    kuwakuValue: ALL_GRIDS_VALUE,
+    categoryValue: exportCardRangeCategory,
+    statusValue: exportCardRangeStatus,
+    dateFromRaw: exportCardRangeDateFrom,
+    dateToRaw: exportCardRangeDateTo,
+  });
+  const kuwakuOptions = collectExportKuwakuOptionsWithCounts(kuwakuScopedSource);
+  if (!kuwakuOptions.some((item) => item.value === exportCardRangeKuwaku)) {
+    exportCardRangeKuwaku = ALL_GRIDS_VALUE;
+  }
+  if (exportCardRangeKuwakuSelect) {
+    exportCardRangeKuwakuSelect.innerHTML = kuwakuOptions
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.value)}" ${item.value === exportCardRangeKuwaku ? "selected" : ""}>${escapeHtml(
+            item.label
+          )}</option>`
+      )
+      .join("");
+  }
+
+  const categoryScopedSource = getRecordsByExportRangeFilters({
+    kuwakuValue: exportCardRangeKuwaku,
+    categoryValue: EXPORT_CATEGORY_ALL_VALUE,
+    statusValue: exportCardRangeStatus,
+    dateFromRaw: exportCardRangeDateFrom,
+    dateToRaw: exportCardRangeDateTo,
+  });
+  const categoryOptions = collectExportCategoryOptions(categoryScopedSource);
+  if (!categoryOptions.some((item) => item.value === exportCardRangeCategory)) {
+    exportCardRangeCategory = EXPORT_CATEGORY_ALL_VALUE;
+  }
+  if (exportCardRangeCategorySelect) {
+    exportCardRangeCategorySelect.innerHTML = categoryOptions
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.value)}" ${item.value === exportCardRangeCategory ? "selected" : ""}>${escapeHtml(
+            item.label
+          )}</option>`
+      )
+      .join("");
+  }
+  if (exportCardRangeStatusSelect) {
+    if (!["all", "complete", "incomplete"].includes(exportCardRangeStatus)) {
+      exportCardRangeStatus = "all";
+    }
+    exportCardRangeStatusSelect.value = exportCardRangeStatus;
+  }
+  if (exportCardRangeDateFromInput) {
+    exportCardRangeDateFromInput.value = exportCardRangeDateFrom;
+  }
+  if (exportCardRangeDateToInput) {
+    exportCardRangeDateToInput.value = exportCardRangeDateTo;
+  }
+
+  const filteredRecords = getCardExportRecords();
+  if (exportCardRangeSummaryEl) {
+    const hasData = filteredRecords.length > 0;
+    exportCardRangeSummaryEl.textContent = `対象件数: ${filteredRecords.length}件（${hasData ? "対象あり" : "対象なし"}）`;
+    setAvailabilityClass(exportCardRangeSummaryEl, hasData);
+  }
+}
+
+function renderExportPlanControls() {
+  const sortedRecords = getRecordsByExportRangeFilters({
+    kuwakuValue: ALL_GRIDS_VALUE,
+    categoryValue: EXPORT_CATEGORY_ALL_VALUE,
+    statusValue: "all",
+    dateFromRaw: exportPlanDateFrom,
+    dateToRaw: exportPlanDateTo,
+  });
+  const kuwakuOptions = collectExportKuwakuOptionsWithCounts(sortedRecords).filter((item) => item.value !== ALL_GRIDS_VALUE);
+  if (!kuwakuOptions.length) {
+    exportPlanKuwaku = "";
+  } else if (!kuwakuOptions.some((item) => item.value === exportPlanKuwaku)) {
+    exportPlanKuwaku = kuwakuOptions[0].value;
+  }
+  if (exportPlanKuwakuSelect) {
+    exportPlanKuwakuSelect.innerHTML = kuwakuOptions
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.value)}" ${item.value === exportPlanKuwaku ? "selected" : ""}>${escapeHtml(
+            item.label
+          )}</option>`
+      )
+      .join("");
+  }
+
+  const kuwakuScopedRecords =
+    !exportPlanKuwaku
+      ? []
+      : sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === exportPlanKuwaku);
+  const categoryScopedRecords =
+    exportPlanCategory === EXPORT_CATEGORY_ALL_VALUE
+      ? kuwakuScopedRecords
+      : kuwakuScopedRecords.filter((record) => {
+          const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+          return normalizeSpecimenPrefix(specimen.prefix) === exportPlanCategory;
+        });
+
+  const categoryOptions = collectExportCategoryOptions(kuwakuScopedRecords);
+  if (!categoryOptions.some((item) => item.value === exportPlanCategory)) {
+    exportPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
+  }
+  if (exportPlanCategorySelect) {
+    exportPlanCategorySelect.innerHTML = categoryOptions
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.value)}" ${item.value === exportPlanCategory ? "selected" : ""}>${escapeHtml(
+            item.label
+          )}</option>`
+      )
+      .join("");
+  }
+  if (exportPlanDateFromInput) {
+    exportPlanDateFromInput.value = exportPlanDateFrom;
+  }
+  if (exportPlanDateToInput) {
+    exportPlanDateToInput.value = exportPlanDateTo;
+  }
+  syncExportPlanModeControls(categoryScopedRecords);
+
+  const groups = buildPlanPdfGroupsForExport({
+    kuwakuValue: exportPlanKuwaku,
+    categoryValue: exportPlanCategory,
+    dateFromRaw: exportPlanDateFrom,
+    dateToRaw: exportPlanDateTo,
+    modeSelections: getExportPlanModeSelections(),
+  });
+  const recordCount = groups.reduce((sum, group) => sum + (Number.isFinite(group.count) ? group.count : 0), 0);
+  if (exportPlanSummaryEl) {
+    const hasData = recordCount > 0;
+    exportPlanSummaryEl.textContent = `PDFページ対象: ${groups.length}ページ / 記録 ${recordCount}件（${hasData ? "対象あり" : "対象なし"}）`;
+    setAvailabilityClass(exportPlanSummaryEl, hasData);
+  }
+}
+
+function updateExportButtonAvailability() {
+  const listCount = getListExportRecords().length;
+  const cardCount = getCardExportRecords().length;
+  const planGroups = buildPlanPdfGroupsForExport({
+    kuwakuValue: exportPlanKuwaku,
+    categoryValue: exportPlanCategory,
+    dateFromRaw: exportPlanDateFrom,
+    dateToRaw: exportPlanDateTo,
+    modeSelections: getExportPlanModeSelections(),
+  });
+  const planRecordCount = planGroups.reduce((sum, group) => sum + (Number.isFinite(group.count) ? group.count : 0), 0);
+
+  if (exportListCsvBtn) {
+    exportListCsvBtn.disabled = listCount === 0;
+  }
+  if (exportListPdfBtn) {
+    exportListPdfBtn.disabled = listCount === 0;
+  }
+  if (exportCardCsvBtn) {
+    exportCardCsvBtn.disabled = cardCount === 0;
+  }
+  if (exportCardPdfBtn) {
+    exportCardPdfBtn.disabled = cardCount === 0;
+  }
+  if (exportPlanPdfBtn) {
+    exportPlanPdfBtn.disabled = planRecordCount === 0;
+  }
+}
+
+function setAvailabilityClass(element, hasData) {
+  if (!element) {
+    return;
+  }
+  element.classList.toggle("has-data", hasData);
+  element.classList.toggle("no-data", !hasData);
+}
+
+function syncExportPlanModeControls(recordsRaw) {
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const unitOptions = collectExportPlanValueOptions(records, (record) => unitValueForSelect(record.unit), unitLabelForSelect);
+  exportPlanModeUnitValues = syncExportPlanModeValues(exportPlanModeUnitValues, unitOptions);
+  exportPlanModeDetailUnitValues = syncExportPlanModeValues(exportPlanModeDetailUnitValues, unitOptions);
+  exportPlanModeDetailSubUnitValues = syncExportPlanModeValues(exportPlanModeDetailSubUnitValues, unitOptions);
+  renderExportPlanModeButtons(exportPlanModeUnitButtons, unitOptions, exportPlanModeUnitValues);
+  renderExportPlanModeChecks(exportPlanModeDetailUnitChecks, unitOptions, exportPlanModeDetailUnitValues);
+  renderExportPlanModeChecks(exportPlanModeDetailSubUnitChecks, unitOptions, exportPlanModeDetailSubUnitValues);
+
+  const detailModeRecords = filterPlanRecordsForMode(records, { unitValues: exportPlanModeDetailUnitValues });
+  const detailOptions = collectExportPlanValueOptions(
+    detailModeRecords,
+    (record) => detailValueForSelect(record.detail),
+    detailLabelForSelect
+  );
+  exportPlanModeDetailValues = syncExportPlanModeValues(exportPlanModeDetailValues, detailOptions);
+  renderExportPlanModeButtons(exportPlanModeDetailButtons, detailOptions, exportPlanModeDetailValues);
+
+  const detailSubBaseRecords = filterPlanRecordsForMode(records, { unitValues: exportPlanModeDetailSubUnitValues });
+  const detailSubDetailOptions = collectExportPlanValueOptions(
+    detailSubBaseRecords,
+    (record) => detailValueForSelect(record.detail),
+    detailLabelForSelect
+  );
+  exportPlanModeDetailSubDetailValues = syncExportPlanModeValues(exportPlanModeDetailSubDetailValues, detailSubDetailOptions);
+  renderExportPlanModeChecks(
+    exportPlanModeDetailSubDetailChecks,
+    detailSubDetailOptions,
+    exportPlanModeDetailSubDetailValues
+  );
+
+  const detailSubRecords = filterPlanRecordsForMode(records, {
+    unitValues: exportPlanModeDetailSubUnitValues,
+    detailValues: exportPlanModeDetailSubDetailValues,
+  });
+  const detailSubOptions = collectExportPlanValueOptions(
+    detailSubRecords,
+    (record) => detailSubValueForSelect(record.detailSub),
+    detailSubLabelForSelect
+  );
+  exportPlanModeDetailSubValues = syncExportPlanModeValues(exportPlanModeDetailSubValues, detailSubOptions);
+  renderExportPlanModeButtons(exportPlanModeDetailSubButtons, detailSubOptions, exportPlanModeDetailSubValues);
+
+  syncExportPlanModeCheckbox(exportPlanModeUnitCheck, unitOptions.length > 0, "unit");
+  syncExportPlanModeCheckbox(exportPlanModeDetailCheck, unitOptions.length > 0 && detailOptions.length > 0, "detail");
+  syncExportPlanModeCheckbox(
+    exportPlanModeDetailSubCheck,
+    unitOptions.length > 0 && detailSubDetailOptions.length > 0 && detailSubOptions.length > 0,
+    "detailSub"
+  );
+
+  const unitScopedRecords = filterPlanRecordsForMode(records, { unitValues: exportPlanModeUnitValues });
+  const detailScopedRecords = filterPlanRecordsForMode(records, {
+    unitValues: exportPlanModeDetailUnitValues,
+    detailValues: exportPlanModeDetailValues,
+  });
+  const detailSubScopedRecords = filterPlanRecordsForMode(records, {
+    unitValues: exportPlanModeDetailSubUnitValues,
+    detailValues: exportPlanModeDetailSubDetailValues,
+    detailSubValues: exportPlanModeDetailSubValues,
+  });
+
+  renderExportPlanModeStats(exportPlanModeUnitStats, unitScopedRecords);
+  renderExportPlanModeStats(exportPlanModeDetailStats, detailScopedRecords);
+  renderExportPlanModeStats(exportPlanModeDetailSubStats, detailSubScopedRecords);
+}
+
+function syncExportPlanModeCheckbox(checkbox, hasOptions, modeKey) {
+  if (!checkbox) {
+    return;
+  }
+  if (!hasOptions) {
+    checkbox.checked = false;
+    checkbox.disabled = true;
+    return;
+  }
+  checkbox.disabled = false;
+  if (modeKey === "unit") {
+    checkbox.checked = exportPlanModeUnitEnabled;
+  } else if (modeKey === "detail") {
+    checkbox.checked = exportPlanModeDetailEnabled;
+  } else if (modeKey === "detailSub") {
+    checkbox.checked = exportPlanModeDetailSubEnabled;
+  }
+}
+
+function collectExportPlanValueOptions(recordsRaw, valueGetter, labelGetter) {
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const countMap = new Map();
+  records.forEach((record) => {
+    const optionValue = value(valueGetter(record));
+    if (!optionValue) {
+      return;
+    }
+    countMap.set(optionValue, (countMap.get(optionValue) || 0) + 1);
+  });
+  return Array.from(countMap.entries())
+    .map(([optionValue, count]) => ({
+      value: optionValue,
+      label: `${labelGetter(optionValue)}（${count}件）`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ja", { numeric: true, sensitivity: "base" }));
+}
+
+function syncExportPlanModeValues(currentValuesRaw, options) {
+  const next = new Set();
+  const currentValues = currentValuesRaw instanceof Set ? currentValuesRaw : new Set();
+  const optionValues = (Array.isArray(options) ? options : []).map((option) => value(option.value)).filter(Boolean);
+  const valid = new Set(optionValues);
+  currentValues.forEach((selectedValue) => {
+    const normalized = value(selectedValue);
+    if (normalized && valid.has(normalized)) {
+      next.add(normalized);
+    }
+  });
+  if (!next.size && optionValues.length) {
+    optionValues.forEach((optionValue) => next.add(optionValue));
+  }
+  return next;
+}
+
+function renderExportPlanModeButtons(container, options, selectedValues) {
+  if (!container) {
+    return;
+  }
+  const optionList = Array.isArray(options) ? options : [];
+  if (!optionList.length) {
+    container.innerHTML = '<span class="muted">候補なし</span>';
+    return;
+  }
+  container.innerHTML = optionList
+    .map(
+      (option) =>
+        `<button type="button" class="export-plan-option-button ${
+          selectedValues.has(option.value) ? "active" : ""
+        }" data-value="${escapeHtml(option.value)}">${escapeHtml(
+          option.label
+        )}</button>`
+    )
+    .join("");
+}
+
+function renderExportPlanModeChecks(container, options, selectedValues) {
+  if (!container) {
+    return;
+  }
+  const optionList = Array.isArray(options) ? options : [];
+  if (!optionList.length) {
+    container.innerHTML = '<span class="muted">候補なし</span>';
+    return;
+  }
+  container.innerHTML = optionList
+    .map(
+      (option) => `
+        <label class="export-plan-option-check">
+          <input type="checkbox" value="${escapeHtml(option.value)}" ${selectedValues.has(option.value) ? "checked" : ""} />
+          <span>${escapeHtml(option.label)}</span>
+        </label>
+      `
+    )
+    .join("");
+}
+
+function toggleSelectionInSet(targetSet, optionValueRaw, checkedForced = null) {
+  const optionValue = value(optionValueRaw);
+  if (!optionValue || !(targetSet instanceof Set)) {
+    return;
+  }
+  if (checkedForced === true) {
+    targetSet.add(optionValue);
+    return;
+  }
+  if (checkedForced === false) {
+    targetSet.delete(optionValue);
+    return;
+  }
+  if (targetSet.has(optionValue)) {
+    targetSet.delete(optionValue);
+  } else {
+    targetSet.add(optionValue);
+  }
+}
+
+function normalizeSelectionSet(valuesRaw) {
+  const next = new Set();
+  if (valuesRaw instanceof Set) {
+    valuesRaw.forEach((item) => {
+      const normalized = value(item);
+      if (normalized) {
+        next.add(normalized);
+      }
+    });
+    return next;
+  }
+  if (Array.isArray(valuesRaw)) {
+    valuesRaw.forEach((item) => {
+      const normalized = value(item);
+      if (normalized) {
+        next.add(normalized);
+      }
+    });
+  }
+  return next;
+}
+
+function filterPlanRecordsForMode(recordsRaw, selections = {}) {
+  let records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const unitValues = normalizeSelectionSet(selections.unitValues);
+  const detailValues = normalizeSelectionSet(selections.detailValues);
+  const detailSubValues = normalizeSelectionSet(selections.detailSubValues);
+  if (unitValues.size) {
+    records = records.filter((record) => unitValues.has(unitValueForSelect(record.unit)));
+  }
+  if (detailValues.size) {
+    records = records.filter((record) => detailValues.has(detailValueForSelect(record.detail)));
+  }
+  if (detailSubValues.size) {
+    records = records.filter((record) => detailSubValues.has(detailSubValueForSelect(record.detailSub)));
+  }
+  return records;
+}
+
+function buildExportPlanModeStats(recordsRaw) {
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  let plottedCount = 0;
+  records.forEach((record) => {
+    if (buildPlanDrawable(record)) {
+      plottedCount += 1;
+    }
+  });
+  return {
+    total: records.length,
+    missing: Math.max(0, records.length - plottedCount),
+  };
+}
+
+function renderExportPlanModeStats(targetEl, records) {
+  if (!targetEl) {
+    return;
+  }
+  const stats = buildExportPlanModeStats(records);
+  const hasData = stats.total > 0;
+  targetEl.textContent = `対象件数: ${stats.total}件 / 平面位置未記入: ${stats.missing}件`;
+  setAvailabilityClass(targetEl, hasData);
+}
+
+function getExportPlanModeSelections() {
+  return {
+    unit: {
+      enabled: exportPlanModeUnitEnabled,
+      unitValues: Array.from(exportPlanModeUnitValues),
+    },
+    detail: {
+      enabled: exportPlanModeDetailEnabled,
+      unitValues: Array.from(exportPlanModeDetailUnitValues),
+      detailValues: Array.from(exportPlanModeDetailValues),
+    },
+    detailSub: {
+      enabled: exportPlanModeDetailSubEnabled,
+      unitValues: Array.from(exportPlanModeDetailSubUnitValues),
+      detailValues: Array.from(exportPlanModeDetailSubDetailValues),
+      detailSubValues: Array.from(exportPlanModeDetailSubValues),
+    },
+  };
+}
+
+function collectExportKuwakuOptionsWithCounts(records) {
+  const list = Array.isArray(records) ? records : [];
+  if (!list.length) {
+    return [{ value: ALL_GRIDS_VALUE, label: "全グリッド（0件）" }];
+  }
+  const countMap = new Map();
+  list.forEach((record) => {
+    const key = kuwakuValueForSelect(getRecordKuwaku(record));
+    countMap.set(key, (countMap.get(key) || 0) + 1);
+  });
+  const options = Array.from(countMap.entries())
+    .sort((a, b) => kuwakuLabelForSelect(a[0]).localeCompare(kuwakuLabelForSelect(b[0]), "ja", { numeric: true, sensitivity: "base" }))
+    .map(([kuwakuValue, count]) => ({
+      value: kuwakuValue,
+      label: `${kuwakuLabelForSelect(kuwakuValue)}（${count}件）`,
+    }));
+  return [{ value: ALL_GRIDS_VALUE, label: `全グリッド（${list.length}件）` }, ...options];
+}
+
+function collectExportCategoryOptions(records) {
+  const list = Array.isArray(records) ? records : [];
+  const countMap = new Map();
+  list.forEach((record) => {
+    const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+    const prefix = normalizeSpecimenPrefix(specimen.prefix);
+    if (!prefix) {
+      return;
+    }
+    countMap.set(prefix, (countMap.get(prefix) || 0) + 1);
+  });
+  const totalCount = list.length;
+  const options = [{ value: EXPORT_CATEGORY_ALL_VALUE, label: `全分類（${totalCount}件）` }];
+  Object.keys(SPECIMEN_CATEGORY_MAP).forEach((prefix) => {
+    const count = countMap.get(prefix) || 0;
+    options.push({
+      value: prefix,
+      label: `${prefix}: ${SPECIMEN_CATEGORY_MAP[prefix] || ""}（${count}件）`,
+    });
+  });
+  return options;
+}
+
+function getListExportRecords() {
+  return getRecordsByExportRangeFilters({
+    kuwakuValue: exportListRangeKuwaku,
+    categoryValue: exportListRangeCategory,
+    statusValue: exportListRangeStatus,
+    specimenFromRaw: exportListRangeSpecimenFrom,
+    specimenToRaw: exportListRangeSpecimenTo,
+    dateFromRaw: exportListRangeDateFrom,
+    dateToRaw: exportListRangeDateTo,
+  });
+}
+
+function getCardExportRecords() {
+  return getRecordsByExportRangeFilters({
+    kuwakuValue: exportCardRangeKuwaku,
+    categoryValue: exportCardRangeCategory,
+    statusValue: exportCardRangeStatus,
+    dateFromRaw: exportCardRangeDateFrom,
+    dateToRaw: exportCardRangeDateTo,
+  });
+}
+
+function getRecordsByExportRangeFilters(filters = {}) {
+  const records = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  const kuwakuValue = value(filters.kuwakuValue) || ALL_GRIDS_VALUE;
+  const categoryValue = value(filters.categoryValue) || EXPORT_CATEGORY_ALL_VALUE;
+  const statusValue = value(filters.statusValue) || "all";
+  const dateFrom = normalizeDateForExportRange(filters.dateFromRaw);
+  const dateTo = normalizeDateForExportRange(filters.dateToRaw);
+  let minDate = dateFrom;
+  let maxDate = dateTo;
+  if (minDate && maxDate && minDate > maxDate) {
+    minDate = dateTo;
+    maxDate = dateFrom;
+  }
+  const fromSpecimen = parseSpecimenForExportRange(filters.specimenFromRaw);
+  const toSpecimen = parseSpecimenForExportRange(filters.specimenToRaw);
+  let minSpecimen = fromSpecimen;
+  let maxSpecimen = toSpecimen;
+  if (minSpecimen && maxSpecimen && compareRecordsBySpecimenNo(minSpecimen, maxSpecimen) > 0) {
+    minSpecimen = toSpecimen;
+    maxSpecimen = fromSpecimen;
+  }
+  return records.filter((record) => {
+    if (kuwakuValue !== ALL_GRIDS_VALUE && kuwakuValueForSelect(getRecordKuwaku(record)) !== kuwakuValue) {
+      return false;
+    }
+    if (categoryValue !== EXPORT_CATEGORY_ALL_VALUE) {
+      const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+      if (normalizeSpecimenPrefix(specimen.prefix) !== categoryValue) {
+        return false;
+      }
+    }
+    if (statusValue === "complete" && !isRecordDataComplete(record)) {
+      return false;
+    }
+    if (statusValue === "incomplete" && isRecordDataComplete(record)) {
+      return false;
+    }
+    if (minDate || maxDate) {
+      const recordDate = normalizeDateForExportRange(getRecordDate(record));
+      if (!recordDate) {
+        return false;
+      }
+      if (minDate && recordDate < minDate) {
+        return false;
+      }
+      if (maxDate && recordDate > maxDate) {
+        return false;
+      }
+    }
+    if (minSpecimen && compareRecordsBySpecimenNo(record, minSpecimen) < 0) {
+      return false;
+    }
+    if (maxSpecimen && compareRecordsBySpecimenNo(record, maxSpecimen) > 0) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function parseSpecimenForExportRange(specimenRaw) {
+  const parsed = parseSpecimenNo(specimenRaw);
+  if (!value(parsed.serial)) {
+    return null;
+  }
+  return {
+    specimenNo: parsed.specimenNo,
+    specimenPrefix: parsed.prefix,
+    specimenSerial: parsed.serial,
+    id: "__export-range__",
+  };
+}
+
+function normalizeDateForExportRange(dateRaw) {
+  const text = value(dateRaw);
+  if (!text) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+  const ms = Date.parse(text);
+  if (!Number.isFinite(ms)) {
+    return "";
+  }
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 function renderListOutput() {
@@ -1972,8 +3330,32 @@ function renderListOutput() {
       const identifierMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["identifier"]);
       const levelReadMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["levelUpperCm", "levelLowerCm"]);
       const sectionMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["occurrenceSection", "sectionDiagrams"]);
+      const sectionChecklistMissing = hasAnyMissingRequiredKey(missingRequiredKeys, [
+        "sectionDiagramDistanceChecked",
+        "sectionDiagramHorizonChecked",
+        "sectionDiagramLayerFaciesChecked",
+      ]);
       const sketchMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["occurrenceSketch"]);
-      const positionMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["nsDir", "nsCm", "ewDir", "ewCm"]);
+      const positionMissing = hasAnyMissingRequiredKey(missingRequiredKeys, [
+        "nsDir",
+        "nsCm",
+        "ewDir",
+        "ewCm",
+        "largeShapeType",
+        "largeAxisDirection",
+        "line1NsDir",
+        "line1NsCm",
+        "line1EwDir",
+        "line1EwCm",
+        "line2NsDir",
+        "line2NsCm",
+        "line2EwDir",
+        "line2EwCm",
+        "rectSide1Cm",
+        "rectSide2Cm",
+        "ellipseLongRadiusCm",
+        "ellipseShortRadiusCm",
+      ]);
       return `
       <tr class="${selectedClass}">
         <td class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
@@ -1998,13 +3380,18 @@ function renderListOutput() {
         <td class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
         <td class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
         <td class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
-        <td class="${listCellClass("", sectionMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSection || "")}</td>
+        <td class="${listCellClass("", sectionMissing || sectionChecklistMissing)}" ${missingTitle}>${escapeHtml(
+          record.occurrenceSection || ""
+        )}</td>
         <td class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
         <td class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
         <td>${escapeHtml(record.notes || "")}</td>
         <td>
           <div class="row-actions">
             <button type="button" data-action="card" data-id="${record.id}">${cardButtonLabel}</button>
+            <button type="button" data-action="copy-to-input" data-id="${record.id}" data-kuwaku="${escapeHtml(
+              getRecordKuwaku(record)
+            )}">コピーして新規入力</button>
             <button type="button" data-action="edit" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
             )}">編集</button>
@@ -2133,7 +3520,26 @@ function dataStatusSortText(record) {
 }
 
 function formatPlanPosition(record) {
-  return `${value(record?.nsDir)}${value(record?.nsCm)}cm / ${value(record?.ewDir)}${value(record?.ewCm)}cm`;
+  const nsDir = value(record?.nsDir);
+  const nsCm = formatCmValue(record?.nsCm);
+  const ewDir = value(record?.ewDir);
+  const ewCm = formatCmValue(record?.ewCm);
+  const nsPart = `${nsDir}${nsCm}`;
+  const ewPart = `${ewDir}${ewCm}`;
+  let base = "";
+  if (nsPart && ewPart) {
+    base = `${nsPart} / ${ewPart}`;
+  } else {
+    base = nsPart || ewPart;
+  }
+  if (normalizePlanSizeMode(record?.planSizeMode) !== "大きなもの") {
+    return base;
+  }
+  const axisDirection = normalizeLargeAxisDirection(record?.largeAxisDirection);
+  if (!base) {
+    return axisDirection ? `方位:${axisDirection}` : "";
+  }
+  return axisDirection ? `${base} / 方位:${axisDirection}` : base;
 }
 
 function renderCardOutput() {
@@ -2200,9 +3606,7 @@ function renderCardOutput() {
         <div><span>レベル読値(上面/下底)</span><strong>${escapeHtml(formatLevelRead(selectedRecord))}</strong></div>
         <div><span>産出状況断面</span><strong>${escapeHtml(selectedRecord.occurrenceSection || "")}</strong></div>
         <div><span>産状スケッチ</span><strong>${escapeHtml(selectedRecord.occurrenceSketch || "")}</strong></div>
-        <div><span>平面位置</span><strong>${escapeHtml(selectedRecord.nsDir || "")} ${escapeHtml(
-          selectedRecord.nsCm || ""
-        )}cm / ${escapeHtml(selectedRecord.ewDir || "")} ${escapeHtml(selectedRecord.ewCm || "")}cm</strong></div>
+        <div><span>平面位置</span><strong>${escapeHtml(formatPlanPosition(selectedRecord))}</strong></div>
       </div>
       <p><strong>備考（観察事項など）:</strong> ${escapeHtml(selectedRecord.notes || "")}</p>
       <p><strong>産出状況断面図:</strong></p>
@@ -2288,7 +3692,15 @@ function renderPlanOutput() {
     planUnitSelect.innerHTML = "";
     planDetailSelect.innerHTML = "";
     planDetailSubSelect.innerHTML = "";
-    planMapWrap.innerHTML = "<p class=\"muted\">この区画（グリッド）には表示対象データがありません。</p>";
+    const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
+    planMapWrap.innerHTML = `
+      <div class="plan-map-meta">
+        <span>区画（グリッド）: ${escapeHtml(kuwakuLabelForMeta)}</span>
+        <span>出力階層: -</span>
+        <span>表示件数: 0件</span>
+      </div>
+      <p class="muted">この区画（グリッド）には表示対象データがありません。</p>
+    `;
     return;
   }
 
@@ -2345,49 +3757,41 @@ function renderPlanOutput() {
     selectedPlanDetailSub === ALL_DETAIL_SUBS_VALUE
       ? detailRecords
       : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedPlanDetailSub);
-  const points = detailSubRecords.map((record) => buildPlanPoint(record)).filter(Boolean);
+  const drawables = detailSubRecords.map((record) => buildPlanDrawable(record)).filter(Boolean);
+  const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
+  const unitLabelForMeta = selectedPlanUnit === ALL_UNITS_VALUE ? "全ユニット" : unitLabelForSelect(selectedPlanUnit);
+  const detailLabelForMeta =
+    selectedPlanDetail === ALL_DETAILS_VALUE ? "全サブユニット" : detailLabelForSelect(selectedPlanDetail);
+  const detailSubLabelForMeta =
+    selectedPlanDetailSub === ALL_DETAIL_SUBS_VALUE ? "全細分" : detailSubLabelForSelect(selectedPlanDetailSub);
+  const hierarchyLabelForMeta = `${unitLabelForMeta} > ${detailLabelForMeta} > ${detailSubLabelForMeta}`;
+  const mapMetaHtml = `
+    <div class="plan-map-meta">
+      <span>区画（グリッド）: ${escapeHtml(kuwakuLabelForMeta)}</span>
+      <span>出力階層: ${escapeHtml(hierarchyLabelForMeta)}</span>
+      <span>表示件数: ${detailSubRecords.length}件</span>
+    </div>
+  `;
 
-  if (!points.length) {
-    planMapWrap.innerHTML =
-      "<p class=\"muted\">このユニット/サブユニット/細分は、平面位置の数値が未入力のため点を表示できません。</p>";
+  if (!drawables.length) {
+    planMapWrap.innerHTML = `
+      ${mapMetaHtml}
+      <p class="muted">このユニット/サブユニット/細分は、平面位置の入力が不足しているため表示できません。</p>
+    `;
     return;
   }
 
-  const verticalGrid = [100, 200, 300].map((x) => `<line x1="${x}" y1="0" x2="${x}" y2="${PLAN_SIZE_CM}" />`).join("");
-  const horizontalGrid = [100, 200, 300].map((y) => `<line x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`).join("");
-  const pointsSvg = points
-    .map((point) => {
-      const labelX = Math.min(PLAN_SIZE_CM - 2, point.x + 6);
-      const labelY = Math.max(8, point.y - 6);
-      const ariaLabel = [
-        `標本番号 ${point.label || "未設定"}`,
-        `化石・遺物名称 ${point.nameMemo || "未設定"}`,
-        `ユニット ${point.unit || "未設定"}`,
-        `サブユニット ${point.detail || "未設定"}`,
-      ].join(" / ");
-      return `
-      <g
-        class="plan-point-group"
-        data-label="${escapeHtml(point.label || "")}"
-        data-name-memo="${escapeHtml(point.nameMemo || "")}"
-        data-unit="${escapeHtml(point.unit || "")}"
-        data-detail="${escapeHtml(point.detail || "")}"
-        data-x="${point.x}"
-        data-y="${point.y}"
-        tabindex="0"
-        role="button"
-        aria-label="${escapeHtml(ariaLabel)}"
-      >
-        <circle class="plan-point-hotspot" cx="${point.x}" cy="${point.y}" r="11" fill="transparent" />
-        <circle class="plan-point-hit" cx="${point.x}" cy="${point.y}" r="5" fill="${point.color}" />
-        <text x="${labelX}" y="${labelY}">${escapeHtml(point.label)}</text>
-      </g>
-      `;
-    })
+  const verticalGrid = [100, 200, 300]
+    .map((x) => `<line class="plan-grid-line" x1="${x}" y1="0" x2="${x}" y2="${PLAN_SIZE_CM}" />`)
     .join("");
+  const horizontalGrid = [100, 200, 300]
+    .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
+    .join("");
+  const pointsSvg = drawables.map((drawable) => renderPlanDrawableSvg(drawable)).join("");
   const cornerLabels = buildPlanCornerLabels(selectedPlanKuwaku);
 
   planMapWrap.innerHTML = `
+    ${mapMetaHtml}
     <div class="plan-map-shell">
       <div class="plan-axis north">北</div>
       <div class="plan-axis east">東</div>
@@ -2398,7 +3802,7 @@ function renderPlanOutput() {
       <div class="plan-grid-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
       <div class="plan-grid-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
       <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="ユニット別平面図">
-        <rect x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
+        <rect class="plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
         ${pointsSvg}
@@ -2557,32 +3961,240 @@ function isDefaultKuwaku(kuwakuRaw) {
   return normalizeKuwakuText(kuwakuRaw) === DEFAULT_KUWAKU;
 }
 
-function buildPlanPoint(record) {
-  const nsCm = parseDistanceToCm(record.nsCm);
-  const ewCm = parseDistanceToCm(record.ewCm);
-  if (nsCm == null || ewCm == null) {
-    return null;
-  }
-
-  const nsDir = normalizeNsDir(record.nsDir);
-  const ewDir = normalizeEwDir(record.ewDir);
-  const yRaw = nsDir === "北から" ? nsCm : PLAN_SIZE_CM - nsCm;
-  const xRaw = ewDir === "西から" ? ewCm : PLAN_SIZE_CM - ewCm;
-  const x = clamp(xRaw, 0, PLAN_SIZE_CM);
-  const y = clamp(yRaw, 0, PLAN_SIZE_CM);
-
+function buildPlanDrawableMeta(record) {
   const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
   const prefix = normalizeSpecimenPrefix(specimen.prefix);
-  const color = getSpecimenPrefixColor(prefix);
   return {
-    x,
-    y,
-    color,
+    color: getSpecimenPrefixColor(prefix),
     label: record.specimenNo || "",
     nameMemo: value(record.nameMemo),
     unit: value(record.unit),
     detail: buildDetailText(record.detail, record.detailSub),
   };
+}
+
+function convertPositionToPlanCoords(nsDirRaw, nsCmRaw, ewDirRaw, ewCmRaw) {
+  const nsCm = parseDistanceToCm(nsCmRaw);
+  const ewCm = parseDistanceToCm(ewCmRaw);
+  if (nsCm == null || ewCm == null) {
+    return null;
+  }
+  const nsDir = normalizeNsDir(nsDirRaw);
+  const ewDir = normalizeEwDir(ewDirRaw);
+  const yRaw = nsDir === "北から" ? nsCm : PLAN_SIZE_CM - nsCm;
+  const xRaw = ewDir === "西から" ? ewCm : PLAN_SIZE_CM - ewCm;
+  return {
+    x: xRaw,
+    y: yRaw,
+  };
+}
+
+function parseLargeAxisAzimuth(valueRaw) {
+  const text = normalizeLargeAxisDirection(valueRaw);
+  if (text === "NS") {
+    return 0;
+  }
+  if (text === "EW") {
+    return 90;
+  }
+  const matched = text.match(/^([NS])(\d+(?:\.\d+)?)([EW])$/);
+  if (!matched) {
+    return null;
+  }
+  const [, ns, degreeRaw, ew] = matched;
+  const degree = Number(degreeRaw);
+  if (!Number.isFinite(degree) || degree < 0 || degree > 90) {
+    return null;
+  }
+  if (ns === "N" && ew === "E") {
+    return degree;
+  }
+  if (ns === "N" && ew === "W") {
+    return (360 - degree) % 360;
+  }
+  if (ns === "S" && ew === "E") {
+    return 180 - degree;
+  }
+  if (ns === "S" && ew === "W") {
+    return 180 + degree;
+  }
+  return null;
+}
+
+function azimuthToPlanUnitVector(azimuthDegRaw) {
+  const azimuthDeg = Number(azimuthDegRaw);
+  if (!Number.isFinite(azimuthDeg)) {
+    return { dx: 0, dy: -1 };
+  }
+  const rad = (azimuthDeg * Math.PI) / 180;
+  return {
+    dx: Math.sin(rad),
+    dy: -Math.cos(rad),
+  };
+}
+
+function azimuthToSvgRotationDeg(azimuthDegRaw) {
+  const azimuthDeg = Number(azimuthDegRaw);
+  if (!Number.isFinite(azimuthDeg)) {
+    return 0;
+  }
+  return azimuthDeg - 90;
+}
+
+function pointsToAzimuthDeg(pointA, pointB) {
+  if (!pointA || !pointB) {
+    return null;
+  }
+  const dx = pointB.x - pointA.x;
+  const dy = pointB.y - pointA.y;
+  const distance = Math.hypot(dx, dy);
+  if (!Number.isFinite(distance) || distance <= 0) {
+    return null;
+  }
+  const rad = Math.atan2(dx, -dy);
+  const deg = (rad * 180) / Math.PI;
+  return (deg + 360) % 360;
+}
+
+function buildPlanDrawable(record) {
+  const meta = buildPlanDrawableMeta(record);
+  const center = convertPositionToPlanCoords(record.nsDir, record.nsCm, record.ewDir, record.ewCm);
+  if (!center) {
+    return null;
+  }
+
+  const planSizeMode = normalizePlanSizeMode(record.planSizeMode);
+  const shapeType = normalizeLargeShapeType(record.largeShapeType);
+  const axisAzimuth = parseLargeAxisAzimuth(record.largeAxisDirection);
+
+  if (planSizeMode !== "大きなもの" || !shapeType) {
+    return {
+      type: "point",
+      x: center.x,
+      y: center.y,
+      ...meta,
+    };
+  }
+
+  if (shapeType === "直線状") {
+    const p1 = convertPositionToPlanCoords(record.line1NsDir, record.line1NsCm, record.line1EwDir, record.line1EwCm);
+    const p2 = convertPositionToPlanCoords(record.line2NsDir, record.line2NsCm, record.line2EwDir, record.line2EwCm);
+    if (!p1 || !p2) {
+      return null;
+    }
+    const lineLength = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (!Number.isFinite(lineLength) || lineLength <= 0) {
+      return null;
+    }
+    const azimuth = axisAzimuth ?? pointsToAzimuthDeg(p1, p2);
+    const unit = azimuthToPlanUnitVector(azimuth);
+    const halfLength = lineLength / 2;
+    const x1 = center.x - unit.dx * halfLength;
+    const y1 = center.y - unit.dy * halfLength;
+    const x2 = center.x + unit.dx * halfLength;
+    const y2 = center.y + unit.dy * halfLength;
+    return {
+      type: "line",
+      x1,
+      y1,
+      x2,
+      y2,
+      x: center.x,
+      y: center.y,
+      ...meta,
+    };
+  }
+
+  if (shapeType === "長方形") {
+    const side1 = parseDistanceToCm(record.rectSide1Cm);
+    const side2 = parseDistanceToCm(record.rectSide2Cm);
+    if (side1 == null || side2 == null) {
+      return null;
+    }
+    const longSide = Math.max(side1, side2);
+    const shortSide = Math.min(side1, side2);
+    const width = Math.max(1, longSide);
+    const height = Math.max(1, shortSide);
+    return {
+      type: "rect",
+      x: center.x,
+      y: center.y,
+      left: center.x - width / 2,
+      top: center.y - height / 2,
+      width,
+      height,
+      rotationDeg: azimuthToSvgRotationDeg(axisAzimuth ?? 90),
+      ...meta,
+    };
+  }
+
+  if (shapeType === "楕円") {
+    const rx = parseDistanceToCm(record.ellipseLongRadiusCm);
+    const ry = parseDistanceToCm(record.ellipseShortRadiusCm);
+    if (rx == null || ry == null) {
+      return null;
+    }
+    const longRadius = Math.max(rx, ry);
+    const shortRadius = Math.min(rx, ry);
+    return {
+      type: "ellipse",
+      x: center.x,
+      y: center.y,
+      rx: Math.min(Math.max(1, longRadius), PLAN_SIZE_CM),
+      ry: Math.min(Math.max(1, shortRadius), PLAN_SIZE_CM),
+      rotationDeg: azimuthToSvgRotationDeg(axisAzimuth ?? 90),
+      ...meta,
+    };
+  }
+
+  return null;
+}
+
+function renderPlanDrawableSvg(drawable) {
+  const labelX = Math.min(PLAN_SIZE_CM - 2, drawable.x + 6);
+  const labelY = Math.max(8, drawable.y - 6);
+  const ariaLabel = [
+    `標本番号 ${drawable.label || "未設定"}`,
+    `化石・遺物名称 ${drawable.nameMemo || "未設定"}`,
+    `ユニット ${drawable.unit || "未設定"}`,
+    `サブユニット ${drawable.detail || "未設定"}`,
+  ].join(" / ");
+
+  let shapeSvg = "";
+  if (drawable.type === "line") {
+    shapeSvg = `<line class="plan-shape-line" x1="${drawable.x1}" y1="${drawable.y1}" x2="${drawable.x2}" y2="${drawable.y2}" stroke="${drawable.color}" />`;
+  } else if (drawable.type === "rect") {
+    const transform = Number.isFinite(drawable.rotationDeg)
+      ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
+      : "";
+    shapeSvg = `<rect class="plan-shape-rect" x="${drawable.left}" y="${drawable.top}" width="${drawable.width}" height="${drawable.height}" stroke="${drawable.color}"${transform} />`;
+  } else if (drawable.type === "ellipse") {
+    const transform = Number.isFinite(drawable.rotationDeg)
+      ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
+      : "";
+    shapeSvg = `<ellipse class="plan-shape-ellipse" cx="${drawable.x}" cy="${drawable.y}" rx="${drawable.rx}" ry="${drawable.ry}" stroke="${drawable.color}"${transform} />`;
+  } else {
+    shapeSvg = `<circle class="plan-point-hit" cx="${drawable.x}" cy="${drawable.y}" r="5" fill="${drawable.color}" />`;
+  }
+
+  return `
+      <g
+        class="plan-point-group"
+        data-label="${escapeHtml(drawable.label || "")}"
+        data-name-memo="${escapeHtml(drawable.nameMemo || "")}"
+        data-unit="${escapeHtml(drawable.unit || "")}"
+        data-detail="${escapeHtml(drawable.detail || "")}"
+        data-x="${drawable.x}"
+        data-y="${drawable.y}"
+        tabindex="0"
+        role="button"
+        aria-label="${escapeHtml(ariaLabel)}"
+      >
+        ${shapeSvg}
+        <circle class="plan-point-hotspot" cx="${drawable.x}" cy="${drawable.y}" r="12" fill="transparent" />
+        <text x="${labelX}" y="${labelY}">${escapeHtml(drawable.label || "")}</text>
+      </g>
+    `;
 }
 
 function parseDistanceToCm(distanceRaw) {
@@ -3082,10 +4694,30 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     levelLowerCm: value(item.levelLowerCm),
     occurrenceSection: normalizeNeedFlag(value(item.occurrenceSection) || value(item.sectionSketch)),
     occurrenceSketch: normalizeNeedFlag(value(item.occurrenceSketch) || value(item.sectionSketch)),
+    sectionDiagramDistanceChecked: normalizeChecklistChecked(value(item.sectionDiagramDistanceChecked)),
+    sectionDiagramHorizonChecked: normalizeChecklistChecked(value(item.sectionDiagramHorizonChecked)),
+    sectionDiagramLayerFaciesChecked: normalizeChecklistChecked(value(item.sectionDiagramLayerFaciesChecked)),
+    photoClinometerChecked: normalizeChecklistChecked(value(item.photoClinometerChecked)),
+    photoRulerChecked: normalizeChecklistChecked(value(item.photoRulerChecked)),
     nsDir: normalizeNsDir(value(item.nsDir)),
     nsCm: value(item.nsCm),
     ewDir: normalizeEwDir(value(item.ewDir)),
     ewCm: value(item.ewCm),
+    planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)),
+    largeShapeType: normalizeLargeShapeType(value(item.largeShapeType)),
+    largeAxisDirection: normalizeLargeAxisDirection(value(item.largeAxisDirection)),
+    line1NsDir: normalizeNsDir(value(item.line1NsDir)),
+    line1NsCm: value(item.line1NsCm),
+    line1EwDir: normalizeEwDir(value(item.line1EwDir)),
+    line1EwCm: value(item.line1EwCm),
+    line2NsDir: normalizeNsDir(value(item.line2NsDir)),
+    line2NsCm: value(item.line2NsCm),
+    line2EwDir: normalizeEwDir(value(item.line2EwDir)),
+    line2EwCm: value(item.line2EwCm),
+    rectSide1Cm: value(item.rectSide1Cm),
+    rectSide2Cm: value(item.rectSide2Cm),
+    ellipseLongRadiusCm: value(item.ellipseLongRadiusCm),
+    ellipseShortRadiusCm: value(item.ellipseShortRadiusCm),
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),
@@ -3353,7 +4985,7 @@ async function bootstrapCloudSync() {
     const remoteHasData = hasAnyStateData(remoteState);
     const localHasData = hasAnyStateData(state);
     const activeTabId = getActiveTabId();
-    const canApplyRemote = activeTabId === "output-tab" || activeTabId === "plan-tab";
+    const canApplyRemote = activeTabId === "output-tab" || activeTabId === "plan-tab" || activeTabId === "export-tab";
     if (remoteHasData) {
       cloudLastPulledAt = value(response.updatedAt) || nowIso();
       if (canApplyRemote) {
@@ -3464,7 +5096,7 @@ function startCloudPullTimer() {
   }
   cloudPullTimer = window.setInterval(() => {
     const activeTabId = getActiveTabId();
-    if (activeTabId === "output-tab" || activeTabId === "plan-tab") {
+    if (activeTabId === "output-tab" || activeTabId === "plan-tab" || activeTabId === "export-tab") {
       void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
     }
   }, CLOUD_PULL_INTERVAL_MS);
@@ -3496,7 +5128,7 @@ async function pullStateFromCloud({ force = false, showToastOnSuccess = false, s
     return false;
   }
   const tabAtRequest = getActiveTabId();
-  if (!force && tabAtRequest !== "output-tab" && tabAtRequest !== "plan-tab") {
+  if (!force && tabAtRequest !== "output-tab" && tabAtRequest !== "plan-tab" && tabAtRequest !== "export-tab") {
     return false;
   }
   cloudPullInProgress = true;
@@ -3771,7 +5403,7 @@ function buildListCsv() {
     "備考（観察事項など）",
   ];
 
-  const rows = [...state.records].sort(compareRecordsBySpecimenNo).map((record) => [
+  const rows = getListExportRecords().map((record) => [
     getRecordKuwaku(record),
     getRecordLevelHeight(record),
     getRecordDate(record),
@@ -3784,14 +5416,14 @@ function buildListCsv() {
     record.unit,
     record.discoverer,
     record.identifier,
-    record.levelUpperCm,
-    record.levelLowerCm,
+    formatCmValue(record.levelUpperCm),
+    formatCmValue(record.levelLowerCm),
     record.occurrenceSection,
     record.occurrenceSketch,
     record.nsDir,
-    record.nsCm,
+    formatCmValue(record.nsCm),
     record.ewDir,
-    record.ewCm,
+    formatCmValue(record.ewCm),
     record.notes,
   ]);
 
@@ -3799,25 +5431,21 @@ function buildListCsv() {
 }
 
 function buildCardCsv() {
+  const records = getCardExportRecords();
   const header = [
     "区画",
     "標本番号",
     "分類",
-    "名称",
+    "化石・遺物名称",
     "重要品指定",
     "簡易記載",
     "地層名",
+    "ユニット",
     "サブユニット",
     "細分",
-    "層理面もしくは鍵層名",
-    "地層中の位置_から(cm)",
-    "地層中の位置_上もしくは下",
-    "レベル読値_上面(cm)",
-    "レベル読値_下底(cm)",
-    "平面位置_NS",
-    "平面位置_NS_cm",
-    "平面位置_EW",
-    "平面位置_EW_cm",
+    "地層中の位置",
+    "レベル読値",
+    "平面位置",
     "発見者",
     "判定者",
     "産出状況断面",
@@ -3826,8 +5454,7 @@ function buildCardCsv() {
     "産出状況断面図枚数",
     "写真枚数",
   ];
-
-  const rows = state.records.map((record) => [
+  const rows = records.map((record) => [
     getRecordKuwaku(record),
     record.specimenNo,
     formatCategoryForRecord(record),
@@ -3835,17 +5462,12 @@ function buildCardCsv() {
     record.importantFlag,
     record.simpleRecordFlag,
     record.layerName,
+    record.unit,
     record.detail,
     record.detailSub,
-    record.layerRef,
-    record.layerFromCm,
-    record.layerRelative,
-    record.levelUpperCm,
-    record.levelLowerCm,
-    record.nsDir,
-    record.nsCm,
-    record.ewDir,
-    record.ewCm,
+    formatLayerPosition(record),
+    formatLevelRead(record),
+    formatPlanPosition(record),
     record.discoverer,
     record.identifier,
     record.occurrenceSection,
@@ -3856,6 +5478,818 @@ function buildCardCsv() {
   ]);
 
   return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
+function exportListPdf() {
+  const records = getListExportRecords();
+  if (!records.length) {
+    showToast("PDF出力対象データがありません");
+    return;
+  }
+  const selectedGridLabel =
+    exportListRangeKuwaku === ALL_GRIDS_VALUE ? "全グリッド" : kuwakuLabelForSelect(exportListRangeKuwaku);
+  const categoryLabel =
+    exportListRangeCategory === EXPORT_CATEGORY_ALL_VALUE
+      ? "全分類"
+      : `${exportListRangeCategory}: ${SPECIMEN_CATEGORY_MAP[exportListRangeCategory] || ""}`;
+  const statusLabel =
+    exportListRangeStatus === "complete" ? "必須完了のみ" : exportListRangeStatus === "incomplete" ? "未記入ありのみ" : "すべて";
+  const specimenRangeLabel =
+    exportListRangeSpecimenFrom || exportListRangeSpecimenTo
+      ? `${value(exportListRangeSpecimenFrom) || "-"} 〜 ${value(exportListRangeSpecimenTo) || "-"}`
+      : "指定なし";
+  const html = buildListPdfHtml(records, {
+    selectedGridLabel,
+    categoryLabel,
+    statusLabel,
+    specimenRangeLabel,
+  });
+  const opened = openPdfPrintWindow({
+    title: "化石遺物リストout＿出力.pdf",
+    pageSize: "A3 landscape",
+    bodyHtml: html,
+  });
+  if (opened) {
+    showToast("リストPDFの印刷画面を開きました（保存先でPDFを選択）");
+  }
+}
+
+function exportCardPdf() {
+  const records = getCardExportRecords();
+  if (!records.length) {
+    showToast("カードPDFの出力対象データがありません");
+    return;
+  }
+  const html = buildCardPdfHtml(records);
+  const opened = openPdfPrintWindow({
+    title: "化石遺物カードout＿出力.pdf",
+    pageSize: "A4 portrait",
+    bodyHtml: html,
+  });
+  if (opened) {
+    showToast("カードPDFの印刷画面を開きました（保存先でPDFを選択）");
+  }
+}
+
+function exportPlanPdf() {
+  const groups = buildPlanPdfGroupsForExport({
+    kuwakuValue: exportPlanKuwaku,
+    categoryValue: exportPlanCategory,
+    dateFromRaw: exportPlanDateFrom,
+    dateToRaw: exportPlanDateTo,
+    modeSelections: getExportPlanModeSelections(),
+  });
+  if (!groups.length) {
+    showToast("平面図PDFの出力対象がありません（平面位置を確認してください）");
+    return;
+  }
+  const html = buildPlanPdfHtml(groups);
+  const opened = openPdfPrintWindow({
+    title: "層準別平面図out＿出力.pdf",
+    pageSize: "A4 portrait",
+    bodyHtml: html,
+  });
+  if (opened) {
+    showToast("平面図PDFの印刷画面を開きました（保存先でPDFを選択）");
+  }
+}
+
+function buildListPdfHtml(records, options = {}) {
+  const generatedAt = formatPdfGeneratedAt(new Date());
+  const selectedGrid = value(options.selectedGridLabel) || "全グリッド";
+  const categoryLabel = value(options.categoryLabel);
+  const statusLabel = value(options.statusLabel);
+  const specimenRangeLabel = value(options.specimenRangeLabel);
+  const rows = records
+    .map((record) => {
+      const complete = isRecordDataComplete(record);
+      return `
+        <tr>
+          <td>${escapeHtml(getRecordKuwaku(record))}</td>
+          <td>${escapeHtml(getRecordTeamValue(record))}</td>
+          <td>${escapeHtml(record.specimenNo || "")}</td>
+          <td>${escapeHtml(formatCategoryForRecord(record))}</td>
+          <td>${escapeHtml(record.nameMemo || "")}</td>
+          <td>${escapeHtml(record.importantFlag || "")}</td>
+          <td>${escapeHtml(record.unit || "")}</td>
+          <td>${escapeHtml(formatDetailForRecord(record))}</td>
+          <td>${escapeHtml(record.discoverer || "")}</td>
+          <td>${escapeHtml(record.identifier || "")}</td>
+          <td>${escapeHtml(formatLevelRead(record))}</td>
+          <td>${escapeHtml(formatPlanPosition(record))}</td>
+          <td class="${complete ? "pdf-status-complete" : "pdf-status-incomplete"}">${complete ? "○" : "未記入"}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="pdf-page">
+      <header class="pdf-header">
+        <h1>化石遺物リスト</h1>
+        <div class="pdf-meta">
+          <span>区画: ${escapeHtml(selectedGrid)}</span>
+          <span>分類: ${escapeHtml(categoryLabel || "全分類")}</span>
+          <span>データ状態: ${escapeHtml(statusLabel || "すべて")}</span>
+          <span>標本番号: ${escapeHtml(specimenRangeLabel || "指定なし")}</span>
+          <span>出力日時: ${escapeHtml(generatedAt)}</span>
+          <span>件数: ${records.length}</span>
+        </div>
+      </header>
+      <table class="pdf-table pdf-list-table">
+        <thead>
+          <tr>
+            <th>区画</th>
+            <th>発掘班</th>
+            <th>標本番号</th>
+            <th>分類</th>
+            <th>名称</th>
+            <th>重要品</th>
+            <th>ユニット</th>
+            <th>サブユニット</th>
+            <th>発見者</th>
+            <th>判定者</th>
+            <th>レベル読値</th>
+            <th>平面位置</th>
+            <th>データ</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>
+  `;
+}
+
+function buildCardPdfHtml(records) {
+  const generatedAt = formatPdfGeneratedAt(new Date());
+  return records
+    .map((record, index) => {
+      const sectionDiagramsHtml = buildPdfImageGrid(record.sectionDiagrams, "断面図なし", "pdf-card-image-grid");
+      const photosHtml = buildPdfImageGrid(record.photos, "写真なし", "pdf-card-image-grid");
+      return `
+        <section class="pdf-page pdf-card-page ${index < records.length - 1 ? "pdf-page-break" : ""}">
+          <header class="pdf-header">
+            <h1>化石遺物カード</h1>
+            <div class="pdf-meta">
+              <span>区画: ${escapeHtml(getRecordKuwaku(record))}</span>
+              <span>標本番号: ${escapeHtml(record.specimenNo || "")}</span>
+              <span>出力日時: ${escapeHtml(generatedAt)}</span>
+            </div>
+          </header>
+          <table class="pdf-table pdf-card-table">
+            <tbody>
+              <tr><th>分類</th><td>${escapeHtml(formatCategoryForRecord(record))}</td><th>重要品指定</th><td>${escapeHtml(
+                record.importantFlag || ""
+              )}</td></tr>
+              <tr><th>化石・遺物名称</th><td>${escapeHtml(record.nameMemo || "")}</td><th>簡易記載</th><td>${escapeHtml(
+                record.simpleRecordFlag || "-"
+              )}</td></tr>
+              <tr><th>地層名</th><td>${escapeHtml(record.layerName || "")}</td><th>ユニット</th><td>${escapeHtml(
+                record.unit || ""
+              )}</td></tr>
+              <tr><th>サブユニット</th><td>${escapeHtml(record.detail || "")}</td><th>細分</th><td>${escapeHtml(
+                record.detailSub || ""
+              )}</td></tr>
+              <tr><th>地層中の位置</th><td colspan="3">${escapeHtml(formatLayerPosition(record))}</td></tr>
+              <tr><th>発見者氏名</th><td>${escapeHtml(record.discoverer || "")}</td><th>判定者氏名</th><td>${escapeHtml(
+                record.identifier || ""
+              )}</td></tr>
+              <tr><th>レベル読値</th><td>${escapeHtml(formatLevelRead(record))}</td><th>平面位置</th><td>${escapeHtml(
+                formatPlanPosition(record)
+              )}</td></tr>
+              <tr><th>産出状況断面</th><td>${escapeHtml(record.occurrenceSection || "")}</td><th>産状スケッチ</th><td>${escapeHtml(
+                record.occurrenceSketch || ""
+              )}</td></tr>
+              <tr><th>備考（観察事項など）</th><td colspan="3">${escapeHtml(record.notes || "")}</td></tr>
+            </tbody>
+          </table>
+          <section class="pdf-image-section">
+            <h2>産出状況断面図</h2>
+            ${sectionDiagramsHtml}
+          </section>
+          <section class="pdf-image-section">
+            <h2>写真</h2>
+            ${photosHtml}
+          </section>
+        </section>
+      `;
+    })
+    .join("");
+}
+
+function buildPlanPdfGroups() {
+  const kuwakuRecords = getFilteredPlanRecords();
+  if (!kuwakuRecords.length) {
+    return [];
+  }
+
+  const unitValues =
+    selectedPlanUnit === ALL_UNITS_VALUE
+      ? collectPlanUnits(kuwakuRecords)
+          .map((item) => item.value)
+          .filter((valueRaw) => valueRaw !== ALL_UNITS_VALUE)
+      : [selectedPlanUnit];
+  const groups = [];
+
+  unitValues.forEach((unitValue) => {
+    const unitRecords =
+      unitValue === ALL_UNITS_VALUE
+        ? kuwakuRecords
+        : kuwakuRecords.filter((record) => unitValueForSelect(record.unit) === unitValue);
+    if (!unitRecords.length) {
+      return;
+    }
+
+    const detailValues =
+      selectedPlanDetail === ALL_DETAILS_VALUE
+        ? collectPlanDetails(unitRecords)
+            .map((item) => item.value)
+            .filter((valueRaw) => valueRaw !== ALL_DETAILS_VALUE)
+        : [selectedPlanDetail];
+
+    detailValues.forEach((detailValue) => {
+      const detailRecords =
+        detailValue === ALL_DETAILS_VALUE
+          ? unitRecords
+          : unitRecords.filter((record) => detailValueForSelect(record.detail) === detailValue);
+      if (!detailRecords.length) {
+        return;
+      }
+
+      const detailSubValues =
+        selectedPlanDetailSub === ALL_DETAIL_SUBS_VALUE
+          ? collectPlanDetailSubs(detailRecords)
+              .map((item) => item.value)
+              .filter((valueRaw) => valueRaw !== ALL_DETAIL_SUBS_VALUE)
+          : [selectedPlanDetailSub];
+
+      detailSubValues.forEach((detailSubValue) => {
+        const scopedRecords =
+          detailSubValue === ALL_DETAIL_SUBS_VALUE
+            ? detailRecords
+            : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === detailSubValue);
+        const drawables = scopedRecords.map((record) => buildPlanDrawable(record)).filter(Boolean);
+        if (!drawables.length) {
+          return;
+        }
+        groups.push({
+          unitValue,
+          detailValue,
+          detailSubValue,
+          drawables,
+          count: scopedRecords.length,
+        });
+      });
+    });
+  });
+
+  return groups;
+}
+
+function buildPlanPdfGroupsForExport(filters = {}) {
+  const allRecords = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  if (!allRecords.length) {
+    return [];
+  }
+
+  const kuwakuValue = value(filters.kuwakuValue);
+  if (!kuwakuValue || kuwakuValue === ALL_GRIDS_VALUE) {
+    return [];
+  }
+  const categoryValue = value(filters.categoryValue) || EXPORT_CATEGORY_ALL_VALUE;
+  const scopedRecords = getRecordsByExportRangeFilters({
+    kuwakuValue,
+    categoryValue,
+    statusValue: "all",
+    dateFromRaw: filters.dateFromRaw,
+    dateToRaw: filters.dateToRaw,
+  });
+  if (!scopedRecords.length) {
+    return [];
+  }
+
+  const modeSelections = filters.modeSelections || {};
+  const groups = [];
+  const unitSelection = modeSelections.unit || {};
+  const detailSelection = modeSelections.detail || {};
+  const detailSubSelection = modeSelections.detailSub || {};
+
+  if (unitSelection.enabled) {
+    const selectedUnitValues = Array.from(normalizeSelectionSet(unitSelection.unitValues)).sort((a, b) =>
+      unitLabelForSelect(a).localeCompare(unitLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" })
+    );
+    selectedUnitValues.forEach((unitValue) => {
+      const records = filterPlanRecordsForMode(scopedRecords, { unitValues: [unitValue] });
+      if (!records.length) {
+        return;
+      }
+      const drawables = records.map((record) => buildPlanDrawable(record)).filter(Boolean);
+      if (!drawables.length) {
+        return;
+      }
+      groups.push({
+        kuwakuValue,
+        modeLabel: "ユニット別",
+        unitValue,
+        detailValue: "",
+        detailSubValue: "",
+        unitLabel: unitLabelForSelect(unitValue),
+        detailLabel: "-",
+        detailSubLabel: "-",
+        drawables,
+        count: records.length,
+      });
+    });
+  }
+
+  if (detailSelection.enabled) {
+    const selectedUnitValues = Array.from(normalizeSelectionSet(detailSelection.unitValues));
+    const selectedDetailValues = Array.from(normalizeSelectionSet(detailSelection.detailValues));
+    selectedUnitValues
+      .sort((a, b) => unitLabelForSelect(a).localeCompare(unitLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" }))
+      .forEach((unitValue) => {
+        const unitRecords = filterPlanRecordsForMode(scopedRecords, { unitValues: [unitValue] });
+        if (!unitRecords.length) {
+          return;
+        }
+        selectedDetailValues
+          .sort((a, b) =>
+            detailLabelForSelect(a).localeCompare(detailLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" })
+          )
+          .forEach((detailValue) => {
+            const records = filterPlanRecordsForMode(unitRecords, { detailValues: [detailValue] });
+            if (!records.length) {
+              return;
+            }
+            const drawables = records.map((record) => buildPlanDrawable(record)).filter(Boolean);
+            if (!drawables.length) {
+              return;
+            }
+            groups.push({
+              kuwakuValue,
+              modeLabel: "サブユニット別",
+              unitValue,
+              detailValue,
+              detailSubValue: "",
+              unitLabel: unitLabelForSelect(unitValue),
+              detailLabel: detailLabelForSelect(detailValue),
+              detailSubLabel: "-",
+              drawables,
+              count: records.length,
+            });
+          });
+      });
+  }
+
+  if (detailSubSelection.enabled) {
+    const selectedUnitValues = Array.from(normalizeSelectionSet(detailSubSelection.unitValues));
+    const selectedDetailValues = Array.from(normalizeSelectionSet(detailSubSelection.detailValues));
+    const selectedDetailSubValues = Array.from(normalizeSelectionSet(detailSubSelection.detailSubValues));
+    selectedUnitValues
+      .sort((a, b) => unitLabelForSelect(a).localeCompare(unitLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" }))
+      .forEach((unitValue) => {
+        const unitRecords = filterPlanRecordsForMode(scopedRecords, { unitValues: [unitValue] });
+        if (!unitRecords.length) {
+          return;
+        }
+        selectedDetailValues
+          .sort((a, b) =>
+            detailLabelForSelect(a).localeCompare(detailLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" })
+          )
+          .forEach((detailValue) => {
+            const detailRecords = filterPlanRecordsForMode(unitRecords, { detailValues: [detailValue] });
+            if (!detailRecords.length) {
+              return;
+            }
+            selectedDetailSubValues
+              .sort((a, b) =>
+                detailSubLabelForSelect(a).localeCompare(detailSubLabelForSelect(b), "ja", {
+                  numeric: true,
+                  sensitivity: "base",
+                })
+              )
+              .forEach((detailSubValue) => {
+                const records = filterPlanRecordsForMode(detailRecords, { detailSubValues: [detailSubValue] });
+                if (!records.length) {
+                  return;
+                }
+                const drawables = records.map((record) => buildPlanDrawable(record)).filter(Boolean);
+                if (!drawables.length) {
+                  return;
+                }
+                groups.push({
+                  kuwakuValue,
+                  modeLabel: "サブユニット細分別",
+                  unitValue,
+                  detailValue,
+                  detailSubValue,
+                  unitLabel: unitLabelForSelect(unitValue),
+                  detailLabel: detailLabelForSelect(detailValue),
+                  detailSubLabel: detailSubLabelForSelect(detailSubValue),
+                  drawables,
+                  count: records.length,
+                });
+              });
+          });
+      });
+  }
+
+  return groups;
+}
+
+function buildPlanPdfHtml(groups) {
+  const generatedAt = formatPdfGeneratedAt(new Date());
+
+  return groups
+    .map((group, index) => {
+      const kuwakuValue = value(group.kuwakuValue) || selectedPlanKuwaku;
+      const kuwakuLabel = kuwakuValue ? kuwakuLabelForSelect(kuwakuValue) : "-";
+      const unitLabel =
+        value(group.unitLabel) || (group.unitValue === ALL_UNITS_VALUE ? "全ユニット" : unitLabelForSelect(group.unitValue));
+      const detailLabel =
+        value(group.detailLabel) ||
+        (group.detailValue === ALL_DETAILS_VALUE ? "全サブユニット" : detailLabelForSelect(group.detailValue));
+      const detailSubLabel =
+        value(group.detailSubLabel) ||
+        (group.detailSubValue === ALL_DETAIL_SUBS_VALUE ? "全細分" : detailSubLabelForSelect(group.detailSubValue));
+      const mapSvg = buildPlanPdfMapSvg(group.drawables, kuwakuValue);
+      return `
+        <section class="pdf-page ${index < groups.length - 1 ? "pdf-page-break" : ""}">
+          <header class="pdf-header">
+            <h1>層準別平面図</h1>
+            <div class="pdf-meta">
+              <span>区画: ${escapeHtml(kuwakuLabel)}</span>
+              <span>出力モード: ${escapeHtml(value(group.modeLabel) || "-")}</span>
+              <span>ユニット: ${escapeHtml(unitLabel)}</span>
+              <span>サブユニット: ${escapeHtml(detailLabel)}</span>
+              <span>細分: ${escapeHtml(detailSubLabel)}</span>
+              <span>件数: ${group.count}</span>
+              <span>出力日時: ${escapeHtml(generatedAt)}</span>
+            </div>
+          </header>
+          <div class="pdf-plan-wrap">
+            ${mapSvg}
+          </div>
+          <div class="pdf-plan-legend">${buildPlanLegendHtml()}</div>
+        </section>
+      `;
+    })
+    .join("");
+}
+
+function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
+  const verticalGrid = [100, 200, 300]
+    .map((x) => `<line class="pdf-plan-grid-line" x1="${x}" y1="0" x2="${x}" y2="${PLAN_SIZE_CM}" />`)
+    .join("");
+  const horizontalGrid = [100, 200, 300]
+    .map((y) => `<line class="pdf-plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
+    .join("");
+  const pointsSvg = drawables.map((drawable) => renderPlanPdfDrawableSvg(drawable)).join("");
+  const cornerLabels = buildPlanCornerLabels(kuwakuRaw);
+
+  return `
+    <div class="pdf-plan-shell">
+      <div class="pdf-plan-axis north">北</div>
+      <div class="pdf-plan-axis east">東</div>
+      <div class="pdf-plan-axis south">南</div>
+      <div class="pdf-plan-axis west">西</div>
+      <div class="pdf-plan-corner top-left">${escapeHtml(cornerLabels.topLeft)}</div>
+      <div class="pdf-plan-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
+      <div class="pdf-plan-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
+      <div class="pdf-plan-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
+      <svg class="pdf-plan-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="層準別平面図">
+        <rect class="pdf-plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
+        ${verticalGrid}
+        ${horizontalGrid}
+        ${pointsSvg}
+      </svg>
+    </div>
+  `;
+}
+
+function renderPlanPdfDrawableSvg(drawable) {
+  const labelX = Math.min(PLAN_SIZE_CM - 2, drawable.x + 6);
+  const labelY = Math.max(8, drawable.y - 6);
+  let shapeSvg = "";
+  if (drawable.type === "line") {
+    shapeSvg = `<line class="pdf-plan-shape-line" x1="${drawable.x1}" y1="${drawable.y1}" x2="${drawable.x2}" y2="${drawable.y2}" stroke="${drawable.color}" />`;
+  } else if (drawable.type === "rect") {
+    const transform = Number.isFinite(drawable.rotationDeg)
+      ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
+      : "";
+    shapeSvg = `<rect class="pdf-plan-shape-rect" x="${drawable.left}" y="${drawable.top}" width="${drawable.width}" height="${drawable.height}" stroke="${drawable.color}"${transform} />`;
+  } else if (drawable.type === "ellipse") {
+    const transform = Number.isFinite(drawable.rotationDeg)
+      ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
+      : "";
+    shapeSvg = `<ellipse class="pdf-plan-shape-ellipse" cx="${drawable.x}" cy="${drawable.y}" rx="${drawable.rx}" ry="${drawable.ry}" stroke="${drawable.color}"${transform} />`;
+  } else {
+    shapeSvg = `<circle cx="${drawable.x}" cy="${drawable.y}" r="5" fill="${drawable.color}" />`;
+  }
+  return `
+    <g>
+      ${shapeSvg}
+      <text x="${labelX}" y="${labelY}">${escapeHtml(drawable.label || "")}</text>
+    </g>
+  `;
+}
+
+function buildPdfImageGrid(itemsRaw, emptyText, gridClassRaw = "") {
+  const items = Array.isArray(itemsRaw) ? itemsRaw : [];
+  if (!items.length) {
+    return `<p class="pdf-muted">${escapeHtml(emptyText)}</p>`;
+  }
+  const gridClass = value(gridClassRaw).replace(/[^a-zA-Z0-9_-]/g, "");
+  const classNames = gridClass ? `pdf-image-grid ${gridClass}` : "pdf-image-grid";
+  return `
+    <div class="${classNames}">
+      ${items
+        .map(
+          (item) => `
+            <figure>
+              <img src="${item.dataUrl}" alt="${escapeHtml(item.name || "image")}" />
+              <figcaption>${escapeHtml(item.caption || "")}</figcaption>
+            </figure>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function openPdfPrintWindow({ title, pageSize, bodyHtml }) {
+  const safeTitle = escapeHtml(title || "出力");
+  const safeBody = bodyHtml || "<p>出力データがありません。</p>";
+  const htmlText = `
+    <!doctype html>
+    <html lang="ja">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${safeTitle}</title>
+        <style>${buildPdfPrintStyles(pageSize)}</style>
+      </head>
+      <body>${safeBody}</body>
+    </html>
+  `;
+
+  const printWindow = window.open("", "_blank");
+  if (printWindow) {
+    printWindow.document.open();
+    printWindow.document.write(htmlText);
+    printWindow.document.close();
+
+    const triggerPrint = () => {
+      try {
+        printWindow.focus();
+        printWindow.print();
+      } catch (_error) {
+        // ignore
+      }
+    };
+    printWindow.onload = () => {
+      window.setTimeout(triggerPrint, 220);
+    };
+    window.setTimeout(triggerPrint, 900);
+    return true;
+  }
+
+  try {
+    const frame = document.createElement("iframe");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    frame.setAttribute("aria-hidden", "true");
+    frame.srcdoc = htmlText;
+    document.body.appendChild(frame);
+    frame.onload = () => {
+      const frameWindow = frame.contentWindow;
+      if (frameWindow) {
+        try {
+          frameWindow.focus();
+          frameWindow.print();
+        } catch (_error) {
+          // ignore
+        }
+      }
+      window.setTimeout(() => {
+        frame.remove();
+      }, 1500);
+    };
+    return true;
+  } catch (_error) {
+    showToast("PDF出力の画面を開けませんでした（ポップアップ設定を確認）");
+    return false;
+  }
+}
+
+function buildPdfPrintStyles(pageSizeRaw) {
+  const pageSize = value(pageSizeRaw) || "A4 portrait";
+  return `
+    @page {
+      size: ${pageSize};
+      margin: 10mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color: #111827;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .pdf-page {
+      width: 100%;
+    }
+    .pdf-page-break {
+      page-break-after: always;
+    }
+    .pdf-header h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .pdf-meta {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      color: #334155;
+      font-size: 12px;
+    }
+    .pdf-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    .pdf-table th, .pdf-table td {
+      border: 1px solid #9ca3af;
+      padding: 4px 6px;
+      vertical-align: top;
+    }
+    .pdf-table th {
+      background: #f3f4f6;
+      white-space: nowrap;
+    }
+    .pdf-list-table td:nth-child(13) {
+      text-align: center;
+      font-weight: 700;
+    }
+    .pdf-status-complete {
+      color: #111827;
+    }
+    .pdf-status-incomplete {
+      color: #b42318;
+    }
+    .pdf-image-section h2 {
+      margin: 10px 0 5px;
+      font-size: 12px;
+    }
+    .pdf-image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(42mm, 1fr));
+      gap: 6px;
+    }
+    .pdf-image-grid figure {
+      margin: 0;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 4px;
+    }
+    .pdf-image-grid img {
+      width: 100%;
+      height: auto;
+      max-height: 38mm;
+      object-fit: cover;
+      display: block;
+    }
+    .pdf-image-grid figcaption {
+      margin-top: 3px;
+      color: #475569;
+      font-size: 10px;
+    }
+    .pdf-card-image-grid {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .pdf-card-image-grid img {
+      max-height: 72mm;
+      object-fit: contain;
+      background: #f8fafc;
+    }
+    .pdf-muted {
+      color: #6b7280;
+      margin: 4px 0;
+    }
+    .pdf-plan-wrap {
+      margin-top: 8px;
+      display: flex;
+      justify-content: center;
+    }
+    .pdf-plan-shell {
+      position: relative;
+      width: 162mm;
+      height: 162mm;
+      border: 1px solid #9ca3af;
+      background: #fff;
+      padding: 12mm;
+    }
+    .pdf-plan-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+    .pdf-plan-svg .pdf-plan-frame {
+      fill: #fff;
+      stroke: #334155;
+      stroke-width: 2;
+    }
+    .pdf-plan-svg .pdf-plan-grid-line {
+      stroke: #94a3b8;
+      stroke-width: 0.9;
+      stroke-dasharray: 4 3;
+    }
+    .pdf-plan-svg text {
+      font-size: 12px;
+      font-weight: 700;
+      fill: #0f172a;
+    }
+    .pdf-plan-svg .pdf-plan-shape-line {
+      stroke-width: 4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-dasharray: none;
+    }
+    .pdf-plan-svg .pdf-plan-shape-rect,
+    .pdf-plan-svg .pdf-plan-shape-ellipse {
+      stroke-width: 3.2;
+      fill: none;
+    }
+    .pdf-plan-axis {
+      position: absolute;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+    .pdf-plan-axis.north { top: 5px; left: 50%; transform: translateX(-50%); }
+    .pdf-plan-axis.south { bottom: 5px; left: 50%; transform: translateX(-50%); }
+    .pdf-plan-axis.east { right: 5px; top: 50%; transform: translateY(-50%); }
+    .pdf-plan-axis.west { left: 5px; top: 50%; transform: translateY(-50%); }
+    .pdf-plan-corner {
+      position: absolute;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eff6ff;
+      border: 1px solid #93c5fd;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    .pdf-plan-corner.top-left { top: 10mm; left: 10mm; }
+    .pdf-plan-corner.top-right { top: 10mm; right: 10mm; }
+    .pdf-plan-corner.bottom-left { bottom: 10mm; left: 10mm; }
+    .pdf-plan-corner.bottom-right { bottom: 10mm; right: 10mm; }
+    .pdf-plan-legend {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .plan-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #334155;
+      background: #f8fafc;
+    }
+    .plan-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      display: inline-block;
+    }
+  `;
+}
+
+function formatPdfGeneratedAt(dateRaw) {
+  const date = dateRaw instanceof Date ? dateRaw : new Date();
+  if (!Number.isFinite(date.getTime())) {
+    return "-";
+  }
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
 }
 
 function csvCell(valueRaw) {
@@ -4340,6 +6774,57 @@ function getMissingRequiredKeys(record) {
     missing.add("ewCm");
   }
 
+  const planSizeMode = normalizePlanSizeMode(value(record.planSizeMode));
+  if (planSizeMode === "大きなもの") {
+    const largeShapeType = normalizeLargeShapeType(value(record.largeShapeType));
+    if (!largeShapeType) {
+      missing.add("largeShapeType");
+    }
+    if (parseLargeAxisAzimuth(value(record.largeAxisDirection)) == null) {
+      missing.add("largeAxisDirection");
+    }
+    if (largeShapeType === "直線状") {
+      if (!value(record.line1NsDir)) {
+        missing.add("line1NsDir");
+      }
+      if (!value(record.line1NsCm)) {
+        missing.add("line1NsCm");
+      }
+      if (!value(record.line1EwDir)) {
+        missing.add("line1EwDir");
+      }
+      if (!value(record.line1EwCm)) {
+        missing.add("line1EwCm");
+      }
+      if (!value(record.line2NsDir)) {
+        missing.add("line2NsDir");
+      }
+      if (!value(record.line2NsCm)) {
+        missing.add("line2NsCm");
+      }
+      if (!value(record.line2EwDir)) {
+        missing.add("line2EwDir");
+      }
+      if (!value(record.line2EwCm)) {
+        missing.add("line2EwCm");
+      }
+    } else if (largeShapeType === "長方形") {
+      if (!value(record.rectSide1Cm)) {
+        missing.add("rectSide1Cm");
+      }
+      if (!value(record.rectSide2Cm)) {
+        missing.add("rectSide2Cm");
+      }
+    } else if (largeShapeType === "楕円") {
+      if (!value(record.ellipseLongRadiusCm)) {
+        missing.add("ellipseLongRadiusCm");
+      }
+      if (!value(record.ellipseShortRadiusCm)) {
+        missing.add("ellipseShortRadiusCm");
+      }
+    }
+  }
+
   const layerName = normalizeLayerName(value(record.layerName));
   if (!value(layerName)) {
     missing.add("layerName");
@@ -4369,10 +6854,28 @@ function getMissingRequiredKeys(record) {
     missing.add("analysisType");
   }
 
-  if (normalizeNeedFlag(value(record.occurrenceSection)) === "要") {
-    const sectionDiagrams = Array.isArray(record.sectionDiagrams) ? record.sectionDiagrams : [];
-    if (!sectionDiagrams.length) {
-      missing.add("sectionDiagrams");
+  const sectionDiagrams = Array.isArray(record.sectionDiagrams) ? record.sectionDiagrams : [];
+  if (normalizeNeedFlag(value(record.occurrenceSection)) === "要" && !sectionDiagrams.length) {
+    missing.add("sectionDiagrams");
+  }
+  if (sectionDiagrams.length) {
+    if (normalizeChecklistChecked(record.sectionDiagramDistanceChecked) !== "1") {
+      missing.add("sectionDiagramDistanceChecked");
+    }
+    if (normalizeChecklistChecked(record.sectionDiagramHorizonChecked) !== "1") {
+      missing.add("sectionDiagramHorizonChecked");
+    }
+    if (normalizeChecklistChecked(record.sectionDiagramLayerFaciesChecked) !== "1") {
+      missing.add("sectionDiagramLayerFaciesChecked");
+    }
+  }
+  const photos = Array.isArray(record.photos) ? record.photos : [];
+  if (photos.length) {
+    if (normalizeChecklistChecked(record.photoClinometerChecked) !== "1") {
+      missing.add("photoClinometerChecked");
+    }
+    if (normalizeChecklistChecked(record.photoRulerChecked) !== "1") {
+      missing.add("photoRulerChecked");
     }
   }
 
@@ -4399,6 +6902,42 @@ function normalizeCircleDashFlag(valueRaw) {
   return "-";
 }
 
+function normalizeChecklistChecked(valueRaw) {
+  const text = value(valueRaw).toLowerCase();
+  if (text === "1" || text === "true" || text === "on" || text === "yes" || text === "checked" || text === "○" || text === "◯") {
+    return "1";
+  }
+  return "";
+}
+
+function validateAttachmentChecklistForSave(formData) {
+  if (!(formData instanceof FormData)) {
+    return "";
+  }
+  if (currentSectionDiagrams.length > 0 && !areSectionDiagramChecklistComplete(formData)) {
+    return "産出状況断面図のチェックをすべて入れてください";
+  }
+  if (currentPhotos.length > 0 && !arePhotoChecklistComplete(formData)) {
+    return "写真添付のチェックをすべて入れてください";
+  }
+  return "";
+}
+
+function areSectionDiagramChecklistComplete(formData) {
+  return (
+    normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")) === "1" &&
+    normalizeChecklistChecked(formData.get("sectionDiagramHorizonChecked")) === "1" &&
+    normalizeChecklistChecked(formData.get("sectionDiagramLayerFaciesChecked")) === "1"
+  );
+}
+
+function arePhotoChecklistComplete(formData) {
+  return (
+    normalizeChecklistChecked(formData.get("photoClinometerChecked")) === "1" &&
+    normalizeChecklistChecked(formData.get("photoRulerChecked")) === "1"
+  );
+}
+
 function normalizeNsDir(valueRaw) {
   const dir = value(valueRaw);
   if (dir === "南" || dir === "南から") {
@@ -4415,11 +6954,61 @@ function normalizeEwDir(valueRaw) {
   return "東から";
 }
 
+function normalizePlanSizeMode(valueRaw) {
+  const mode = value(valueRaw);
+  if (mode === "大きなもの" || mode === "大きいもの") {
+    return "大きなもの";
+  }
+  return "通常";
+}
+
+function normalizeLargeShapeType(valueRaw) {
+  const text = value(valueRaw);
+  if (text === "直線状" || text === "長方形" || text === "楕円") {
+    return text;
+  }
+  return "";
+}
+
+function normalizeLargeAxisDirection(valueRaw) {
+  const text = value(valueRaw)
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/[°度]/g, "")
+    .replace(/[-_]/g, "");
+  if (!text) {
+    return "";
+  }
+  if (text === "NS" || text === "SN") {
+    return "NS";
+  }
+  if (text === "EW" || text === "WE") {
+    return "EW";
+  }
+  const matched = text.match(/^([NS])(\d+(?:\.\d+)?)([EW])$/);
+  if (!matched) {
+    return text;
+  }
+  const [, ns, degreeRaw, ew] = matched;
+  const degree = Number(degreeRaw);
+  if (!Number.isFinite(degree)) {
+    return text;
+  }
+  const degreeText = Number.isInteger(degree) ? String(degree) : String(degree).replace(/\.?0+$/, "");
+  return `${ns}${degreeText}${ew}`;
+}
+
 function normalizeDirectionValue(group, valueRaw) {
   if (group === "ns") {
     return normalizeNsDir(valueRaw);
   }
   if (group === "ew") {
+    return normalizeEwDir(valueRaw);
+  }
+  if (group === "line1Ns" || group === "line2Ns") {
+    return normalizeNsDir(valueRaw);
+  }
+  if (group === "line1Ew" || group === "line2Ew") {
     return normalizeEwDir(valueRaw);
   }
   if (group === "importantFlag") {
@@ -4433,6 +7022,12 @@ function normalizeDirectionValue(group, valueRaw) {
   }
   if (group === "layerRelative") {
     return normalizeLayerRelative(valueRaw);
+  }
+  if (group === "planSizeMode") {
+    return normalizePlanSizeMode(valueRaw);
+  }
+  if (group === "largeShapeType") {
+    return normalizeLargeShapeType(valueRaw);
   }
   return value(valueRaw);
 }
@@ -4462,21 +7057,21 @@ function formatLevelRead(record) {
   if (!upper && !lower) {
     return "";
   }
-  return `${upper || "-"} / ${lower || "-"}`;
+  return `${formatCmValue(upper, "-")} / ${formatCmValue(lower, "-")}`;
 }
 
 function formatLayerPosition(record) {
   const ref = value(record?.layerRef);
-  const fromCm = value(record?.layerFromCm);
+  const fromCm = formatCmValue(record?.layerFromCm);
   const relative = value(record?.layerRelative);
   const line1 = ref;
   let line2 = "";
   if (relative && fromCm) {
-    line2 = `${relative} に ${fromCm}cm`;
+    line2 = `${relative} に ${fromCm}`;
   } else if (relative) {
     line2 = relative;
   } else if (fromCm) {
-    line2 = `${fromCm}cm`;
+    line2 = fromCm;
   }
 
   if (!line1 && !line2) {
@@ -4489,6 +7084,21 @@ function formatLayerPosition(record) {
     return line1;
   }
   return `${line1} / ${line2}`;
+}
+
+function formatCmValue(cmRaw, fallback = "") {
+  const text = value(cmRaw);
+  if (!text) {
+    return fallback;
+  }
+  if (/^[-ー－]+$/.test(text)) {
+    return text;
+  }
+  const normalized = text.replace(/\s*(cm|㎝)$/i, "");
+  if (!normalized) {
+    return fallback;
+  }
+  return `${normalized}cm`;
 }
 
 function clonePhotos(photos) {

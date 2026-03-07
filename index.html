@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>第24次野尻湖湖底発掘　化石・遺物 入力</title>
-    <link rel="stylesheet" href="./styles.css?v=20260307-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260307-14" />
   </head>
   <body>
     <header class="app-header">
@@ -15,11 +15,6 @@
         <h1>第24次野尻湖湖底発掘　化石・遺物 入力</h1>
       </div>
       <div class="header-actions">
-        <button id="export-list-csv-btn" type="button">リストCSV</button>
-        <button id="export-card-csv-btn" type="button">カードCSV</button>
-        <button id="export-json-btn" type="button">JSON書き出し</button>
-        <label class="import-label" for="import-json-input">JSON読み込み</label>
-        <input id="import-json-input" type="file" accept="application/json" />
         <div class="cloud-controls">
           <input id="cloud-endpoint-input" type="url" placeholder="Google Apps Script WebアプリURL" />
           <button id="cloud-connect-btn" type="button">共有保存を設定</button>
@@ -34,6 +29,7 @@
       <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
       <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
       <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
+      <button class="tab-button" data-tab="export-tab" type="button">4. 出力</button>
     </nav>
 
     <main>
@@ -200,7 +196,7 @@
             </fieldset>
 
             <fieldset class="inline-fieldset">
-              <legend>平面位置 [北から・南から]<span class="required">*</span></legend>
+              <legend>平面位置（中心）[北から・南から]<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="北南方向">
                 <button class="dir-tab active" data-group="ns" data-value="北から" type="button">北から</button>
                 <button class="dir-tab" data-group="ns" data-value="南から" type="button">南から</button>
@@ -213,7 +209,7 @@
             </fieldset>
 
             <fieldset class="inline-fieldset">
-              <legend>平面位置 [東から・西から]<span class="required">*</span></legend>
+              <legend>平面位置（中心）[東から・西から]<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="東西方向">
                 <button class="dir-tab active" data-group="ew" data-value="東から" type="button">東から</button>
                 <button class="dir-tab" data-group="ew" data-value="西から" type="button">西から</button>
@@ -222,6 +218,119 @@
               <div class="inline-cm-row">
                 <input name="ewCm" type="text" />
                 <span>cm<span class="required">*</span></span>
+              </div>
+            </fieldset>
+
+            <fieldset class="inline-fieldset span-3">
+              <legend>平面位置（大きなもの）</legend>
+              <div class="dir-tabs" role="tablist" aria-label="大きなもの設定">
+                <button class="dir-tab active" data-group="planSizeMode" data-value="通常" type="button">通常</button>
+                <button class="dir-tab" data-group="planSizeMode" data-value="大きなもの" type="button">大きなもの</button>
+              </div>
+              <input id="plan-size-mode-input" name="planSizeMode" type="hidden" value="通常" />
+
+              <div id="large-shape-section" class="large-shape-section hidden">
+                <div class="dir-tabs" role="tablist" aria-label="大きなもの形状">
+                  <button class="dir-tab" data-group="largeShapeType" data-value="直線状" type="button">直線状</button>
+                  <button class="dir-tab" data-group="largeShapeType" data-value="長方形" type="button">長方形</button>
+                  <button class="dir-tab" data-group="largeShapeType" data-value="楕円" type="button">楕円</button>
+                </div>
+                <input id="large-shape-type-input" name="largeShapeType" type="hidden" value="" />
+                <label class="large-axis-direction-label">長軸・長辺・長半径方向
+                  <input id="large-axis-direction-input" name="largeAxisDirection" type="text" placeholder="例：N30W" />
+                </label>
+
+                <section class="large-shape-panel hidden" data-large-shape-panel="直線状">
+                  <p class="hint-text">両端の位置を記入</p>
+                  <div class="large-line-grid">
+                    <div class="large-line-endpoint">
+                      <p class="large-line-endpoint-title">端点1</p>
+                      <div class="large-line-axis-row">
+                        <div class="dir-tabs" role="tablist" aria-label="端点1 北南方向">
+                          <button class="dir-tab active" data-group="line1Ns" data-value="北から" type="button">北から</button>
+                          <button class="dir-tab" data-group="line1Ns" data-value="南から" type="button">南から</button>
+                        </div>
+                        <input id="line1-ns-dir-input" name="line1NsDir" type="hidden" value="北から" />
+                        <div class="inline-cm-row">
+                          <input name="line1NsCm" type="text" />
+                          <span>cm</span>
+                        </div>
+                      </div>
+                      <div class="large-line-axis-row">
+                        <div class="dir-tabs" role="tablist" aria-label="端点1 東西方向">
+                          <button class="dir-tab active" data-group="line1Ew" data-value="東から" type="button">東から</button>
+                          <button class="dir-tab" data-group="line1Ew" data-value="西から" type="button">西から</button>
+                        </div>
+                        <input id="line1-ew-dir-input" name="line1EwDir" type="hidden" value="東から" />
+                        <div class="inline-cm-row">
+                          <input name="line1EwCm" type="text" />
+                          <span>cm</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="large-line-endpoint">
+                      <p class="large-line-endpoint-title">端点2</p>
+                      <div class="large-line-axis-row">
+                        <div class="dir-tabs" role="tablist" aria-label="端点2 北南方向">
+                          <button class="dir-tab active" data-group="line2Ns" data-value="北から" type="button">北から</button>
+                          <button class="dir-tab" data-group="line2Ns" data-value="南から" type="button">南から</button>
+                        </div>
+                        <input id="line2-ns-dir-input" name="line2NsDir" type="hidden" value="北から" />
+                        <div class="inline-cm-row">
+                          <input name="line2NsCm" type="text" />
+                          <span>cm</span>
+                        </div>
+                      </div>
+                      <div class="large-line-axis-row">
+                        <div class="dir-tabs" role="tablist" aria-label="端点2 東西方向">
+                          <button class="dir-tab active" data-group="line2Ew" data-value="東から" type="button">東から</button>
+                          <button class="dir-tab" data-group="line2Ew" data-value="西から" type="button">西から</button>
+                        </div>
+                        <input id="line2-ew-dir-input" name="line2EwDir" type="hidden" value="東から" />
+                        <div class="inline-cm-row">
+                          <input name="line2EwCm" type="text" />
+                          <span>cm</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="large-shape-panel hidden" data-large-shape-panel="長方形">
+                  <p class="hint-text">2辺の長さを記入</p>
+                  <div class="large-size-grid">
+                    <label>辺1
+                      <div class="inline-cm-row">
+                        <input name="rectSide1Cm" type="text" />
+                        <span>cm</span>
+                      </div>
+                    </label>
+                    <label>辺2
+                      <div class="inline-cm-row">
+                        <input name="rectSide2Cm" type="text" />
+                        <span>cm</span>
+                      </div>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="large-shape-panel hidden" data-large-shape-panel="楕円">
+                  <p class="hint-text">長半径と短半径を記入</p>
+                  <div class="large-size-grid">
+                    <label>長半径
+                      <div class="inline-cm-row">
+                        <input name="ellipseLongRadiusCm" type="text" />
+                        <span>cm</span>
+                      </div>
+                    </label>
+                    <label>短半径
+                      <div class="inline-cm-row">
+                        <input name="ellipseShortRadiusCm" type="text" />
+                        <span>cm</span>
+                      </div>
+                    </label>
+                  </div>
+                </section>
               </div>
             </fieldset>
 
@@ -266,7 +375,7 @@
             </fieldset>
           </div>
 
-          <label>備考（観察事項など）
+          <label>備考（走向傾斜と長軸の傾斜方向（プランジ），破損状況，ほか観察事項などを記入）
             <textarea name="notes" rows="4"></textarea>
           </label>
 
@@ -280,12 +389,26 @@
             <input id="section-diagram-camera-input" class="upload-file-input" type="file" accept="image/*" capture="environment" multiple />
             <input id="section-diagram-input" class="upload-file-input" type="file" accept="image/*" multiple />
             <div id="section-diagram-list" class="photo-list"></div>
+            <div class="section-diagram-checklist">
+              <label class="section-diagram-check-item">
+                <input name="sectionDiagramDistanceChecked" type="checkbox" />
+                <span>・化石と層理面や鍵層からの垂直距離を記入している</span>
+              </label>
+              <label class="section-diagram-check-item">
+                <input name="sectionDiagramHorizonChecked" type="checkbox" />
+                <span>・産出層準を記入している</span>
+              </label>
+              <label class="section-diagram-check-item">
+                <input name="sectionDiagramLayerFaciesChecked" type="checkbox" />
+                <span>・産出した地層や上下の地層の層相を記入している（色，粒径，堆積構造，円磨度，淘汰など）</span>
+              </label>
+            </div>
+            <p class="checklist-warning">全てにチェックが入ると画像が保存できます</p>
           </section>
 
           <section class="photo-upload-wrap">
             <h3>写真添付</h3>
             <p class="hint-text">この記録に紐づける写真を追加します。</p>
-            <p class="hint-text">撮影時は、クリノメーター（方位の分かるもの）と定規を一緒に写してください。</p>
             <div class="upload-picker-row">
               <label class="upload-picker-label" for="photo-camera-input">カメラで撮影</label>
               <label class="upload-picker-label secondary" for="photo-input">保存フォルダから選択</label>
@@ -293,10 +416,22 @@
             <input id="photo-camera-input" class="upload-file-input" type="file" accept="image/*" capture="environment" multiple />
             <input id="photo-input" class="upload-file-input" type="file" accept="image/*" multiple />
             <div id="photo-list" class="photo-list"></div>
+            <div class="section-diagram-checklist">
+              <label class="section-diagram-check-item">
+                <input name="photoClinometerChecked" type="checkbox" />
+                <span>クリノメーター（方位のわかるもの）が写っている</span>
+              </label>
+              <label class="section-diagram-check-item">
+                <input name="photoRulerChecked" type="checkbox" />
+                <span>定規（大きさがわかるもの）が写っている</span>
+              </label>
+            </div>
+            <p class="checklist-warning">全てにチェックが入ると画像が保存できます</p>
           </section>
 
             <div class="panel-actions">
               <button id="record-submit-btn" type="submit">記録を保存</button>
+              <button id="record-copy-to-input-btn" class="hidden" type="button">コピーして新規入力</button>
               <button id="record-reset-btn" type="button">入力クリア</button>
             </div>
           </form>
@@ -394,6 +529,167 @@
         </section>
       </section>
 
+      <section id="export-tab" class="tab-panel">
+        <section class="panel">
+          <h2>リスト出力（範囲設定）</h2>
+          <div class="grid cols-3 export-range-grid">
+            <label>区画（グリッド）
+              <select id="export-range-kuwaku-select"></select>
+            </label>
+            <label>分類
+              <select id="export-range-category-select"></select>
+            </label>
+            <label>データ状態
+              <select id="export-range-status-select">
+                <option value="all">すべて</option>
+                <option value="complete">必須完了のみ</option>
+                <option value="incomplete">未記入ありのみ</option>
+              </select>
+            </label>
+            <label>標本番号（開始）
+              <input id="export-range-specimen-from" type="text" placeholder="例: m-1" />
+            </label>
+            <label>標本番号（終了）
+              <input id="export-range-specimen-to" type="text" placeholder="例: m-30" />
+            </label>
+            <div class="date-range-inline span-2">
+              <span class="date-range-title">日付</span>
+              <div class="date-range-pair">
+                <label>開始
+                  <input id="export-range-date-from" type="date" />
+                </label>
+                <label>終了
+                  <input id="export-range-date-to" type="date" />
+                </label>
+              </div>
+            </div>
+          </div>
+          <p id="export-range-summary" class="muted">対象件数: 0件（対象なし）</p>
+          <div class="export-button-grid">
+            <button id="export-list-csv-btn" type="button">リストCSV</button>
+            <button id="export-list-pdf-btn" type="button">リストPDF</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>カード出力（範囲設定）</h2>
+          <div class="grid cols-3 export-range-grid">
+            <label>区画（グリッド）
+              <select id="export-card-kuwaku-select"></select>
+            </label>
+            <label>分類
+              <select id="export-card-category-select"></select>
+            </label>
+            <label>データ状態
+              <select id="export-card-status-select">
+                <option value="all">すべて</option>
+                <option value="complete">必須完了のみ</option>
+                <option value="incomplete">未記入ありのみ</option>
+              </select>
+            </label>
+            <div class="date-range-inline span-2">
+              <span class="date-range-title">日付</span>
+              <div class="date-range-pair">
+                <label>開始
+                  <input id="export-card-date-from" type="date" />
+                </label>
+                <label>終了
+                  <input id="export-card-date-to" type="date" />
+                </label>
+              </div>
+            </div>
+          </div>
+          <p id="export-card-summary" class="muted">対象件数: 0件（対象なし）</p>
+          <div class="export-button-grid">
+            <button id="export-card-csv-btn" type="button">カードCSV</button>
+            <button id="export-card-pdf-btn" type="button">カードPDF</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>平面図出力（範囲設定）</h2>
+          <div class="grid cols-3 export-range-grid">
+            <label>区画（グリッド）
+              <select id="export-plan-kuwaku-select"></select>
+            </label>
+            <label>分類
+              <select id="export-plan-category-select"></select>
+            </label>
+            <div class="span-3 export-plan-hierarchy-panel">
+              <p class="export-plan-hierarchy-title">出力階層</p>
+              <div class="export-plan-hierarchy-rows">
+                <div class="export-plan-hierarchy-row">
+                  <label class="export-plan-mode-check">
+                    <input id="export-plan-mode-unit-check" type="checkbox" checked />
+                    <span>ユニット別</span>
+                  </label>
+                  <div id="export-plan-mode-unit-buttons" class="export-plan-option-buttons" aria-label="ユニット別選択"></div>
+                  <span id="export-plan-mode-unit-stats" class="muted export-plan-mode-stats">対象件数: 0件 / 平面位置未記入: 0件</span>
+                </div>
+                <div class="export-plan-hierarchy-row">
+                  <label class="export-plan-mode-check">
+                    <input id="export-plan-mode-detail-check" type="checkbox" />
+                    <span>サブユニット別</span>
+                  </label>
+                  <div class="export-plan-selection-block">
+                    <p class="export-plan-selection-label">ユニット（チェック）</p>
+                    <div id="export-plan-mode-detail-unit-checks" class="export-plan-option-checks" aria-label="サブユニット別 ユニット選択"></div>
+                  </div>
+                  <div class="export-plan-selection-block">
+                    <p class="export-plan-selection-label">サブユニット（ボタン）</p>
+                    <div id="export-plan-mode-detail-buttons" class="export-plan-option-buttons" aria-label="サブユニット別 サブユニット選択"></div>
+                  </div>
+                  <span id="export-plan-mode-detail-stats" class="muted export-plan-mode-stats">対象件数: 0件 / 平面位置未記入: 0件</span>
+                </div>
+                <div class="export-plan-hierarchy-row">
+                  <label class="export-plan-mode-check">
+                    <input id="export-plan-mode-detail-sub-check" type="checkbox" />
+                    <span>サブユニット細分別</span>
+                  </label>
+                  <div class="export-plan-selection-block">
+                    <p class="export-plan-selection-label">ユニット（チェック）</p>
+                    <div id="export-plan-mode-detail-sub-unit-checks" class="export-plan-option-checks" aria-label="細分別 ユニット選択"></div>
+                  </div>
+                  <div class="export-plan-selection-block">
+                    <p class="export-plan-selection-label">サブユニット（チェック）</p>
+                    <div id="export-plan-mode-detail-sub-detail-checks" class="export-plan-option-checks" aria-label="細分別 サブユニット選択"></div>
+                  </div>
+                  <div class="export-plan-selection-block">
+                    <p class="export-plan-selection-label">細分（ボタン）</p>
+                    <div id="export-plan-mode-detail-sub-buttons" class="export-plan-option-buttons" aria-label="細分別 細分選択"></div>
+                  </div>
+                  <span id="export-plan-mode-detail-sub-stats" class="muted export-plan-mode-stats">対象件数: 0件 / 平面位置未記入: 0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="date-range-inline span-3">
+              <span class="date-range-title">日付</span>
+              <div class="date-range-pair">
+                <label>開始
+                  <input id="export-plan-date-from" type="date" />
+                </label>
+                <label>終了
+                  <input id="export-plan-date-to" type="date" />
+                </label>
+              </div>
+            </div>
+          </div>
+          <p id="export-plan-summary" class="muted">PDFページ対象: 0ページ / 記録 0件（対象なし）</p>
+          <div class="export-button-grid">
+            <button id="export-plan-pdf-btn" type="button">平面図PDF</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>データ入出力（JSON）</h2>
+          <div class="export-button-grid">
+            <button id="export-json-btn" type="button">JSON書き出し</button>
+            <label class="import-label" for="import-json-input">JSON読み込み</label>
+            <input id="import-json-input" type="file" accept="application/json" />
+          </div>
+        </section>
+      </section>
+
       <section id="edit-tab" class="tab-panel">
         <section class="panel">
           <h2>編集画面</h2>
@@ -449,6 +745,6 @@
 
     <div id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=20260307-2"></script>
+    <script src="./app.js?v=20260307-28"></script>
   </body>
 </html>
