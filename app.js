@@ -62,6 +62,8 @@ const ALL_UNITS_VALUE = "__UNIT_ALL__";
 const EMPTY_UNIT_VALUE = "__UNIT_EMPTY__";
 const ALL_DETAILS_VALUE = "__DETAIL_ALL__";
 const EMPTY_DETAIL_VALUE = "__DETAIL_EMPTY__";
+const ALL_DETAIL_SUBS_VALUE = "__DETAIL_SUB_ALL__";
+const EMPTY_DETAIL_SUB_VALUE = "__DETAIL_SUB_EMPTY__";
 const SPECIMEN_POINT_COLORS = {
   m: "#d62828",
   a: "#5b21b6",
@@ -119,6 +121,7 @@ let selectedOutputKuwaku = ALL_GRIDS_VALUE;
 let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
+let selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
 let outputListSortKey = "kuwaku";
 let outputListSortDirection = "asc";
 let isOverwriteMode = false;
@@ -164,6 +167,7 @@ const outputKuwakuSelect = document.getElementById("output-kuwaku-select");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
 const planUnitSelect = document.getElementById("plan-unit-select");
 const planDetailSelect = document.getElementById("plan-detail-select");
+const planDetailSubSelect = document.getElementById("plan-detail-sub-select");
 const planMapLegend = document.getElementById("plan-map-legend");
 const planMapWrap = document.getElementById("plan-map-wrap");
 const planKuwakuInfo = document.getElementById("plan-kuwaku-info");
@@ -688,6 +692,12 @@ function bindEvents() {
   if (planDetailSelect) {
     planDetailSelect.addEventListener("change", () => {
       selectedPlanDetail = value(planDetailSelect.value) || ALL_DETAILS_VALUE;
+      renderPlanOutput();
+    });
+  }
+  if (planDetailSubSelect) {
+    planDetailSubSelect.addEventListener("change", () => {
+      selectedPlanDetailSub = value(planDetailSubSelect.value) || ALL_DETAIL_SUBS_VALUE;
       renderPlanOutput();
     });
   }
@@ -1934,7 +1944,7 @@ function collectOutputKuwakuOptions(records) {
 }
 
 function renderPlanOutput() {
-  if (!planMapWrap || !planMapLegend || !planUnitSelect || !planDetailSelect) {
+  if (!planMapWrap || !planMapLegend || !planUnitSelect || !planDetailSelect || !planDetailSubSelect) {
     return;
   }
   planMapLegend.innerHTML = buildPlanLegendHtml();
@@ -1943,9 +1953,11 @@ function renderPlanOutput() {
     selectedPlanKuwaku = "";
     selectedPlanUnit = "";
     selectedPlanDetail = ALL_DETAILS_VALUE;
+    selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
     syncPlanKuwakuSelect([]);
     planUnitSelect.innerHTML = "";
     planDetailSelect.innerHTML = "";
+    planDetailSubSelect.innerHTML = "";
     if (planKuwakuInfo) {
       planKuwakuInfo.textContent = "区画: -";
     }
@@ -1961,8 +1973,10 @@ function renderPlanOutput() {
   if (!kuwakuFilteredRecords.length) {
     selectedPlanUnit = "";
     selectedPlanDetail = ALL_DETAILS_VALUE;
+    selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
     planUnitSelect.innerHTML = "";
     planDetailSelect.innerHTML = "";
+    planDetailSubSelect.innerHTML = "";
     planMapWrap.innerHTML = "<p class=\"muted\">この区画（グリッド）には表示対象データがありません。</p>";
     return;
   }
@@ -2001,12 +2015,30 @@ function renderPlanOutput() {
   const detailRecords =
     selectedPlanDetail === ALL_DETAILS_VALUE
       ? unitRecords
-      : unitRecords.filter((record) => detailValueForSelect(record.detail, record.detailSub) === selectedPlanDetail);
-  const points = detailRecords.map((record) => buildPlanPoint(record)).filter(Boolean);
+      : unitRecords.filter((record) => detailValueForSelect(record.detail) === selectedPlanDetail);
+
+  const detailSubs = collectPlanDetailSubs(detailRecords);
+  if (!detailSubs.some((detailSub) => detailSub.value === selectedPlanDetailSub)) {
+    selectedPlanDetailSub = detailSubs[0].value;
+  }
+  planDetailSubSelect.innerHTML = detailSubs
+    .map(
+      (detailSub) =>
+        `<option value="${escapeHtml(detailSub.value)}" ${detailSub.value === selectedPlanDetailSub ? "selected" : ""}>${escapeHtml(
+          detailSub.label
+        )}</option>`
+    )
+    .join("");
+
+  const detailSubRecords =
+    selectedPlanDetailSub === ALL_DETAIL_SUBS_VALUE
+      ? detailRecords
+      : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedPlanDetailSub);
+  const points = detailSubRecords.map((record) => buildPlanPoint(record)).filter(Boolean);
 
   if (!points.length) {
     planMapWrap.innerHTML =
-      "<p class=\"muted\">このユニット/細別は、平面位置の数値が未入力のため点を表示できません。</p>";
+      "<p class=\"muted\">このユニット/細別/細別（上下など）は、平面位置の数値が未入力のため点を表示できません。</p>";
     return;
   }
 
@@ -2119,7 +2151,7 @@ function unitLabelForSelect(unitValue) {
 }
 
 function collectPlanDetails(records) {
-  const detailSet = new Set(records.map((record) => detailValueForSelect(record.detail, record.detailSub)));
+  const detailSet = new Set(records.map((record) => detailValueForSelect(record.detail)));
   const detailOptions = Array.from(detailSet)
     .sort((a, b) => detailLabelForSelect(a).localeCompare(detailLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" }))
     .map((detailValue) => ({
@@ -2127,6 +2159,19 @@ function collectPlanDetails(records) {
       label: detailLabelForSelect(detailValue),
     }));
   return [{ value: ALL_DETAILS_VALUE, label: "全細別" }, ...detailOptions];
+}
+
+function collectPlanDetailSubs(records) {
+  const detailSubSet = new Set(records.map((record) => detailSubValueForSelect(record.detailSub)));
+  const detailSubOptions = Array.from(detailSubSet)
+    .sort((a, b) =>
+      detailSubLabelForSelect(a).localeCompare(detailSubLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" })
+    )
+    .map((detailSubValue) => ({
+      value: detailSubValue,
+      label: detailSubLabelForSelect(detailSubValue),
+    }));
+  return [{ value: ALL_DETAIL_SUBS_VALUE, label: "全細別（上下など）" }, ...detailSubOptions];
 }
 
 function buildDetailText(detailRaw, detailSubRaw = "") {
@@ -2142,13 +2187,22 @@ function formatDetailForRecord(record) {
   return buildDetailText(record?.detail, record?.detailSub);
 }
 
-function detailValueForSelect(detailRaw, detailSubRaw = "") {
-  const detail = buildDetailText(detailRaw, detailSubRaw);
+function detailValueForSelect(detailRaw) {
+  const detail = value(detailRaw);
   return detail || EMPTY_DETAIL_VALUE;
 }
 
 function detailLabelForSelect(detailValue) {
   return detailValue === EMPTY_DETAIL_VALUE ? "（未設定）" : detailValue;
+}
+
+function detailSubValueForSelect(detailSubRaw) {
+  const detailSub = value(detailSubRaw);
+  return detailSub || EMPTY_DETAIL_SUB_VALUE;
+}
+
+function detailSubLabelForSelect(detailSubValue) {
+  return detailSubValue === EMPTY_DETAIL_SUB_VALUE ? "（未設定）" : detailSubValue;
 }
 
 function getRecordKuwaku(record) {

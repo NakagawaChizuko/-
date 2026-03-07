@@ -201,7 +201,8 @@ main {
 
 .plan-grid-row,
 .plan-unit-row,
-.plan-detail-row {
+.plan-detail-row,
+.plan-detail-sub-row {
   width: min(100%, 280px);
 }
 
