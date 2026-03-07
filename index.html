@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>第24次野尻湖湖底発掘　化石・遺物 入力</title>
-    <link rel="stylesheet" href="./styles.css?v=20260307-14" />
+    <link rel="stylesheet" href="./styles.css?v=20260307-18" />
   </head>
   <body>
     <header class="app-header">
@@ -241,58 +241,13 @@
                 </label>
 
                 <section class="large-shape-panel hidden" data-large-shape-panel="直線状">
-                  <p class="hint-text">両端の位置を記入</p>
-                  <div class="large-line-grid">
-                    <div class="large-line-endpoint">
-                      <p class="large-line-endpoint-title">端点1</p>
-                      <div class="large-line-axis-row">
-                        <div class="dir-tabs" role="tablist" aria-label="端点1 北南方向">
-                          <button class="dir-tab active" data-group="line1Ns" data-value="北から" type="button">北から</button>
-                          <button class="dir-tab" data-group="line1Ns" data-value="南から" type="button">南から</button>
-                        </div>
-                        <input id="line1-ns-dir-input" name="line1NsDir" type="hidden" value="北から" />
-                        <div class="inline-cm-row">
-                          <input name="line1NsCm" type="text" />
-                          <span>cm</span>
-                        </div>
+                  <div class="large-size-grid">
+                    <label>長さ
+                      <div class="inline-cm-row">
+                        <input name="lineLengthCm" type="text" />
+                        <span>cm</span>
                       </div>
-                      <div class="large-line-axis-row">
-                        <div class="dir-tabs" role="tablist" aria-label="端点1 東西方向">
-                          <button class="dir-tab active" data-group="line1Ew" data-value="東から" type="button">東から</button>
-                          <button class="dir-tab" data-group="line1Ew" data-value="西から" type="button">西から</button>
-                        </div>
-                        <input id="line1-ew-dir-input" name="line1EwDir" type="hidden" value="東から" />
-                        <div class="inline-cm-row">
-                          <input name="line1EwCm" type="text" />
-                          <span>cm</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="large-line-endpoint">
-                      <p class="large-line-endpoint-title">端点2</p>
-                      <div class="large-line-axis-row">
-                        <div class="dir-tabs" role="tablist" aria-label="端点2 北南方向">
-                          <button class="dir-tab active" data-group="line2Ns" data-value="北から" type="button">北から</button>
-                          <button class="dir-tab" data-group="line2Ns" data-value="南から" type="button">南から</button>
-                        </div>
-                        <input id="line2-ns-dir-input" name="line2NsDir" type="hidden" value="北から" />
-                        <div class="inline-cm-row">
-                          <input name="line2NsCm" type="text" />
-                          <span>cm</span>
-                        </div>
-                      </div>
-                      <div class="large-line-axis-row">
-                        <div class="dir-tabs" role="tablist" aria-label="端点2 東西方向">
-                          <button class="dir-tab active" data-group="line2Ew" data-value="東から" type="button">東から</button>
-                          <button class="dir-tab" data-group="line2Ew" data-value="西から" type="button">西から</button>
-                        </div>
-                        <input id="line2-ew-dir-input" name="line2EwDir" type="hidden" value="東から" />
-                        <div class="inline-cm-row">
-                          <input name="line2EwCm" type="text" />
-                          <span>cm</span>
-                        </div>
-                      </div>
-                    </div>
+                    </label>
                   </div>
                 </section>
 
@@ -632,8 +587,8 @@
                     <span>サブユニット別</span>
                   </label>
                   <div class="export-plan-selection-block">
-                    <p class="export-plan-selection-label">ユニット（チェック）</p>
-                    <div id="export-plan-mode-detail-unit-checks" class="export-plan-option-checks" aria-label="サブユニット別 ユニット選択"></div>
+                    <p class="export-plan-selection-label">ユニット（1つ選択）</p>
+                    <select id="export-plan-mode-detail-unit-select" aria-label="サブユニット別 ユニット選択"></select>
                   </div>
                   <div class="export-plan-selection-block">
                     <p class="export-plan-selection-label">サブユニット（ボタン）</p>
@@ -647,12 +602,12 @@
                     <span>サブユニット細分別</span>
                   </label>
                   <div class="export-plan-selection-block">
-                    <p class="export-plan-selection-label">ユニット（チェック）</p>
-                    <div id="export-plan-mode-detail-sub-unit-checks" class="export-plan-option-checks" aria-label="細分別 ユニット選択"></div>
+                    <p class="export-plan-selection-label">ユニット（1つ選択）</p>
+                    <select id="export-plan-mode-detail-sub-unit-select" aria-label="細分別 ユニット選択"></select>
                   </div>
                   <div class="export-plan-selection-block">
-                    <p class="export-plan-selection-label">サブユニット（チェック）</p>
-                    <div id="export-plan-mode-detail-sub-detail-checks" class="export-plan-option-checks" aria-label="細分別 サブユニット選択"></div>
+                    <p class="export-plan-selection-label">サブユニット（1つ選択）</p>
+                    <select id="export-plan-mode-detail-sub-detail-select" aria-label="細分別 サブユニット選択"></select>
                   </div>
                   <div class="export-plan-selection-block">
                     <p class="export-plan-selection-label">細分（ボタン）</p>
@@ -742,9 +697,15 @@
         </section>
       </section>
     </main>
+    <nav class="tabs tabs-bottom" aria-label="入力セクション（下部）">
+      <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
+      <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
+      <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
+      <button class="tab-button" data-tab="export-tab" type="button">4. 出力</button>
+    </nav>
 
     <div id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=20260307-28"></script>
+    <script src="./app.js?v=20260307-31"></script>
   </body>
 </html>

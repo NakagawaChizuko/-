@@ -121,6 +121,12 @@ button:hover,
   padding: 12px;
 }
 
+.tabs-bottom {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  background: #f8fafc;
+}
+
 .tab-button {
   background: #fff;
   color: var(--text);
@@ -288,6 +294,10 @@ main {
   min-width: 220px;
 }
 
+.export-plan-selection-block select {
+  min-width: 180px;
+}
+
 .export-plan-selection-label {
   margin: 0;
   font-size: 0.78rem;
@@ -302,6 +312,17 @@ main {
   gap: 6px;
 }
 
+.export-plan-unit-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.export-plan-unit-button-row + .export-plan-unit-button-row {
+  margin-top: 6px;
+}
+
 .export-plan-option-button {
   border: 1px solid #cbd5e1;
   background: #ffffff;
@@ -313,11 +334,43 @@ main {
   cursor: pointer;
 }
 
+.export-plan-option-button.export-plan-option-button-all {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.export-plan-option-button.export-plan-option-button-all.active {
+  border-color: #16a34a;
+  background: #dcfce7;
+  color: #166534;
+}
+
 .export-plan-option-button.active {
   border-color: #ea580c;
   background: #ffedd5;
   color: #7c2d12;
   font-weight: 700;
+}
+
+.export-plan-unit-button-row.unit-row .export-plan-option-button {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.export-plan-unit-button-row.unit-row .export-plan-option-button.active {
+  border-color: #1d4ed8;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.export-plan-select-hint {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #b45309;
+  margin-left: 6px;
 }
 
 .export-plan-option-check {
