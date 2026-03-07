@@ -5277,12 +5277,31 @@ async function pushStateToCloud({ showToastOnSuccess = false, silentOnError = fa
   }
   cloudPushInProgress = true;
   try {
+    let mergedStateForSave = normalizeState(state);
+    try {
+      const remoteResponse = await requestCloud("load");
+      const remoteState = normalizeState(remoteResponse?.state);
+      mergedStateForSave = mergeStatesForCloud(remoteState, mergedStateForSave);
+      const remoteUpdatedAt = value(remoteResponse?.updatedAt) || getStateUpdatedAt(remoteState);
+      if (remoteUpdatedAt) {
+        cloudLastPulledAt = remoteUpdatedAt;
+      }
+    } catch (_error) {
+      // 読込に失敗しても、従来どおり端末側データで保存処理は継続する。
+      mergedStateForSave = normalizeState(state);
+    }
     const payload = {
       clientId: cloudClientId,
-      updatedAt: getStateUpdatedAt(state) || nowIso(),
-      state,
+      updatedAt: getStateUpdatedAt(mergedStateForSave) || nowIso(),
+      state: mergedStateForSave,
     };
     const response = await requestCloud("save", payload);
+    state = normalizeState(mergedStateForSave);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (_error) {
+      // 端末容量不足時でもクラウド保存結果は維持する。
+    }
     cloudLastSyncedAt = value(response.updatedAt) || payload.updatedAt;
     updateCloudStatus();
     if (showToastOnSuccess) {
@@ -5460,6 +5479,165 @@ function getStateUpdatedAt(candidateState) {
     });
   }
   return Number.isFinite(latestMs) ? new Date(latestMs).toISOString() : "";
+}
+
+function mergeStatesForCloud(remoteStateRaw, localStateRaw) {
+  const remoteState = normalizeState(remoteStateRaw);
+  const localState = normalizeState(localStateRaw);
+  const mergedSite = mergeSiteForCloud(remoteState.site, localState.site);
+  const recordById = new Map();
+
+  const upsertRecord = (recordRaw, preferIncomingOnTie) => {
+    const record = normalizeRecord(recordRaw, mergedSite);
+    const recordId = value(record?.id);
+    if (!recordId) {
+      return;
+    }
+    const existing = recordById.get(recordId);
+    if (!existing) {
+      recordById.set(recordId, record);
+      return;
+    }
+    recordById.set(recordId, chooseNewerRecordForCloud(existing, record, preferIncomingOnTie));
+  };
+
+  remoteState.records.forEach((record) => upsertRecord(record, false));
+  localState.records.forEach((record) => upsertRecord(record, true));
+
+  return normalizeState({
+    site: mergedSite,
+    records: Array.from(recordById.values()),
+  });
+}
+
+function mergeSiteForCloud(remoteSiteRaw, localSiteRaw) {
+  const remoteSite = remoteSiteRaw && typeof remoteSiteRaw === "object" ? remoteSiteRaw : {};
+  const localSite = localSiteRaw && typeof localSiteRaw === "object" ? localSiteRaw : {};
+  const preferLocal = isIsoTimestampGreaterOrEqual(localSite.updatedAt, remoteSite.updatedAt);
+  const primary = preferLocal ? localSite : remoteSite;
+  const secondary = preferLocal ? remoteSite : localSite;
+  const mergedUpdatedAt = pickLatestIsoTimestamp(localSite.updatedAt, remoteSite.updatedAt);
+
+  return {
+    kuwaku: value(primary.kuwaku) || value(secondary.kuwaku) || DEFAULT_KUWAKU,
+    kuwakuHeadA: value(primary.kuwakuHeadA) || value(secondary.kuwakuHeadA) || DEFAULT_KUWAKU_HEAD_A,
+    kuwakuHeadB: value(primary.kuwakuHeadB) || value(secondary.kuwakuHeadB) || DEFAULT_KUWAKU_HEAD_B,
+    kuwakuBlock: value(primary.kuwakuBlock) || value(secondary.kuwakuBlock),
+    kuwakuNo: value(primary.kuwakuNo) || value(secondary.kuwakuNo),
+    levelHeight: value(primary.levelHeight) || value(secondary.levelHeight),
+    date: value(primary.date) || value(secondary.date),
+    team: value(primary.team) || value(secondary.team),
+    teamOther: value(primary.teamOther) || value(secondary.teamOther),
+    teamLead: value(primary.teamLead) || value(secondary.teamLead),
+    recorder: value(primary.recorder) || value(secondary.recorder),
+    updatedAt: mergedUpdatedAt || value(primary.updatedAt) || value(secondary.updatedAt),
+  };
+}
+
+function chooseNewerRecordForCloud(existingRecordRaw, incomingRecordRaw, preferIncomingOnTie = true) {
+  const existingRecord = normalizeRecord(existingRecordRaw);
+  const incomingRecord = normalizeRecord(incomingRecordRaw);
+  const existingMs = getRecordUpdatedAtMs(existingRecord);
+  const incomingMs = getRecordUpdatedAtMs(incomingRecord);
+  let winner = existingRecord;
+  let loser = incomingRecord;
+
+  if (Number.isFinite(incomingMs) && Number.isFinite(existingMs)) {
+    if (incomingMs > existingMs || (incomingMs === existingMs && preferIncomingOnTie)) {
+      winner = incomingRecord;
+      loser = existingRecord;
+    }
+  } else if (Number.isFinite(incomingMs) && !Number.isFinite(existingMs)) {
+    winner = incomingRecord;
+    loser = existingRecord;
+  } else if (!Number.isFinite(incomingMs) && !Number.isFinite(existingMs) && preferIncomingOnTie) {
+    winner = incomingRecord;
+    loser = existingRecord;
+  }
+
+  const mergedHistory = mergeRecordHistoryEntries(existingRecord?.history, incomingRecord?.history);
+  return {
+    ...loser,
+    ...winner,
+    history: mergedHistory.length ? mergedHistory : normalizeRecordHistory(winner?.history),
+  };
+}
+
+function mergeRecordHistoryEntries(historyA, historyB) {
+  const mergedMap = new Map();
+  const upsert = (entryRaw) => {
+    const entry = normalizeRecordHistory([entryRaw])[0];
+    if (!entry) {
+      return;
+    }
+    const key = value(entry.id) || `${value(entry.at)}::${value(entry.action)}::${value(entry.content)}`;
+    if (!key) {
+      return;
+    }
+    const existing = mergedMap.get(key);
+    if (!existing) {
+      mergedMap.set(key, entry);
+      return;
+    }
+    const existingMs = Date.parse(value(existing.at));
+    const incomingMs = Date.parse(value(entry.at));
+    if (Number.isFinite(incomingMs) && (!Number.isFinite(existingMs) || incomingMs >= existingMs)) {
+      mergedMap.set(key, entry);
+    }
+  };
+
+  normalizeRecordHistory(historyA).forEach(upsert);
+  normalizeRecordHistory(historyB).forEach(upsert);
+
+  return Array.from(mergedMap.values())
+    .sort((a, b) => {
+      const aMs = Date.parse(value(a.at));
+      const bMs = Date.parse(value(b.at));
+      if (Number.isFinite(aMs) && Number.isFinite(bMs) && aMs !== bMs) {
+        return aMs - bMs;
+      }
+      return value(a.id).localeCompare(value(b.id));
+    })
+    .slice(-50);
+}
+
+function getRecordUpdatedAtMs(record) {
+  const updatedMs = Date.parse(value(record?.updatedAt));
+  if (Number.isFinite(updatedMs)) {
+    return updatedMs;
+  }
+  const createdMs = Date.parse(value(record?.createdAt));
+  return Number.isFinite(createdMs) ? createdMs : Number.NaN;
+}
+
+function pickLatestIsoTimestamp(tsA, tsB) {
+  const aMs = Date.parse(value(tsA));
+  const bMs = Date.parse(value(tsB));
+  if (Number.isFinite(aMs) && Number.isFinite(bMs)) {
+    return new Date(Math.max(aMs, bMs)).toISOString();
+  }
+  if (Number.isFinite(aMs)) {
+    return new Date(aMs).toISOString();
+  }
+  if (Number.isFinite(bMs)) {
+    return new Date(bMs).toISOString();
+  }
+  return "";
+}
+
+function isIsoTimestampGreaterOrEqual(tsA, tsB) {
+  const aMs = Date.parse(value(tsA));
+  const bMs = Date.parse(value(tsB));
+  if (Number.isFinite(aMs) && Number.isFinite(bMs)) {
+    return aMs >= bMs;
+  }
+  if (Number.isFinite(aMs)) {
+    return true;
+  }
+  if (Number.isFinite(bMs)) {
+    return false;
+  }
+  return true;
 }
 
 function formatStatusTime(isoString) {
