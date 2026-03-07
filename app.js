@@ -756,6 +756,11 @@ function bindEvents() {
       openRecordForEdit(record.id, rowKuwaku);
       return;
     }
+    if (action === "copy-to-input") {
+      const rowKuwaku = value(button.dataset.kuwaku);
+      copySavedRecordToInput(recordId, rowKuwaku);
+      return;
+    }
 
     if (action === "delete") {
       const answer = window.confirm(`標本番号 ${record.specimenNo} を削除しますか？`);
@@ -2560,6 +2565,9 @@ function renderRecordTable() {
             <button type="button" data-action="edit" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
             )}">編集</button>
+            <button type="button" data-action="copy-to-input" data-id="${record.id}" data-kuwaku="${escapeHtml(
+              getRecordKuwaku(record)
+            )}">コピーして新規入力</button>
             <button class="danger" type="button" data-action="delete" data-id="${record.id}">削除</button>
           </div>
         </td>
@@ -6299,7 +6307,12 @@ function openPdfPrintWindow({ title, pageSize, bodyHtml }) {
     printWindow.document.write(htmlText);
     printWindow.document.close();
 
+    let hasPrinted = false;
     const triggerPrint = () => {
+      if (hasPrinted) {
+        return;
+      }
+      hasPrinted = true;
       try {
         printWindow.focus();
         printWindow.print();
