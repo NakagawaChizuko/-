@@ -38,7 +38,7 @@
         <form id="site-form" class="panel">
           <h2>区画（グリッド）情報</h2>
           <div class="grid cols-3">
-            <label class="span-2">区画（グリッド）名　　　　例：（24 - １ - C - 4 )
+            <label class="span-2">区画（グリッド）名　　　　例：（24 - Ⅰ - C - 4 )
               <div class="kuwaku-input">
                 <input name="kuwakuHeadA" type="text" value="24" />
                 <span class="sep">-</span>
@@ -225,12 +225,17 @@
               <input id="layer-name-input" name="layerName" type="hidden" value="1.芙蓉湖砂シルト部層" />
               <input id="layer-other-input" type="text" class="hidden" placeholder="4.その他 の内容を入力" />
             </fieldset>
-            <label>ユニット
-              <input name="unit" type="text" />
-            </label>
-            <label>細別
-              <input name="detail" type="text" />
-            </label>
+            <div class="unit-detail-inline span-3">
+              <label class="compact-input-group">ユニット
+                <input name="unit" type="text" placeholder="T2, T3, T4　など" />
+              </label>
+              <label class="compact-input-group">細別
+                <input name="detail" type="text" placeholder="a, b, c, d, など" />
+              </label>
+              <label class="compact-input-group no-caption">
+                <input name="detailSub" type="text" placeholder="上, 下 など" aria-label="細別（上下など）" />
+              </label>
+            </div>
             <fieldset class="inline-fieldset span-2">
               <legend>地層中の位置</legend>
               <div class="layer-position-row top">
@@ -370,7 +375,7 @@
         <section class="panel">
           <h2>編集画面</h2>
           <div class="grid cols-3">
-            <label class="span-2">区画（グリッド）名　　　　例：（24 - １ - C - 4 )
+            <label class="span-2">区画（グリッド）名　　　　例：（24 - Ⅰ - C - 4 )
               <div class="kuwaku-input">
                 <input id="edit-kuwaku-head-a" type="text" value="24" />
                 <span class="sep">-</span>

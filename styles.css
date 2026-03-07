@@ -392,6 +392,28 @@ main {
   grid-column: span 3;
 }
 
+.unit-detail-inline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(88px, 128px));
+  justify-content: start;
+  align-items: end;
+  gap: 8px;
+}
+
+.compact-input-group {
+  margin: 0;
+  gap: 3px;
+}
+
+.compact-input-group input {
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.compact-input-group.no-caption {
+  gap: 0;
+}
+
 label,
 fieldset {
   display: grid;

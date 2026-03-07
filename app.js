@@ -459,6 +459,7 @@ function bindEvents() {
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
       detail: value(formData.get("detail")),
+      detailSub: value(formData.get("detailSub")),
       layerRef: value(formData.get("layerRef")),
       layerFromCm: value(formData.get("layerFromCm")),
       layerRelative: value(formData.get("layerRelative")),
@@ -498,6 +499,7 @@ function bindEvents() {
       layerName: record.layerName,
       unit: record.unit,
       detail: record.detail,
+      detailSub: record.detailSub,
       layerRef: record.layerRef,
       layerFromCm: record.layerFromCm,
       layerRelative: record.layerRelative,
@@ -988,6 +990,7 @@ function applyCarryForwardFields(saved) {
   setLayerFromValue(value(saved?.layerName));
   recordForm.elements.unit.value = value(saved?.unit);
   recordForm.elements.detail.value = value(saved?.detail);
+  recordForm.elements.detailSub.value = value(saved?.detailSub);
   recordForm.elements.layerRef.value = value(saved?.layerRef);
   recordForm.elements.layerFromCm.value = value(saved?.layerFromCm);
   recordForm.elements.layerRelative.value = value(saved?.layerRelative);
@@ -1001,6 +1004,9 @@ function markCarryForwardSavedFields(saved) {
   }
   if (value(saved?.detail)) {
     recordForm.elements.detail.classList.add("saved-carry-value");
+  }
+  if (value(saved?.detailSub)) {
+    recordForm.elements.detailSub.classList.add("saved-carry-value");
   }
   if (value(saved?.layerRef)) {
     recordForm.elements.layerRef.classList.add("saved-carry-value");
@@ -1021,6 +1027,7 @@ function markCarryForwardSavedFields(saved) {
 function clearCarryForwardSavedFields() {
   recordForm.elements.unit.classList.remove("saved-carry-value");
   recordForm.elements.detail.classList.remove("saved-carry-value");
+  recordForm.elements.detailSub.classList.remove("saved-carry-value");
   recordForm.elements.layerRef.classList.remove("saved-carry-value");
   recordForm.elements.layerFromCm.classList.remove("saved-carry-value");
   recordForm.elements.layerRelative.classList.remove("saved-carry-value");
@@ -1089,6 +1096,7 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
     "nsCm",
     "ewCm",
     "detail",
+    "detailSub",
     "layerRef",
     "layerFromCm",
     "layerRelative",
@@ -1203,6 +1211,7 @@ function handleRecordFormFieldEdit(event) {
     target instanceof HTMLInputElement &&
     (target.name === "unit" ||
       target.name === "detail" ||
+      target.name === "detailSub" ||
       target.name === "layerRef" ||
       target.name === "layerFromCm" ||
       target.name === "layerRelative");
@@ -1287,6 +1296,7 @@ function populateRecordForm(record) {
   recordForm.elements.simpleRecordFlag.value = normalizeCircleDashFlag(record.simpleRecordFlag);
   setLayerFromValue(record.layerName);
   recordForm.elements.detail.value = record.detail || "";
+  recordForm.elements.detailSub.value = record.detailSub || "";
   recordForm.elements.layerRef.value = record.layerRef || "";
   recordForm.elements.layerFromCm.value = record.layerFromCm || "";
   recordForm.elements.layerRelative.value = record.layerRelative || "";
@@ -1557,7 +1567,7 @@ function renderCardOutput() {
         <div><span>簡易記載</span><strong>${escapeHtml(selectedRecord.simpleRecordFlag || "-")}</strong></div>
         <div><span>地層名</span><strong>${escapeHtml(selectedRecord.layerName || "")}</strong></div>
         <div><span>ユニット</span><strong>${escapeHtml(selectedRecord.unit || "")}</strong></div>
-        <div><span>細別</span><strong>${escapeHtml(selectedRecord.detail || "")}</strong></div>
+        <div><span>細別</span><strong>${escapeHtml(formatDetailForRecord(selectedRecord))}</strong></div>
         <div><span>地層中の位置</span><strong>${escapeHtml(formatLayerPosition(selectedRecord))}</strong></div>
         <div><span>発見者</span><strong>${escapeHtml(selectedRecord.discoverer || "")}</strong></div>
         <div><span>判定者</span><strong>${escapeHtml(selectedRecord.identifier || "")}</strong></div>
@@ -1686,7 +1696,7 @@ function renderPlanOutput() {
   const detailRecords =
     selectedPlanDetail === ALL_DETAILS_VALUE
       ? unitRecords
-      : unitRecords.filter((record) => detailValueForSelect(record.detail) === selectedPlanDetail);
+      : unitRecords.filter((record) => detailValueForSelect(record.detail, record.detailSub) === selectedPlanDetail);
   const points = detailRecords.map((record) => buildPlanPoint(record)).filter(Boolean);
 
   if (!points.length) {
@@ -1804,7 +1814,7 @@ function unitLabelForSelect(unitValue) {
 }
 
 function collectPlanDetails(records) {
-  const detailSet = new Set(records.map((record) => detailValueForSelect(record.detail)));
+  const detailSet = new Set(records.map((record) => detailValueForSelect(record.detail, record.detailSub)));
   const detailOptions = Array.from(detailSet)
     .sort((a, b) => detailLabelForSelect(a).localeCompare(detailLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" }))
     .map((detailValue) => ({
@@ -1814,8 +1824,21 @@ function collectPlanDetails(records) {
   return [{ value: ALL_DETAILS_VALUE, label: "全細別" }, ...detailOptions];
 }
 
-function detailValueForSelect(detailRaw) {
+function buildDetailText(detailRaw, detailSubRaw = "") {
   const detail = value(detailRaw);
+  const detailSub = value(detailSubRaw);
+  if (detail && detailSub) {
+    return `${detail} ${detailSub}`;
+  }
+  return detail || detailSub;
+}
+
+function formatDetailForRecord(record) {
+  return buildDetailText(record?.detail, record?.detailSub);
+}
+
+function detailValueForSelect(detailRaw, detailSubRaw = "") {
+  const detail = buildDetailText(detailRaw, detailSubRaw);
   return detail || EMPTY_DETAIL_VALUE;
 }
 
@@ -1888,7 +1911,7 @@ function buildPlanPoint(record) {
     label: record.specimenNo || "",
     nameMemo: value(record.nameMemo),
     unit: value(record.unit),
-    detail: value(record.detail),
+    detail: buildDetailText(record.detail, record.detailSub),
   };
 }
 
@@ -2199,6 +2222,7 @@ function normalizeState(candidate) {
         simpleRecordFlag: value(card.simpleRecordFlag),
         layerName: value(card.layerName),
         detail: value(card.detail),
+        detailSub: value(card.detailSub),
         layerRef: value(card.layerRef) || value(card.layerPosition),
         layerFromCm: value(card.layerFromCm),
         layerRelative: value(card.layerRelative),
@@ -2267,6 +2291,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),
     detail: value(item.detail),
+    detailSub: value(item.detailSub),
     layerRef: value(item.layerRef) || value(item.layerPosition),
     layerFromCm: value(item.layerFromCm),
     layerRelative: value(item.layerRelative),
@@ -2305,7 +2330,7 @@ function createHistorySnapshot(record) {
     category: formatCategoryForRecord(record),
     layerName: value(record?.layerName),
     unit: value(record?.unit),
-    detail: value(record?.detail),
+    detail: formatDetailForRecord(record),
     layerPosition: formatLayerPosition(record),
   };
 }
@@ -2962,6 +2987,7 @@ function buildCardCsv() {
     "簡易記載",
     "地層名",
     "細別",
+    "細別（上下など）",
     "層理面もしくは鍵層名",
     "地層中の位置_から(cm)",
     "地層中の位置_上もしくは下",
@@ -2989,6 +3015,7 @@ function buildCardCsv() {
     record.simpleRecordFlag,
     record.layerName,
     record.detail,
+    record.detailSub,
     record.layerRef,
     record.layerFromCm,
     record.layerRelative,
@@ -3450,8 +3477,14 @@ function clonePhotos(photos) {
   return normalizePhotos(photos).map((photo) => ({ ...photo }));
 }
 
+function normalizeAsciiWidth(inputText) {
+  return String(inputText)
+    .replace(/\u3000/g, " ")
+    .replace(/[！-～]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0));
+}
+
 function value(input) {
-  return input == null ? "" : String(input).trim();
+  return input == null ? "" : normalizeAsciiWidth(String(input)).trim();
 }
 
 function clamp(number, min, max) {
