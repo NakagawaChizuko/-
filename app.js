@@ -421,15 +421,6 @@ function bindEvents() {
       return;
     }
     const specimenNo = buildSpecimenNo(specimenPrefix, specimenSerial);
-    const duplicateRecord = findDuplicateRecordByKuwakuAndSpecimen(
-      recordKuwaku,
-      specimenNo,
-      found?.id || editingId || ""
-    );
-    if (duplicateRecord) {
-      showToast(`警告: 同じ区画で標本番号 ${specimenNo} はすでに登録されています`);
-      return;
-    }
     const saveAnswer = window.confirm(
       isEditTab ? `${specimenNo}の情報を上書き保存しますか？` : `${specimenNo}の情報を保存しますか？`
     );
@@ -981,6 +972,9 @@ function updateDuplicateSpecimenWarning() {
   if (!specimenDuplicateWarning) {
     return;
   }
+  if (recordSubmitBtn) {
+    recordSubmitBtn.disabled = false;
+  }
   const activeTabId = getActiveTabId();
   if (activeTabId !== "input-tab" && activeTabId !== "edit-tab") {
     hideDuplicateSpecimenWarning();
@@ -1008,6 +1002,9 @@ function updateDuplicateSpecimenWarning() {
   }
   specimenDuplicateWarning.textContent = `警告: この区画には ${specimenNo} がすでにあります`;
   specimenDuplicateWarning.classList.remove("hidden");
+  if (recordSubmitBtn) {
+    recordSubmitBtn.disabled = true;
+  }
 }
 
 function currentKuwakuForDuplicateWarning(activeTabId = getActiveTabId()) {
@@ -1038,6 +1035,9 @@ function hideDuplicateSpecimenWarning() {
   }
   specimenDuplicateWarning.textContent = "";
   specimenDuplicateWarning.classList.add("hidden");
+  if (recordSubmitBtn) {
+    recordSubmitBtn.disabled = false;
+  }
 }
 
 function syncAnalysisTypeInput(prefixRaw) {
