@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>第24次野尻湖湖底発掘　化石・遺物 入力</title>
-    <link rel="stylesheet" href="./styles.css?v=20260307-18" />
+    <link rel="stylesheet" href="./styles.css?v=20260308-3d22" />
   </head>
   <body>
     <header class="app-header">
@@ -29,7 +29,8 @@
       <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
       <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
       <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
-      <button class="tab-button" data-tab="export-tab" type="button">4. 出力</button>
+      <button class="tab-button" data-tab="viewer-tab" type="button">4. 3Dビュアー</button>
+      <button class="tab-button" data-tab="export-tab" type="button">5. 出力</button>
     </nav>
 
     <main>
@@ -235,8 +236,25 @@
                   <button class="dir-tab" data-group="largeShapeType" data-value="長方形" type="button">長方形</button>
                   <button class="dir-tab" data-group="largeShapeType" data-value="楕円" type="button">楕円</button>
                 </div>
+                <div id="large-shape-image-buttons" class="dir-tabs image-shape-tabs" role="tablist" aria-label="図形画像"></div>
                 <input id="large-shape-type-input" name="largeShapeType" type="hidden" value="" />
-                <label class="large-axis-direction-label">長軸・長辺・長半径方向
+                <div id="large-shape-image-preview" class="large-shape-image-preview hidden" aria-live="polite">
+                  <p id="large-shape-image-preview-title" class="large-shape-image-preview-title"></p>
+                  <div class="large-shape-image-preview-wrap">
+                    <span class="preview-corner-frame" aria-hidden="true"></span>
+                    <img id="large-shape-image-preview-img" alt="" />
+                    <span class="preview-corner-dot p1" aria-hidden="true"></span>
+                    <span class="preview-corner-dot p2" aria-hidden="true"></span>
+                    <span class="preview-corner-dot p3" aria-hidden="true"></span>
+                    <span class="preview-corner-dot p4" aria-hidden="true"></span>
+                    <span class="preview-corner-badge p1">点1</span>
+                    <span class="preview-corner-badge p2">点2</span>
+                    <span class="preview-corner-badge p3">点3</span>
+                    <span class="preview-corner-badge p4">点4</span>
+                  </div>
+                  <p class="hint-text">点1=左上 / 点2=右上 / 点3=右下 / 点4=左下</p>
+                </div>
+                <label id="large-axis-direction-row" class="large-axis-direction-label">長軸・長辺・長半径方向
                   <input id="large-axis-direction-input" name="largeAxisDirection" type="text" placeholder="例：N30W" />
                 </label>
 
@@ -284,6 +302,72 @@
                         <span>cm</span>
                       </div>
                     </label>
+                  </div>
+                </section>
+
+                <section class="large-shape-panel hidden" data-large-shape-panel="__IMAGE__">
+                  <p class="hint-text">画像の四隅にあたる4点（化石の輪郭ではないので注意）を点1(左上)→点2(右上)→点3(右下)→点4(左下)の順で入力</p>
+                  <div class="image-corner-grid">
+                    <div class="image-corner-row">
+                      <strong>点1</strong>
+                      <select name="imgP1NsDir">
+                        <option value="北から">北から</option>
+                        <option value="南から">南から</option>
+                      </select>
+                      <input name="imgP1NsCm" type="text" />
+                      <span>cm</span>
+                      <select name="imgP1EwDir">
+                        <option value="東から">東から</option>
+                        <option value="西から">西から</option>
+                      </select>
+                      <input name="imgP1EwCm" type="text" />
+                      <span>cm</span>
+                    </div>
+                    <div class="image-corner-row">
+                      <strong>点2</strong>
+                      <select name="imgP2NsDir">
+                        <option value="北から">北から</option>
+                        <option value="南から">南から</option>
+                      </select>
+                      <input name="imgP2NsCm" type="text" />
+                      <span>cm</span>
+                      <select name="imgP2EwDir">
+                        <option value="東から">東から</option>
+                        <option value="西から">西から</option>
+                      </select>
+                      <input name="imgP2EwCm" type="text" />
+                      <span>cm</span>
+                    </div>
+                    <div class="image-corner-row">
+                      <strong>点3</strong>
+                      <select name="imgP3NsDir">
+                        <option value="北から">北から</option>
+                        <option value="南から">南から</option>
+                      </select>
+                      <input name="imgP3NsCm" type="text" />
+                      <span>cm</span>
+                      <select name="imgP3EwDir">
+                        <option value="東から">東から</option>
+                        <option value="西から">西から</option>
+                      </select>
+                      <input name="imgP3EwCm" type="text" />
+                      <span>cm</span>
+                    </div>
+                    <div class="image-corner-row">
+                      <strong>点4</strong>
+                      <select name="imgP4NsDir">
+                        <option value="北から">北から</option>
+                        <option value="南から">南から</option>
+                      </select>
+                      <input name="imgP4NsCm" type="text" />
+                      <span>cm</span>
+                      <select name="imgP4EwDir">
+                        <option value="東から">東から</option>
+                        <option value="西から">西から</option>
+                      </select>
+                      <input name="imgP4EwCm" type="text" />
+                      <span>cm</span>
+                    </div>
                   </div>
                 </section>
               </div>
@@ -437,6 +521,7 @@
                   <th data-sort-key="discoverer" tabindex="0">発見者</th>
                   <th data-sort-key="identifier" tabindex="0">判定者</th>
                   <th data-sort-key="levelRead" tabindex="0">レベル読値(上面/下底)</th>
+                  <th data-sort-key="altitudeM" tabindex="0">標高(m)</th>
                   <th data-sort-key="occurrenceSection" tabindex="0">産出状況断面</th>
                   <th data-sort-key="occurrenceSketch" tabindex="0">産状スケッチ</th>
                   <th data-sort-key="position" tabindex="0">平面位置</th>
@@ -481,6 +566,48 @@
           </div>
           <div id="plan-map-legend" class="plan-map-legend"></div>
           <div id="plan-map-wrap"></div>
+        </section>
+      </section>
+
+      <section id="viewer-tab" class="tab-panel">
+        <section class="panel">
+          <div class="plan-title-row">
+            <h2>標高・区画・平面位置 3Dビュー</h2>
+            <p id="viewer-kuwaku-info" class="plan-kuwaku-info"></p>
+          </div>
+          <div class="plan-filter-row">
+            <label class="plan-grid-row">
+              区画（グリッド）
+              <select id="viewer-kuwaku-select"></select>
+            </label>
+            <label class="plan-unit-row">
+              ユニット
+              <select id="viewer-unit-select"></select>
+            </label>
+            <label class="plan-detail-row">
+              サブユニット
+              <select id="viewer-detail-select"></select>
+            </label>
+            <label class="plan-detail-sub-row">
+              細分
+              <select id="viewer-detail-sub-select"></select>
+            </label>
+          </div>
+          <div class="viewer-toolbar">
+            <button id="viewer-view-top-btn" type="button">上面</button>
+            <button id="viewer-view-iso-btn" type="button">斜め</button>
+            <button id="viewer-reset-btn" type="button">再描画</button>
+            <label class="viewer-z-scale-control">
+              縦スケール
+              <input id="viewer-z-scale-input" type="range" min="1" max="5" step="0.1" value="1" />
+              <span id="viewer-z-scale-value">1.0x</span>
+            </label>
+          </div>
+          <div id="viewer-map-legend" class="plan-map-legend"></div>
+          <p id="viewer-status" class="muted">表示対象データがありません。</p>
+          <div id="viewer-canvas-wrap" class="viewer-canvas-wrap">
+            <div id="viewer-tooltip" class="viewer-tooltip" hidden></div>
+          </div>
         </section>
       </section>
 
@@ -701,11 +828,15 @@
       <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
       <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
       <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
-      <button class="tab-button" data-tab="export-tab" type="button">4. 出力</button>
+      <button class="tab-button" data-tab="viewer-tab" type="button">4. 3Dビュアー</button>
+      <button class="tab-button" data-tab="export-tab" type="button">5. 出力</button>
     </nav>
 
     <div id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=20260307-31"></script>
+    <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
+    <script src="./app.js?v=20260308-3d31"></script>
   </body>
 </html>

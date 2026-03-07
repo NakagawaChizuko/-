@@ -70,6 +70,14 @@ const REQUIRED_FIELD_LABELS = {
   rectSide2Cm: "長方形 辺2",
   ellipseLongRadiusCm: "楕円 長半径",
   ellipseShortRadiusCm: "楕円 短半径",
+  imgP1NsCm: "画像点1 北/南距離",
+  imgP1EwCm: "画像点1 東/西距離",
+  imgP2NsCm: "画像点2 北/南距離",
+  imgP2EwCm: "画像点2 東/西距離",
+  imgP3NsCm: "画像点3 北/南距離",
+  imgP3EwCm: "画像点3 東/西距離",
+  imgP4NsCm: "画像点4 北/南距離",
+  imgP4EwCm: "画像点4 東/西距離",
   layerName: "地層名",
   layerOther: "地層名（その他）",
   unit: "ユニット",
@@ -123,6 +131,47 @@ const SPECIMEN_POINT_COLORS = {
   g: "#8f5a2b",
   h: "#6b7280",
 };
+const IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS = 5;
+const LARGE_SHAPE_DIR_PATH = "./shapes";
+const LARGE_SHAPE_FILE_LABEL_MAP = {
+  palmate_antler: "掌状角",
+  incisor: "切歯",
+  constricted_shape: "くびれた形",
+  rib_curved: "肋骨（湾曲形）",
+  triangle: "三角",
+  c_shape: "C形",
+  diamond_hira: "ひし形",
+};
+const DEFAULT_LARGE_SHAPE_IMAGE_PATHS = {
+  掌状角: `${LARGE_SHAPE_DIR_PATH}/palmate_antler.png`,
+  切歯: `${LARGE_SHAPE_DIR_PATH}/incisor.png`,
+  くびれた形: `${LARGE_SHAPE_DIR_PATH}/constricted_shape.png`,
+  "肋骨（湾曲形）": `${LARGE_SHAPE_DIR_PATH}/rib_curved.png`,
+  三角: `${LARGE_SHAPE_DIR_PATH}/triangle.png`,
+  C形: `${LARGE_SHAPE_DIR_PATH}/c_shape.png`,
+  ひし形: `${LARGE_SHAPE_DIR_PATH}/diamond_hira.png`,
+};
+const LARGE_SHAPE_IMAGE_FALLBACK_PATHS = {
+  掌状角: ["./assets/large-shapes/palmate_antler.png"],
+  切歯: ["./assets/large-shapes/incisor.png"],
+  三角: ["./assets/large-shapes/triangle.png"],
+  C形: ["./assets/large-shapes/c_shape.png"],
+  くびれた形: ["./assets/large-shapes/constricted_shape.png"],
+  ひし形: ["./assets/large-shapes/diamond_hira.png"],
+  "肋骨（湾曲形）": ["./assets/large-shapes/rib_curved.png"],
+};
+const EXCLUDED_LARGE_SHAPE_LABELS = new Set(["菱形", "肋骨", "肋骨（湾曲型）"]);
+const LARGE_SHAPE_MANIFEST_PATH = `${LARGE_SHAPE_DIR_PATH}/manifest.json`;
+let largeShapeImagePathMap = new Map(Object.entries(DEFAULT_LARGE_SHAPE_IMAGE_PATHS));
+const INLINE_LARGE_SHAPE_DATA_MAP =
+  typeof window !== "undefined" &&
+  window.__INLINE_LARGE_SHAPE_DATA_MAP__ &&
+  typeof window.__INLINE_LARGE_SHAPE_DATA_MAP__ === "object"
+    ? window.__INLINE_LARGE_SHAPE_DATA_MAP__
+    : {};
+const VIEWER_HEAD_SEQUENCE = ["Ⅲ", "Ⅰ", "Ⅱ"];
+const VIEWER_HEAD_INDEX_MAP = new Map(VIEWER_HEAD_SEQUENCE.map((head, index) => [head, index]));
+const VIEWER_ALTITUDE_BASE_M = 655;
 const UNIT_CELL_COLOR_MAP = {
   U1: { background: "hsl(272, 64%, 93%)", border: "hsl(272, 38%, 80%)", color: "#111827" },
   U2: { background: "hsl(286, 62%, 93%)", border: "hsl(286, 36%, 80%)", color: "#111827" },
@@ -171,6 +220,12 @@ let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
 let selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
+let selectedViewerKuwaku = ALL_GRIDS_VALUE;
+let selectedViewerUnit = ALL_UNITS_VALUE;
+let selectedViewerDetail = ALL_DETAILS_VALUE;
+let selectedViewerDetailSub = ALL_DETAIL_SUBS_VALUE;
+let selectedViewerPerspective = "top";
+let viewerVerticalScale = 1;
 let exportListRangeKuwaku = ALL_GRIDS_VALUE;
 let exportListRangeCategory = EXPORT_CATEGORY_ALL_VALUE;
 let exportListRangeStatus = "all";
@@ -250,6 +305,21 @@ const planDetailSubSelect = document.getElementById("plan-detail-sub-select");
 const planMapLegend = document.getElementById("plan-map-legend");
 const planMapWrap = document.getElementById("plan-map-wrap");
 const planKuwakuInfo = document.getElementById("plan-kuwaku-info");
+const viewerKuwakuSelect = document.getElementById("viewer-kuwaku-select");
+const viewerUnitSelect = document.getElementById("viewer-unit-select");
+const viewerDetailSelect = document.getElementById("viewer-detail-select");
+const viewerDetailSubSelect = document.getElementById("viewer-detail-sub-select");
+const viewerKuwakuInfo = document.getElementById("viewer-kuwaku-info");
+const viewerMapLegend = document.getElementById("viewer-map-legend");
+const viewerCanvasWrap = document.getElementById("viewer-canvas-wrap");
+const viewerTooltip = document.getElementById("viewer-tooltip");
+const viewerStatus = document.getElementById("viewer-status");
+const viewerViewTopBtn = document.getElementById("viewer-view-top-btn");
+const viewerViewIsoBtn = document.getElementById("viewer-view-iso-btn");
+const viewerResetBtn = document.getElementById("viewer-reset-btn");
+const viewerZScaleInput = document.getElementById("viewer-z-scale-input");
+const viewerZScaleValue = document.getElementById("viewer-z-scale-value");
+const largeAxisDirectionRow = document.getElementById("large-axis-direction-row");
 const exportListRangeKuwakuSelect = document.getElementById("export-range-kuwaku-select");
 const exportListRangeCategorySelect = document.getElementById("export-range-category-select");
 const exportListRangeStatusSelect = document.getElementById("export-range-status-select");
@@ -291,7 +361,6 @@ const specimenDuplicateWarning = document.getElementById("specimen-duplicate-war
 const analysisTypeRow = document.getElementById("analysis-type-row");
 const analysisTypeSelect = document.getElementById("analysis-type-select");
 
-const dirTabButtons = document.querySelectorAll(".dir-tab");
 const nsDirInput = document.getElementById("ns-dir-input");
 const ewDirInput = document.getElementById("ew-dir-input");
 const importantFlagInput = document.getElementById("important-flag-input");
@@ -302,6 +371,10 @@ const layerRelativeInput = document.getElementById("layer-relative-input");
 const planSizeModeInput = document.getElementById("plan-size-mode-input");
 const largeShapeTypeInput = document.getElementById("large-shape-type-input");
 const largeAxisDirectionInput = document.getElementById("large-axis-direction-input");
+const largeShapeImageButtons = document.getElementById("large-shape-image-buttons");
+const largeShapeImagePreview = document.getElementById("large-shape-image-preview");
+const largeShapeImagePreviewTitle = document.getElementById("large-shape-image-preview-title");
+const largeShapeImagePreviewImg = document.getElementById("large-shape-image-preview-img");
 const line1NsDirInput = document.getElementById("line1-ns-dir-input");
 const line1EwDirInput = document.getElementById("line1-ew-dir-input");
 const line2NsDirInput = document.getElementById("line2-ns-dir-input");
@@ -334,19 +407,44 @@ const cloudDisableBtn = document.getElementById("cloud-disable-btn");
 const cloudStatusEl = document.getElementById("cloud-status");
 const toastEl = document.getElementById("toast");
 
+const viewer3d = {
+  initialized: false,
+  available: false,
+  scene: null,
+  camera: null,
+  renderer: null,
+  controls: null,
+  raycaster: null,
+  pointer: null,
+  frameHandle: 0,
+  resizeObserver: null,
+  meshesByRecordId: new Map(),
+  pickMeshes: [],
+  dataGroup: null,
+  labelGroup: null,
+  gridGroup: null,
+  renderNonce: 0,
+};
+const planLargeShapeImageCache = new Map();
+const planLargeShapeTintedCanvasCache = new Map();
+const planLargeShapeTintedDataUrlCache = new Map();
+
 initialize();
 
 function initialize() {
   bindEvents();
+  renderLargeShapeImageButtons();
   if (stateNeedsRewriteAfterLoad) {
     persist();
     stateNeedsRewriteAfterLoad = false;
   }
   initCloudControls();
+  syncViewerVerticalScaleUi();
   hydrateSiteForm();
   resetRecordForm({ showMessage: false });
   renderRecordTable();
   renderOutputs();
+  void loadLargeShapeImageManifest();
   void bootstrapCloudSync();
 }
 
@@ -470,10 +568,16 @@ function bindEvents() {
     });
   }
 
-  dirTabButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      activateDirectionTab(button.dataset.group, button.dataset.value);
-    });
+  recordForm.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const button = target.closest(".dir-tab");
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    activateDirectionTab(button.dataset.group, button.dataset.value);
   });
 
   layerTabButtons.forEach((button) => {
@@ -609,13 +713,20 @@ function bindEvents() {
         };
     const recordTeamState = normalizeTeamState(recordSiteSnapshot.team, recordSiteSnapshot.teamOther);
     const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
-    const largeShapeType = planSizeMode === "大きなもの" ? normalizeLargeShapeType(value(formData.get("largeShapeType"))) : "";
+    const rawLargeShapeType = value(formData.get("largeShapeType"));
+    const largeShapeType =
+      planSizeMode === "大きなもの"
+        ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType)
+        : "";
     const largeAxisDirection = planSizeMode === "大きなもの" ? normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))) : "";
     const lineLengthCm = value(formData.get("lineLengthCm"));
     const rectSide1Cm = value(formData.get("rectSide1Cm"));
     const rectSide2Cm = value(formData.get("rectSide2Cm"));
     const ellipseLongRadiusCm = value(formData.get("ellipseLongRadiusCm"));
     const ellipseShortRadiusCm = value(formData.get("ellipseShortRadiusCm"));
+    const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
+    const isLargeImageShape = planSizeMode === "大きなもの" && isLargeShapeImageType(largeShapeType);
+    const keepImageCornerFields = planSizeMode === "大きなもの";
 
     const recordBase = {
       id: recordId,
@@ -650,7 +761,7 @@ function bindEvents() {
       ewCm: value(formData.get("ewCm")),
       planSizeMode,
       largeShapeType,
-      largeAxisDirection,
+      largeAxisDirection: isLargeImageShape ? "" : largeAxisDirection,
       lineLengthCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? lineLengthCm : "",
       line1NsDir: "",
       line1NsCm: "",
@@ -664,6 +775,22 @@ function bindEvents() {
       rectSide2Cm: planSizeMode === "大きなもの" && largeShapeType === "長方形" ? rectSide2Cm : "",
       ellipseLongRadiusCm: planSizeMode === "大きなもの" && largeShapeType === "楕円" ? ellipseLongRadiusCm : "",
       ellipseShortRadiusCm: planSizeMode === "大きなもの" && largeShapeType === "楕円" ? ellipseShortRadiusCm : "",
+      imgP1NsDir: keepImageCornerFields ? imageCornerFields.imgP1NsDir : "",
+      imgP1NsCm: keepImageCornerFields ? imageCornerFields.imgP1NsCm : "",
+      imgP1EwDir: keepImageCornerFields ? imageCornerFields.imgP1EwDir : "",
+      imgP1EwCm: keepImageCornerFields ? imageCornerFields.imgP1EwCm : "",
+      imgP2NsDir: keepImageCornerFields ? imageCornerFields.imgP2NsDir : "",
+      imgP2NsCm: keepImageCornerFields ? imageCornerFields.imgP2NsCm : "",
+      imgP2EwDir: keepImageCornerFields ? imageCornerFields.imgP2EwDir : "",
+      imgP2EwCm: keepImageCornerFields ? imageCornerFields.imgP2EwCm : "",
+      imgP3NsDir: keepImageCornerFields ? imageCornerFields.imgP3NsDir : "",
+      imgP3NsCm: keepImageCornerFields ? imageCornerFields.imgP3NsCm : "",
+      imgP3EwDir: keepImageCornerFields ? imageCornerFields.imgP3EwDir : "",
+      imgP3EwCm: keepImageCornerFields ? imageCornerFields.imgP3EwCm : "",
+      imgP4NsDir: keepImageCornerFields ? imageCornerFields.imgP4NsDir : "",
+      imgP4NsCm: keepImageCornerFields ? imageCornerFields.imgP4NsCm : "",
+      imgP4EwDir: keepImageCornerFields ? imageCornerFields.imgP4EwDir : "",
+      imgP4EwCm: keepImageCornerFields ? imageCornerFields.imgP4EwCm : "",
       importantFlag: normalizeHasFlag(value(formData.get("importantFlag"))),
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
@@ -964,6 +1091,59 @@ function bindEvents() {
     planDetailSubSelect.addEventListener("change", () => {
       selectedPlanDetailSub = value(planDetailSubSelect.value) || ALL_DETAIL_SUBS_VALUE;
       renderPlanOutput();
+    });
+  }
+
+  if (viewerKuwakuSelect) {
+    viewerKuwakuSelect.addEventListener("change", () => {
+      selectedViewerKuwaku = value(viewerKuwakuSelect.value) || ALL_GRIDS_VALUE;
+      renderViewerOutput();
+    });
+  }
+  if (viewerUnitSelect) {
+    viewerUnitSelect.addEventListener("change", () => {
+      selectedViewerUnit = value(viewerUnitSelect.value) || ALL_UNITS_VALUE;
+      renderViewerOutput();
+    });
+  }
+  if (viewerDetailSelect) {
+    viewerDetailSelect.addEventListener("change", () => {
+      selectedViewerDetail = value(viewerDetailSelect.value) || ALL_DETAILS_VALUE;
+      renderViewerOutput();
+    });
+  }
+  if (viewerDetailSubSelect) {
+    viewerDetailSubSelect.addEventListener("change", () => {
+      selectedViewerDetailSub = value(viewerDetailSubSelect.value) || ALL_DETAIL_SUBS_VALUE;
+      renderViewerOutput();
+    });
+  }
+  if (viewerViewTopBtn) {
+    viewerViewTopBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "top";
+      applyViewerPerspective();
+      syncViewerViewButtons();
+    });
+  }
+  if (viewerViewIsoBtn) {
+    viewerViewIsoBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "iso";
+      applyViewerPerspective();
+      syncViewerViewButtons();
+    });
+  }
+  if (viewerResetBtn) {
+    viewerResetBtn.addEventListener("click", () => {
+      renderViewerOutput();
+    });
+  }
+  if (viewerZScaleInput) {
+    viewerZScaleInput.addEventListener("input", () => {
+      viewerVerticalScale = normalizeViewerVerticalScale(viewerZScaleInput.value);
+      syncViewerVerticalScaleUi();
+      if (viewer3d.initialized) {
+        renderViewerOutput();
+      }
     });
   }
 
@@ -1330,7 +1510,11 @@ function setActiveTab(tabId) {
   } else {
     clearEditMissingRequiredHighlights();
   }
-  if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab" || tabId === "export-tab")) {
+  if (tabId === "viewer-tab") {
+    renderViewerOutput();
+    ensureViewerCanvasSize();
+  }
+  if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab" || tabId === "viewer-tab" || tabId === "export-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
   }
 }
@@ -1515,7 +1699,7 @@ function syncDirectionTabsFromForm() {
   setDirectionGroupValue("largeShapeType", largeShapeTypeInput?.value);
   syncLargeShapeSectionFromForm();
 
-  dirTabButtons.forEach((button) => {
+  document.querySelectorAll(".dir-tab").forEach((button) => {
     const group = value(button.dataset.group);
     const selected = getDirectionGroupValue(group);
     button.classList.toggle("active", normalizeDirectionValue(group, button.dataset.value) === selected);
@@ -1620,6 +1804,191 @@ function getDirectionGroupValue(group) {
   return "";
 }
 
+function deriveShapeLabelFromFileName(fileNameRaw) {
+  const fileName = value(fileNameRaw);
+  if (!fileName) {
+    return "";
+  }
+  const baseName = fileName.split("/").pop() || fileName;
+  const normalized = typeof baseName.normalize === "function" ? baseName.normalize("NFC") : baseName;
+  const stem = normalized.replace(/\.[^.]+$/, "");
+  const mapped = LARGE_SHAPE_FILE_LABEL_MAP[stem] || LARGE_SHAPE_FILE_LABEL_MAP[stem.toLowerCase()] || stem;
+  return normalizeLargeShapeLabel(mapped);
+}
+
+function normalizeLargeShapeLabel(labelRaw) {
+  const raw = value(labelRaw);
+  const normalized = typeof raw.normalize === "function" ? raw.normalize("NFC") : raw;
+  const withoutExt = normalized.replace(/\.[^.]+$/, "");
+  const compact = withoutExt.replace(/\s+/g, "");
+  const compactLower = compact.toLowerCase();
+  if (LARGE_SHAPE_FILE_LABEL_MAP[compact]) {
+    return LARGE_SHAPE_FILE_LABEL_MAP[compact];
+  }
+  if (LARGE_SHAPE_FILE_LABEL_MAP[compactLower]) {
+    return LARGE_SHAPE_FILE_LABEL_MAP[compactLower];
+  }
+  if (compact === "くびれた骨") {
+    return "くびれた形";
+  }
+  if (
+    compact === "肋骨" ||
+    compact === "肋骨（湾曲型）" ||
+    compact === "肋骨（湾曲形）" ||
+    compact === "肋骨(湾曲型)" ||
+    compact === "肋骨(湾曲形)"
+  ) {
+    return "肋骨（湾曲形）";
+  }
+  if (compact === "C型") {
+    return "C形";
+  }
+  if (compact === "菱形") {
+    return "ひし形";
+  }
+  return withoutExt;
+}
+
+function toSafeAssetUrl(pathRaw) {
+  const path = pathRaw == null ? "" : String(pathRaw).trim();
+  if (!path) {
+    return "";
+  }
+  if (path.startsWith("data:")) {
+    return path;
+  }
+  try {
+    return encodeURI(path);
+  } catch (_error) {
+    return path;
+  }
+}
+
+function normalizeAssetPathKey(pathRaw) {
+  const raw = pathRaw == null ? "" : String(pathRaw).trim();
+  if (!raw) {
+    return "";
+  }
+  if (raw.startsWith("data:")) {
+    return raw;
+  }
+  let normalized = raw.replace(/[#?].*$/, "");
+  try {
+    normalized = decodeURI(normalized);
+  } catch (_error) {
+    // ignore decode failures and keep the original string
+  }
+  normalized = normalized.replace(/\\/g, "/").replace(/^(\.\/)+/, "").replace(/^\/+/, "");
+  const repoMarker = "kaseki_mobile_app/";
+  const markerIndex = normalized.lastIndexOf(repoMarker);
+  if (markerIndex >= 0) {
+    normalized = normalized.slice(markerIndex + repoMarker.length);
+  }
+  return normalized;
+}
+
+function getInlineLargeShapeDataUrl(pathRaw) {
+  const key = normalizeAssetPathKey(pathRaw);
+  if (!key || key.startsWith("data:")) {
+    return "";
+  }
+  return value(INLINE_LARGE_SHAPE_DATA_MAP[key]);
+}
+
+function renderLargeShapeImageButtons() {
+  if (!largeShapeImageButtons) {
+    return;
+  }
+  const labels = Array.from(largeShapeImagePathMap.keys()).filter((label) => value(label));
+  largeShapeImageButtons.innerHTML = labels
+    .map(
+      (label) =>
+        `<button class="dir-tab" data-group="largeShapeType" data-value="${escapeHtml(label)}" type="button">${escapeHtml(label)}</button>`
+    )
+    .join("");
+}
+
+async function loadLargeShapeImageManifest() {
+  try {
+    const response = await fetch(`${LARGE_SHAPE_MANIFEST_PATH}?v=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const manifest = await response.json();
+    const images = Array.isArray(manifest?.images) ? manifest.images : [];
+    if (!images.length) {
+      return;
+    }
+    const nextMap = new Map(Object.entries(DEFAULT_LARGE_SHAPE_IMAGE_PATHS));
+    images.forEach((item) => {
+      if (typeof item === "string") {
+        const fileName = value(item);
+        if (!fileName) {
+          return;
+        }
+        const label = deriveShapeLabelFromFileName(fileName);
+        if (!label || EXCLUDED_LARGE_SHAPE_LABELS.has(label)) {
+          return;
+        }
+        if (!nextMap.has(label)) {
+          nextMap.set(label, toSafeAssetUrl(`${LARGE_SHAPE_DIR_PATH}/${fileName}`));
+        }
+        return;
+      }
+      if (item && typeof item === "object") {
+        const fileName = value(item.file || item.path || item.src);
+        const explicitLabel = value(item.label);
+        const label = explicitLabel ? normalizeLargeShapeLabel(explicitLabel) : deriveShapeLabelFromFileName(fileName);
+        if (!fileName || !label || EXCLUDED_LARGE_SHAPE_LABELS.has(label)) {
+          return;
+        }
+        const path = /^(\/|\.\/|https?:)/.test(fileName) ? fileName : `${LARGE_SHAPE_DIR_PATH}/${fileName}`;
+        nextMap.set(label, toSafeAssetUrl(path));
+      }
+    });
+    if (!nextMap.size) {
+      return;
+    }
+    largeShapeImagePathMap = nextMap;
+    planLargeShapeImageCache.clear();
+    planLargeShapeTintedCanvasCache.clear();
+    planLargeShapeTintedDataUrlCache.clear();
+    renderLargeShapeImageButtons();
+    syncDirectionTabsFromForm();
+    renderOutputs();
+  } catch (_error) {
+    // ローカル file:// 実行時など manifest を読めない場合は既定画像のみで継続。
+  }
+}
+
+function syncLargeShapeImagePreview(shapeTypeRaw) {
+  if (!largeShapeImagePreview || !largeShapeImagePreviewTitle || !largeShapeImagePreviewImg) {
+    return;
+  }
+  const shapeType = normalizeLargeShapeType(shapeTypeRaw);
+  const candidates = getLargeShapeImagePathCandidates(shapeType);
+  if (!candidates.length) {
+    largeShapeImagePreview.classList.add("hidden");
+    largeShapeImagePreviewTitle.textContent = "";
+    largeShapeImagePreviewImg.removeAttribute("src");
+    largeShapeImagePreviewImg.alt = "";
+    return;
+  }
+  largeShapeImagePreview.classList.remove("hidden");
+  largeShapeImagePreviewTitle.textContent = `${shapeType}`;
+  largeShapeImagePreviewImg.alt = `${shapeType} 画像`;
+  let candidateIndex = 0;
+  largeShapeImagePreviewImg.onerror = () => {
+    candidateIndex += 1;
+    if (candidateIndex >= candidates.length) {
+      largeShapeImagePreview.classList.add("hidden");
+      return;
+    }
+    largeShapeImagePreviewImg.src = candidates[candidateIndex];
+  };
+  largeShapeImagePreviewImg.src = candidates[candidateIndex];
+}
+
 function syncLargeShapeSectionFromForm() {
   if (!largeShapeSection) {
     return;
@@ -1640,20 +2009,31 @@ function syncLargeShapeSectionFromForm() {
     largeShapePanels.forEach((panel) => {
       panel.classList.add("hidden");
     });
+    if (largeAxisDirectionRow) {
+      largeAxisDirectionRow.classList.remove("hidden");
+    }
+    syncLargeShapeImagePreview("");
     return;
   }
 
   const shapeTypeRaw = normalizeLargeShapeType(largeShapeTypeInput?.value);
   const shapeType = shapeTypeRaw || "直線状";
+  const isImageShape = isLargeShapeImageType(shapeType);
   if (largeShapeTypeInput) {
     largeShapeTypeInput.value = shapeType;
   }
   if (largeAxisDirectionInput) {
-    largeAxisDirectionInput.value = normalizeLargeAxisDirection(largeAxisDirectionInput.value);
+    largeAxisDirectionInput.value = isImageShape ? "" : normalizeLargeAxisDirection(largeAxisDirectionInput.value);
+  }
+  if (largeAxisDirectionRow) {
+    largeAxisDirectionRow.classList.toggle("hidden", isImageShape);
   }
   largeShapePanels.forEach((panel) => {
-    panel.classList.toggle("hidden", value(panel.dataset.largeShapePanel) !== shapeType);
+    const panelType = value(panel.dataset.largeShapePanel);
+    const shouldShow = panelType === shapeType || (panelType === "__IMAGE__" && isImageShape);
+    panel.classList.toggle("hidden", !shouldShow);
   });
+  syncLargeShapeImagePreview(isImageShape ? shapeType : "");
 }
 
 function activateLayerTab(layerRaw) {
@@ -1838,14 +2218,14 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
   }
 
   if (normalizeNsDir(previousRecord.nsDir) !== normalizeNsDir(nextRecord.nsDir)) {
-    dirTabButtons.forEach((button) => {
+    document.querySelectorAll(".dir-tab").forEach((button) => {
       if (button.dataset.group === "ns") {
         button.classList.add("overwrite-updated");
       }
     });
   }
   if (normalizeEwDir(previousRecord.ewDir) !== normalizeEwDir(nextRecord.ewDir)) {
-    dirTabButtons.forEach((button) => {
+    document.querySelectorAll(".dir-tab").forEach((button) => {
       if (button.dataset.group === "ew") {
         button.classList.add("overwrite-updated");
       }
@@ -1939,6 +2319,60 @@ function handleRecordFormFieldEdit(event) {
   updateEditMissingRequiredHighlights();
 }
 
+function setDefaultImageCornerDirections() {
+  const defaults = {
+    imgP1NsDir: "北から",
+    imgP1EwDir: "東から",
+    imgP2NsDir: "北から",
+    imgP2EwDir: "東から",
+    imgP3NsDir: "北から",
+    imgP3EwDir: "東から",
+    imgP4NsDir: "北から",
+    imgP4EwDir: "東から",
+  };
+  Object.entries(defaults).forEach(([name, defaultValue]) => {
+    const field = recordForm?.elements?.namedItem(name);
+    if (field instanceof HTMLSelectElement || field instanceof HTMLInputElement) {
+      field.value = defaultValue;
+    }
+  });
+}
+
+function clearImageCornerCmFields() {
+  const names = ["imgP1NsCm", "imgP1EwCm", "imgP2NsCm", "imgP2EwCm", "imgP3NsCm", "imgP3EwCm", "imgP4NsCm", "imgP4EwCm"];
+  names.forEach((name) => {
+    const field = recordForm?.elements?.namedItem(name);
+    if (field instanceof HTMLInputElement) {
+      field.value = "";
+    }
+  });
+}
+
+function extractImageCornerFieldsFromFormData(formData) {
+  const getNsDir = (name) => normalizeNsDir(value(formData.get(name)));
+  const getEwDir = (name) => normalizeEwDir(value(formData.get(name)));
+  const getCm = (name) => value(formData.get(name));
+
+  return {
+    imgP1NsDir: getNsDir("imgP1NsDir"),
+    imgP1NsCm: getCm("imgP1NsCm"),
+    imgP1EwDir: getEwDir("imgP1EwDir"),
+    imgP1EwCm: getCm("imgP1EwCm"),
+    imgP2NsDir: getNsDir("imgP2NsDir"),
+    imgP2NsCm: getCm("imgP2NsCm"),
+    imgP2EwDir: getEwDir("imgP2EwDir"),
+    imgP2EwCm: getCm("imgP2EwCm"),
+    imgP3NsDir: getNsDir("imgP3NsDir"),
+    imgP3NsCm: getCm("imgP3NsCm"),
+    imgP3EwDir: getEwDir("imgP3EwDir"),
+    imgP3EwCm: getCm("imgP3EwCm"),
+    imgP4NsDir: getNsDir("imgP4NsDir"),
+    imgP4NsCm: getCm("imgP4NsCm"),
+    imgP4EwDir: getEwDir("imgP4EwDir"),
+    imgP4EwCm: getCm("imgP4EwCm"),
+  };
+}
+
 function resetRecordForm({ showMessage }) {
   recordForm.reset();
   isOverwriteMode = false;
@@ -1973,6 +2407,8 @@ function resetRecordForm({ showMessage }) {
   if (recordForm.elements.lineLengthCm) {
     recordForm.elements.lineLengthCm.value = "";
   }
+  clearImageCornerCmFields();
+  setDefaultImageCornerDirections();
   setLayerFromValue(PRESET_LAYER_NAMES[0]);
 
   nsDirInput.value = "北から";
@@ -2066,6 +2502,39 @@ function populateRecordForm(record) {
   if (recordForm.elements.ellipseShortRadiusCm) {
     recordForm.elements.ellipseShortRadiusCm.value = record.ellipseShortRadiusCm || "";
   }
+  [
+    "imgP1NsDir",
+    "imgP1NsCm",
+    "imgP1EwDir",
+    "imgP1EwCm",
+    "imgP2NsDir",
+    "imgP2NsCm",
+    "imgP2EwDir",
+    "imgP2EwCm",
+    "imgP3NsDir",
+    "imgP3NsCm",
+    "imgP3EwDir",
+    "imgP3EwCm",
+    "imgP4NsDir",
+    "imgP4NsCm",
+    "imgP4EwDir",
+    "imgP4EwCm",
+  ].forEach((name) => {
+    const field = recordForm.elements.namedItem(name);
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+      field.value = value(record?.[name]);
+    }
+  });
+  setDefaultImageCornerDirections();
+  ["imgP1NsDir", "imgP1EwDir", "imgP2NsDir", "imgP2EwDir", "imgP3NsDir", "imgP3EwDir", "imgP4NsDir", "imgP4EwDir"].forEach((name) => {
+    const field = recordForm.elements.namedItem(name);
+    if (field instanceof HTMLSelectElement) {
+      const savedValue = value(record?.[name]);
+      if (savedValue) {
+        field.value = savedValue;
+      }
+    }
+  });
   recordForm.elements.layerRef.value = record.layerRef || "";
   recordForm.elements.layerFromCm.value = record.layerFromCm || "";
   recordForm.elements.notes.value = record.notes || "";
@@ -2138,6 +2607,10 @@ function buildCurrentEditDraftRecord() {
   const teamState = normalizeTeamState(value(editTeamInput?.value), value(editTeamOtherInput?.value));
   const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
   const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
+  const draftRawShapeType = value(formData.get("largeShapeType"));
+  const draftShapeType = normalizeLargeShapeType(draftRawShapeType) || normalizeLargeShapeLabel(draftRawShapeType);
+  const draftIsImageShape = isLargeShapeImageType(draftShapeType);
+  const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
   return {
     kuwaku: buildKuwaku(
       normalizeKuwakuHeadA(editKuwakuHeadAInput?.value),
@@ -2174,8 +2647,8 @@ function buildCurrentEditDraftRecord() {
     ewDir: value(formData.get("ewDir")),
     ewCm: value(formData.get("ewCm")),
     planSizeMode: normalizePlanSizeMode(value(formData.get("planSizeMode"))),
-    largeShapeType: normalizeLargeShapeType(value(formData.get("largeShapeType"))),
-    largeAxisDirection: normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
+    largeShapeType: draftShapeType,
+    largeAxisDirection: draftIsImageShape ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
     lineLengthCm: value(formData.get("lineLengthCm")),
     line1NsDir: "",
     line1NsCm: "",
@@ -2189,6 +2662,22 @@ function buildCurrentEditDraftRecord() {
     rectSide2Cm: value(formData.get("rectSide2Cm")),
     ellipseLongRadiusCm: value(formData.get("ellipseLongRadiusCm")),
     ellipseShortRadiusCm: value(formData.get("ellipseShortRadiusCm")),
+    imgP1NsDir: imageCornerFields.imgP1NsDir,
+    imgP1NsCm: imageCornerFields.imgP1NsCm,
+    imgP1EwDir: imageCornerFields.imgP1EwDir,
+    imgP1EwCm: imageCornerFields.imgP1EwCm,
+    imgP2NsDir: imageCornerFields.imgP2NsDir,
+    imgP2NsCm: imageCornerFields.imgP2NsCm,
+    imgP2EwDir: imageCornerFields.imgP2EwDir,
+    imgP2EwCm: imageCornerFields.imgP2EwCm,
+    imgP3NsDir: imageCornerFields.imgP3NsDir,
+    imgP3NsCm: imageCornerFields.imgP3NsCm,
+    imgP3EwDir: imageCornerFields.imgP3EwDir,
+    imgP3EwCm: imageCornerFields.imgP3EwCm,
+    imgP4NsDir: imageCornerFields.imgP4NsDir,
+    imgP4NsCm: imageCornerFields.imgP4NsCm,
+    imgP4EwDir: imageCornerFields.imgP4EwDir,
+    imgP4EwCm: imageCornerFields.imgP4EwCm,
     layerName: getSelectedLayerName(),
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
@@ -2451,6 +2940,20 @@ function updateEditMissingRequiredHighlights() {
   if (missingKeys.has("ellipseShortRadiusCm")) {
     markEditMissingFieldByName("ellipseShortRadiusCm");
   }
+  [
+    "imgP1NsCm",
+    "imgP1EwCm",
+    "imgP2NsCm",
+    "imgP2EwCm",
+    "imgP3NsCm",
+    "imgP3EwCm",
+    "imgP4NsCm",
+    "imgP4EwCm",
+  ].forEach((name) => {
+    if (missingKeys.has(name)) {
+      markEditMissingFieldByName(name);
+    }
+  });
   if (missingKeys.has("layerName")) {
     markEditMissingGroupByName("layerName");
   }
@@ -2592,6 +3095,7 @@ function renderOutputs() {
   renderCardOutput();
   renderListOutput();
   renderPlanOutput();
+  renderViewerOutput();
   renderExportOutput();
 }
 
@@ -3379,13 +3883,13 @@ function renderListOutput() {
   updateOutputListSortHeader();
   if (!state.records.length) {
     syncOutputKuwakuSelect([]);
-    outputListBody.innerHTML = "<tr><td colspan=\"17\">出力対象データがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"18\">出力対象データがありません。</td></tr>";
     return;
   }
 
   const filteredRecords = getFilteredOutputRecords();
   if (!filteredRecords.length) {
-    outputListBody.innerHTML = "<tr><td colspan=\"17\">選択した区画のデータがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"18\">選択した区画のデータがありません。</td></tr>";
     return;
   }
 
@@ -3411,6 +3915,7 @@ function renderListOutput() {
       const unitMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["unit"]);
       const discovererMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["discoverer"]);
       const identifierMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["identifier"]);
+      const levelHeightMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["levelHeight"]);
       const levelReadMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["levelUpperCm", "levelLowerCm"]);
       const sectionMissing = hasAnyMissingRequiredKey(missingRequiredKeys, ["occurrenceSection", "sectionDiagrams"]);
       const sectionChecklistMissing = hasAnyMissingRequiredKey(missingRequiredKeys, [
@@ -3456,6 +3961,7 @@ function renderListOutput() {
         <td class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
         <td class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
         <td class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
+        <td class="${listCellClass("", levelHeightMissing || levelReadMissing)}" ${missingTitle}>${escapeHtml(formatRecordAltitudeM(record))}</td>
         <td class="${listCellClass("", sectionMissing || sectionChecklistMissing)}" ${missingTitle}>${escapeHtml(
           record.occurrenceSection || ""
         )}</td>
@@ -3560,6 +4066,9 @@ function compareOutputRecordsForList(a, b) {
     case "levelRead":
       compared = compareSortText(formatLevelRead(a), formatLevelRead(b));
       break;
+    case "altitudeM":
+      compared = compareNullableNumber(getRecordAltitudeMValue(a), getRecordAltitudeMValue(b));
+      break;
     case "occurrenceSection":
       compared = compareSortText(a?.occurrenceSection, b?.occurrenceSection);
       break;
@@ -3589,6 +4098,21 @@ function compareOutputRecordsForList(a, b) {
 
 function compareSortText(a, b) {
   return value(a).localeCompare(value(b), "ja", { numeric: true, sensitivity: "base" });
+}
+
+function compareNullableNumber(a, b) {
+  const aValid = Number.isFinite(a);
+  const bValid = Number.isFinite(b);
+  if (aValid && bValid) {
+    return a - b;
+  }
+  if (aValid) {
+    return -1;
+  }
+  if (bValid) {
+    return 1;
+  }
+  return 0;
 }
 
 function dataStatusSortText(record) {
@@ -3882,7 +4406,7 @@ function renderPlanOutput() {
   const horizontalGrid = [100, 200, 300]
     .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
-  const pointsSvg = drawables.map((drawable) => renderPlanDrawableSvg(drawable)).join("");
+  const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
   const cornerLabels = buildPlanCornerLabels(selectedPlanKuwaku);
 
   planMapWrap.innerHTML = `
@@ -3982,6 +4506,1350 @@ function collectPlanDetailSubs(records) {
       label: detailSubLabelForSelect(detailSubValue),
     }));
   return [{ value: ALL_DETAIL_SUBS_VALUE, label: "全細分" }, ...detailSubOptions];
+}
+
+function normalizeViewerVerticalScale(scaleRaw) {
+  const num = Number(value(scaleRaw));
+  if (!Number.isFinite(num)) {
+    return 1;
+  }
+  return clamp(num, 1, 5);
+}
+
+function syncViewerVerticalScaleUi() {
+  viewerVerticalScale = normalizeViewerVerticalScale(viewerVerticalScale);
+  if (viewerZScaleInput) {
+    viewerZScaleInput.value = String(viewerVerticalScale);
+  }
+  if (viewerZScaleValue) {
+    viewerZScaleValue.textContent = `${viewerVerticalScale.toFixed(1)}x`;
+  }
+}
+
+function applyViewerVerticalScale(zRaw, baseZRaw) {
+  const z = Number(zRaw);
+  const baseZ = Number(baseZRaw);
+  if (!Number.isFinite(z) || !Number.isFinite(baseZ)) {
+    return z;
+  }
+  return baseZ + (z - baseZ) * viewerVerticalScale;
+}
+
+function renderViewerOutput() {
+  if (
+    !viewerKuwakuSelect ||
+    !viewerUnitSelect ||
+    !viewerDetailSelect ||
+    !viewerDetailSubSelect ||
+    !viewerMapLegend ||
+    !viewerStatus
+  ) {
+    return;
+  }
+  viewerMapLegend.innerHTML = buildPlanLegendHtml();
+  syncViewerVerticalScaleUi();
+  syncViewerViewButtons();
+
+  const sortedRecords = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  syncViewerKuwakuSelect(sortedRecords);
+
+  if (!sortedRecords.length) {
+    selectedViewerUnit = ALL_UNITS_VALUE;
+    selectedViewerDetail = ALL_DETAILS_VALUE;
+    selectedViewerDetailSub = ALL_DETAIL_SUBS_VALUE;
+    viewerUnitSelect.innerHTML = "";
+    viewerDetailSelect.innerHTML = "";
+    viewerDetailSubSelect.innerHTML = "";
+    if (viewerKuwakuInfo) {
+      viewerKuwakuInfo.textContent = "区画: -";
+    }
+    viewerStatus.textContent = "表示対象データがありません。";
+    clearViewerScene();
+    return;
+  }
+
+  const kuwakuRecords =
+    selectedViewerKuwaku === ALL_GRIDS_VALUE
+      ? sortedRecords
+      : sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === selectedViewerKuwaku);
+
+  const kuwakuLabel = selectedViewerKuwaku === ALL_GRIDS_VALUE ? "全グリッド" : kuwakuLabelForSelect(selectedViewerKuwaku);
+  if (viewerKuwakuInfo) {
+    viewerKuwakuInfo.textContent = `区画: ${kuwakuLabel}`;
+  }
+
+  if (!kuwakuRecords.length) {
+    selectedViewerUnit = ALL_UNITS_VALUE;
+    selectedViewerDetail = ALL_DETAILS_VALUE;
+    selectedViewerDetailSub = ALL_DETAIL_SUBS_VALUE;
+    viewerUnitSelect.innerHTML = "";
+    viewerDetailSelect.innerHTML = "";
+    viewerDetailSubSelect.innerHTML = "";
+    viewerStatus.textContent = "この条件では表示対象データがありません。";
+    clearViewerScene();
+    return;
+  }
+
+  const units = collectPlanUnits(kuwakuRecords);
+  if (!units.some((unit) => unit.value === selectedViewerUnit)) {
+    selectedViewerUnit = units[0]?.value || ALL_UNITS_VALUE;
+  }
+  viewerUnitSelect.innerHTML = units
+    .map(
+      (unit) =>
+        `<option value="${escapeHtml(unit.value)}" ${unit.value === selectedViewerUnit ? "selected" : ""}>${escapeHtml(
+          unit.label
+        )}</option>`
+    )
+    .join("");
+  const unitRecords =
+    selectedViewerUnit === ALL_UNITS_VALUE
+      ? kuwakuRecords
+      : kuwakuRecords.filter((record) => unitValueForSelect(record.unit) === selectedViewerUnit);
+
+  const details = collectPlanDetails(unitRecords);
+  if (!details.some((detail) => detail.value === selectedViewerDetail)) {
+    selectedViewerDetail = details[0]?.value || ALL_DETAILS_VALUE;
+  }
+  viewerDetailSelect.innerHTML = details
+    .map(
+      (detail) =>
+        `<option value="${escapeHtml(detail.value)}" ${detail.value === selectedViewerDetail ? "selected" : ""}>${escapeHtml(
+          detail.label
+        )}</option>`
+    )
+    .join("");
+  const detailRecords =
+    selectedViewerDetail === ALL_DETAILS_VALUE
+      ? unitRecords
+      : unitRecords.filter((record) => detailValueForSelect(record.detail) === selectedViewerDetail);
+
+  const detailSubs = collectPlanDetailSubs(detailRecords);
+  if (!detailSubs.some((detailSub) => detailSub.value === selectedViewerDetailSub)) {
+    selectedViewerDetailSub = detailSubs[0]?.value || ALL_DETAIL_SUBS_VALUE;
+  }
+  viewerDetailSubSelect.innerHTML = detailSubs
+    .map(
+      (detailSub) =>
+        `<option value="${escapeHtml(detailSub.value)}" ${detailSub.value === selectedViewerDetailSub ? "selected" : ""}>${escapeHtml(
+          detailSub.label
+        )}</option>`
+    )
+    .join("");
+  const detailSubRecords =
+    selectedViewerDetailSub === ALL_DETAIL_SUBS_VALUE
+      ? detailRecords
+      : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedViewerDetailSub);
+
+  const viewerCandidates = [];
+  let missingPositionCount = 0;
+  let missingAltitudeCount = 0;
+  for (const record of detailSubRecords) {
+    const drawable = buildPlanDrawable(record);
+    if (!drawable) {
+      missingPositionCount += 1;
+      continue;
+    }
+    let altitudeM = getRecordAltitudeMValue(record);
+    let altitudeEstimated = false;
+    if (altitudeM == null) {
+      missingAltitudeCount += 1;
+      altitudeM = VIEWER_ALTITUDE_BASE_M;
+      altitudeEstimated = true;
+    }
+    const kuwaku = parseKuwaku(getRecordKuwaku(record));
+    const xIndex = kuwakuToViewerXIndex(kuwaku);
+    const noIndex = parseGridNoToIndex(kuwaku.no);
+    viewerCandidates.push({
+      record,
+      drawable,
+      altitudeM,
+      altitudeEstimated,
+      grid: {
+        kuwaku: buildKuwaku(kuwaku.headA, kuwaku.headB, kuwaku.block, kuwaku.no),
+        headB: kuwaku.headB,
+        block: kuwaku.block,
+        no: kuwaku.no,
+        xIndex,
+        noIndex,
+      },
+    });
+  }
+
+  viewerStatus.textContent = `対象 ${detailSubRecords.length}件 / 3D表示 ${viewerCandidates.length}件 / 平面位置未記入 ${missingPositionCount}件 / 標高未記入 ${missingAltitudeCount}件（655mで仮表示） / 縦スケール ${viewerVerticalScale.toFixed(1)}x`;
+
+  if (!viewerCandidates.length) {
+    clearViewerScene();
+    return;
+  }
+
+  if (!isViewerTabActive() && !viewer3d.initialized) {
+    return;
+  }
+  if (!ensureViewerInitialized()) {
+    return;
+  }
+
+  const metrics = buildViewerGridMetrics(viewerCandidates);
+  const shapes = viewerCandidates.map((candidate) => buildViewerShapeFromCandidate(candidate, metrics)).filter(Boolean);
+  renderViewerScene(shapes, metrics);
+}
+
+function isViewerTabActive() {
+  return getActiveTabId() === "viewer-tab";
+}
+
+function syncViewerKuwakuSelect(records) {
+  if (!viewerKuwakuSelect) {
+    return;
+  }
+  const options = collectOutputKuwakuOptions(records);
+  if (!options.some((item) => item.value === selectedViewerKuwaku)) {
+    selectedViewerKuwaku = ALL_GRIDS_VALUE;
+  }
+  viewerKuwakuSelect.innerHTML = options
+    .map(
+      (item) =>
+        `<option value="${escapeHtml(item.value)}" ${item.value === selectedViewerKuwaku ? "selected" : ""}>${escapeHtml(
+          item.label
+        )}</option>`
+    )
+    .join("");
+}
+
+function parseGridNoToIndex(noRaw) {
+  const no = value(noRaw);
+  if (/^-?\d+$/.test(no)) {
+    return Number(no);
+  }
+  if (!no) {
+    return 0;
+  }
+  return hashText(no) % 100;
+}
+
+function buildViewerGridMetrics(candidates) {
+  const xIndexes = candidates.map((item) => item.grid.xIndex).filter((num) => Number.isFinite(num));
+  const noIndexes = candidates.map((item) => item.grid.noIndex).filter((num) => Number.isFinite(num));
+  const altitudes = candidates.map((item) => item.altitudeM).filter((num) => Number.isFinite(num));
+  const minXIndex = xIndexes.length ? Math.min(...xIndexes) : 0;
+  let maxXIndex = xIndexes.length ? Math.max(...xIndexes) : minXIndex;
+  const presentHeads = new Set(candidates.map((item) => normalizeViewerHead(item?.grid?.headB)));
+  presentHeads.forEach((head) => {
+    const headIndex = VIEWER_HEAD_INDEX_MAP.get(head);
+    if (!Number.isFinite(headIndex)) {
+      return;
+    }
+    const fIndex = headIndex * 26 + 5;
+    if (fIndex > maxXIndex) {
+      maxXIndex = fIndex;
+    }
+  });
+  const minNo = noIndexes.length ? Math.min(...noIndexes) : 0;
+  const maxNo = noIndexes.length ? Math.max(...noIndexes) : minNo;
+  const minZ = VIEWER_ALTITUDE_BASE_M;
+  const observedMaxZ = altitudes.length ? Math.max(...altitudes) : minZ + 1;
+  const maxZ = Math.max(minZ + 1, Math.ceil(observedMaxZ));
+  return {
+    minXIndex,
+    maxXIndex,
+    minNo,
+    maxNo,
+    minZ,
+    maxZ,
+    gridWidthM: Math.max(4, (maxXIndex - minXIndex + 1) * 4),
+    gridHeightM: Math.max(4, (maxNo - minNo + 1) * 4),
+  };
+}
+
+function buildViewerShapeFromCandidate(candidate, metrics) {
+  const drawable = candidate.drawable;
+  const altitudeM = candidate.altitudeM;
+  const altitudeZ = applyViewerVerticalScale(altitudeM, metrics.minZ);
+  const worldCenter = convertViewerPointCmToWorld(drawable.x, drawable.y, candidate.grid, metrics);
+  const meta = {
+    id: value(candidate.record.id),
+    label: value(candidate.record.specimenNo),
+    nameMemo: value(candidate.record.nameMemo),
+    unit: value(candidate.record.unit),
+    detail: buildDetailText(candidate.record.detail, candidate.record.detailSub),
+    kuwaku: value(candidate.grid.kuwaku),
+    altitudeM,
+    altitudeEstimated: Boolean(candidate.altitudeEstimated),
+    color: drawable.color,
+  };
+  if (drawable.type === "point") {
+    return {
+      type: "point",
+      x: worldCenter.x,
+      y: worldCenter.y,
+      z: altitudeZ,
+      ...meta,
+    };
+  }
+
+  if (drawable.type === "line") {
+    const p1 = convertViewerPointCmToWorld(drawable.x1, drawable.y1, candidate.grid, metrics);
+    const p2 = convertViewerPointCmToWorld(drawable.x2, drawable.y2, candidate.grid, metrics);
+    return {
+      type: "line",
+      points: [
+        { x: p1.x, y: p1.y, z: altitudeZ },
+        { x: p2.x, y: p2.y, z: altitudeZ },
+      ],
+      x: worldCenter.x,
+      y: worldCenter.y,
+      z: altitudeZ,
+      ...meta,
+    };
+  }
+
+  if (drawable.type === "rect") {
+    const halfW = drawable.width / 2;
+    const halfH = drawable.height / 2;
+    const localCorners = [
+      { x: drawable.x - halfW, y: drawable.y - halfH },
+      { x: drawable.x + halfW, y: drawable.y - halfH },
+      { x: drawable.x + halfW, y: drawable.y + halfH },
+      { x: drawable.x - halfW, y: drawable.y + halfH },
+    ].map((point) => rotatePlanPoint(point, { x: drawable.x, y: drawable.y }, drawable.rotationDeg));
+    const points = localCorners.map((point) => {
+      const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
+      return { x: world.x, y: world.y, z: altitudeZ };
+    });
+    points.push(points[0]);
+    return {
+      type: "polyline",
+      points,
+      x: worldCenter.x,
+      y: worldCenter.y,
+      z: altitudeZ,
+      ...meta,
+    };
+  }
+
+  if (drawable.type === "ellipse") {
+    const points = [];
+    const segmentCount = 48;
+    for (let i = 0; i <= segmentCount; i += 1) {
+      const theta = (i / segmentCount) * Math.PI * 2;
+      const local = {
+        x: drawable.x + Math.cos(theta) * drawable.rx,
+        y: drawable.y + Math.sin(theta) * drawable.ry,
+      };
+      const rotated = rotatePlanPoint(local, { x: drawable.x, y: drawable.y }, drawable.rotationDeg);
+      const world = convertViewerPointCmToWorld(rotated.x, rotated.y, candidate.grid, metrics);
+      points.push({ x: world.x, y: world.y, z: altitudeZ });
+    }
+    return {
+      type: "polyline",
+      points,
+      x: worldCenter.x,
+      y: worldCenter.y,
+      z: altitudeZ,
+      ...meta,
+    };
+  }
+
+  if (drawable.type === "imageQuad") {
+    const points = (drawable.points || []).map((point) => {
+      const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
+      return { x: world.x, y: world.y, z: altitudeZ };
+    });
+    return {
+      type: "imageQuad",
+      points,
+      imageType: value(drawable.imageType),
+      imagePath: value(drawable.imagePath),
+      x: worldCenter.x,
+      y: worldCenter.y,
+      z: altitudeZ,
+      ...meta,
+    };
+  }
+  return null;
+}
+
+function rotatePlanPoint(point, center, rotationDegRaw) {
+  const rotationDeg = Number(rotationDegRaw);
+  if (!Number.isFinite(rotationDeg) || Math.abs(rotationDeg) < 1e-6) {
+    return { x: point.x, y: point.y };
+  }
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+function convertViewerPointCmToWorld(xCmRaw, yCmRaw, grid, metrics) {
+  const xCm = Number(xCmRaw);
+  const yCm = Number(yCmRaw);
+  const xIndex = Number(grid?.xIndex);
+  const noIndex = Number(grid?.noIndex);
+  const baseEast = (xIndex - metrics.minXIndex) * 4;
+  const baseNorth = (metrics.maxNo - noIndex) * 4;
+  return {
+    x: baseEast + xCm / 100,
+    y: baseNorth + (PLAN_SIZE_CM - yCm) / 100,
+  };
+}
+
+function syncViewerViewButtons() {
+  if (viewerViewTopBtn) {
+    viewerViewTopBtn.classList.toggle("active", selectedViewerPerspective === "top");
+  }
+  if (viewerViewIsoBtn) {
+    viewerViewIsoBtn.classList.toggle("active", selectedViewerPerspective === "iso");
+  }
+}
+
+function ensureViewerInitialized() {
+  if (!viewerCanvasWrap || viewer3d.initialized) {
+    return viewer3d.initialized;
+  }
+  if (!window.THREE) {
+    if (viewerStatus) {
+      viewerStatus.textContent = "3Dライブラリの読み込みに失敗しました。";
+    }
+    return false;
+  }
+  try {
+    viewer3d.scene = new THREE.Scene();
+    viewer3d.scene.background = new THREE.Color(0xf8fafc);
+    viewer3d.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
+    viewer3d.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    viewer3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    viewer3d.renderer.domElement.setAttribute("aria-label", "3Dビュアー");
+    viewerCanvasWrap.prepend(viewer3d.renderer.domElement);
+
+    viewer3d.controls =
+      typeof THREE.OrbitControls === "function"
+        ? new THREE.OrbitControls(viewer3d.camera, viewer3d.renderer.domElement)
+        : null;
+    if (viewer3d.controls) {
+      viewer3d.controls.enableDamping = true;
+      viewer3d.controls.enablePan = true;
+      viewer3d.controls.zoomSpeed = 0.45;
+      viewer3d.controls.target.set(0, 0, 0);
+    }
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.88);
+    const directional = new THREE.DirectionalLight(0xffffff, 0.55);
+    directional.position.set(8, -6, 14);
+    viewer3d.scene.add(ambient);
+    viewer3d.scene.add(directional);
+
+    viewer3d.gridGroup = new THREE.Group();
+    viewer3d.dataGroup = new THREE.Group();
+    viewer3d.labelGroup = new THREE.Group();
+    viewer3d.scene.add(viewer3d.gridGroup);
+    viewer3d.scene.add(viewer3d.dataGroup);
+    viewer3d.scene.add(viewer3d.labelGroup);
+    viewer3d.raycaster = new THREE.Raycaster();
+    viewer3d.pointer = new THREE.Vector2();
+    viewer3d.available = true;
+    viewer3d.initialized = true;
+
+    viewerCanvasWrap.addEventListener("pointermove", handleViewerPointerMove);
+    viewerCanvasWrap.addEventListener("pointerleave", hideViewerTooltip);
+    if (typeof ResizeObserver === "function") {
+      viewer3d.resizeObserver = new ResizeObserver(() => {
+        ensureViewerCanvasSize();
+      });
+      viewer3d.resizeObserver.observe(viewerCanvasWrap);
+    } else {
+      window.addEventListener("resize", ensureViewerCanvasSize);
+    }
+    ensureViewerCanvasSize();
+    animateViewerScene();
+    return true;
+  } catch (_error) {
+    viewer3d.available = false;
+    viewer3d.initialized = false;
+    if (viewerStatus) {
+      viewerStatus.textContent = "3D表示の初期化に失敗しました。";
+    }
+    return false;
+  }
+}
+
+function ensureViewerCanvasSize() {
+  if (!viewer3d.initialized || !viewerCanvasWrap || !viewer3d.renderer || !viewer3d.camera) {
+    return;
+  }
+  const rect = viewerCanvasWrap.getBoundingClientRect();
+  const width = Math.max(16, Math.floor(rect.width));
+  const height = Math.max(16, Math.floor(rect.height));
+  viewer3d.renderer.setSize(width, height, false);
+  viewer3d.camera.aspect = width / height;
+  viewer3d.camera.updateProjectionMatrix();
+}
+
+function animateViewerScene() {
+  if (!viewer3d.initialized || !viewer3d.renderer || !viewer3d.scene || !viewer3d.camera) {
+    return;
+  }
+  viewer3d.frameHandle = window.requestAnimationFrame(animateViewerScene);
+  if (viewer3d.controls) {
+    viewer3d.controls.update();
+  }
+  viewer3d.renderer.render(viewer3d.scene, viewer3d.camera);
+}
+
+function clearViewerScene() {
+  if (!viewer3d.initialized || !viewer3d.dataGroup || !viewer3d.labelGroup || !viewer3d.gridGroup) {
+    return;
+  }
+  viewer3d.dataGroup.children.forEach((child) => disposeViewerObject3D(child));
+  viewer3d.labelGroup.children.forEach((child) => disposeViewerObject3D(child));
+  viewer3d.gridGroup.children.forEach((child) => disposeViewerObject3D(child));
+  viewer3d.dataGroup.clear();
+  viewer3d.labelGroup.clear();
+  viewer3d.gridGroup.clear();
+  viewer3d.pickMeshes = [];
+  viewer3d.meshesByRecordId = new Map();
+  hideViewerTooltip();
+}
+
+function disposeViewerObject3D(object) {
+  if (!object) {
+    return;
+  }
+  object.traverse?.((child) => {
+    if (child.geometry?.dispose) {
+      child.geometry.dispose();
+    }
+    if (child.material) {
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => {
+        if (material.map?.dispose) {
+          material.map.dispose();
+        }
+        if (material.dispose) {
+          material.dispose();
+        }
+      });
+    }
+  });
+}
+
+function renderViewerScene(shapes, metrics) {
+  if (!viewer3d.initialized || !viewer3d.dataGroup || !viewer3d.labelGroup || !viewer3d.gridGroup) {
+    return;
+  }
+  clearViewerScene();
+  renderViewerGrid(metrics);
+  viewer3d.renderNonce += 1;
+  const renderNonce = viewer3d.renderNonce;
+
+  shapes.forEach((shape) => {
+    const color = new THREE.Color(shape.color || "#6b7280");
+    if (shape.type === "point") {
+      const pointMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 14, 14),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      pointMesh.position.set(shape.x, shape.y, shape.z);
+      viewer3d.dataGroup.add(pointMesh);
+    } else if (shape.type === "line") {
+      renderViewerSegment(shape.points[0], shape.points[1], color, 0.05);
+    } else if (shape.type === "polyline") {
+      for (let i = 0; i < shape.points.length - 1; i += 1) {
+        renderViewerSegment(shape.points[i], shape.points[i + 1], color, 0.04);
+      }
+    } else if (shape.type === "imageQuad") {
+      renderViewerImageQuad(shape, renderNonce);
+    }
+
+    const label = createViewerTextSprite(shape.label || "-", shape.color);
+    label.position.set(shape.x, shape.y, shape.z + 0.16);
+    viewer3d.labelGroup.add(label);
+
+    const pickMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 10, 10),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+    );
+    pickMesh.position.set(shape.x, shape.y, shape.z);
+    pickMesh.userData = {
+      label: shape.label,
+      nameMemo: shape.nameMemo,
+      unit: shape.unit,
+      detail: shape.detail,
+      kuwaku: shape.kuwaku,
+      altitudeM: shape.altitudeM,
+      altitudeEstimated: Boolean(shape.altitudeEstimated),
+    };
+    viewer3d.pickMeshes.push(pickMesh);
+    viewer3d.dataGroup.add(pickMesh);
+    viewer3d.meshesByRecordId.set(shape.id, shape);
+  });
+
+  viewer3d.bounds = computeViewerBounds(shapes, metrics);
+  applyViewerPerspective();
+}
+
+function renderViewerGrid(metrics) {
+  if (!viewer3d.gridGroup) {
+    return;
+  }
+  const axisMinAltitude = Math.floor(metrics.minZ);
+  const axisMaxAltitude = Math.max(axisMinAltitude + 1, Math.ceil(metrics.maxZ));
+  const zBase = applyViewerVerticalScale(axisMinAltitude, metrics.minZ) - 0.05;
+  const width = metrics.gridWidthM;
+  const height = metrics.gridHeightM;
+  const gridMat = new THREE.LineBasicMaterial({ color: 0xcbd5e1 });
+
+  for (let x = 0; x <= width + 0.001; x += 4) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x, 0, zBase),
+      new THREE.Vector3(x, height, zBase),
+    ]);
+    viewer3d.gridGroup.add(new THREE.Line(geometry, gridMat));
+  }
+  for (let y = 0; y <= height + 0.001; y += 4) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, y, zBase),
+      new THREE.Vector3(width, y, zBase),
+    ]);
+    viewer3d.gridGroup.add(new THREE.Line(geometry, gridMat));
+  }
+
+  for (let xIndex = metrics.minXIndex; xIndex <= metrics.maxXIndex; xIndex += 1) {
+    const headBlock = viewerXIndexToHeadBlock(xIndex);
+    for (let no = metrics.minNo; no <= metrics.maxNo; no += 1) {
+      const label = `${headBlock.head}-${headBlock.block}-${no}`;
+      const x = (xIndex - metrics.minXIndex) * 4 + 0.45;
+      const y = (metrics.maxNo - no) * 4 + 3.55;
+      const sprite = createViewerTextSprite(label, "#334155", {
+        fontPx: 124,
+        scaleX: 2.24,
+        scaleY: 0.56,
+      });
+      sprite.position.set(x, y, zBase + 0.01);
+      viewer3d.gridGroup.add(sprite);
+    }
+  }
+
+  const zStart = applyViewerVerticalScale(axisMinAltitude, metrics.minZ);
+  const zEnd = applyViewerVerticalScale(axisMaxAltitude, metrics.minZ);
+  const zAxisMat = new THREE.LineBasicMaterial({ color: 0x334155 });
+  const cornerAxes = [
+    { x: 0, y: 0, dirX: -1, dirY: -1 },
+    { x: width, y: 0, dirX: 1, dirY: -1 },
+    { x: 0, y: height, dirX: -1, dirY: 1 },
+    { x: width, y: height, dirX: 1, dirY: 1 },
+  ];
+  cornerAxes.forEach((corner) => {
+    const zAxisGeom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(corner.x, corner.y, zStart),
+      new THREE.Vector3(corner.x, corner.y, zEnd),
+    ]);
+    viewer3d.gridGroup.add(new THREE.Line(zAxisGeom, zAxisMat));
+
+    for (let altitude = axisMinAltitude; altitude <= axisMaxAltitude; altitude += 1) {
+      const z = applyViewerVerticalScale(altitude, metrics.minZ);
+      const tickGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(corner.x, corner.y, z),
+        new THREE.Vector3(corner.x + corner.dirX * 0.14, corner.y + corner.dirY * 0.14, z),
+      ]);
+      viewer3d.gridGroup.add(new THREE.Line(tickGeom, zAxisMat));
+      const label = createViewerTextSprite(`${altitude}m`, "#334155", {
+        fontPx: 87,
+        scaleX: 1.57,
+        scaleY: 0.39,
+      });
+      label.position.set(corner.x + corner.dirX * 0.62, corner.y + corner.dirY * 0.62, z);
+      viewer3d.gridGroup.add(label);
+    }
+    const axisLabel = createViewerTextSprite("標高(m)", "#1e293b", {
+      fontPx: 87,
+      scaleX: 1.57,
+      scaleY: 0.39,
+    });
+    axisLabel.position.set(corner.x + corner.dirX * 0.68, corner.y + corner.dirY * 0.68, zEnd + 0.08);
+    viewer3d.gridGroup.add(axisLabel);
+  });
+}
+
+function renderViewerSegment(start, end, color, radius = 0.04) {
+  if (!viewer3d.dataGroup) {
+    return;
+  }
+  const startVec = new THREE.Vector3(start.x, start.y, start.z);
+  const endVec = new THREE.Vector3(end.x, end.y, end.z);
+  const diff = new THREE.Vector3().subVectors(endVec, startVec);
+  const length = diff.length();
+  if (!Number.isFinite(length) || length <= 0.0001) {
+    return;
+  }
+  const geometry = new THREE.CylinderGeometry(radius, radius, length, 8);
+  const material = new THREE.MeshBasicMaterial({ color });
+  const mesh = new THREE.Mesh(geometry, material);
+  const mid = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5);
+  mesh.position.copy(mid);
+  const axis = new THREE.Vector3(0, 1, 0);
+  mesh.quaternion.setFromUnitVectors(axis, diff.clone().normalize());
+  viewer3d.dataGroup.add(mesh);
+}
+
+function renderViewerImageQuad(shape, renderNonce) {
+  if (!viewer3d.dataGroup) {
+    return;
+  }
+  const targetGroup = viewer3d.dataGroup;
+  const points = Array.isArray(shape?.points) ? shape.points : [];
+  const imagePath = value(shape?.imagePath) || getLargeShapeImagePath(shape?.imageType);
+  if (points.length !== 4) {
+    return;
+  }
+  // 画像が読めない場合でも位置が分かるように、外形線は先に描画する。
+  for (let i = 0; i < points.length; i += 1) {
+    const start = points[i];
+    const end = points[(i + 1) % points.length];
+    renderViewerSegment(start, end, new THREE.Color(shape?.color || "#6b7280"), 0.012);
+  }
+  if (!imagePath) {
+    return;
+  }
+  const buildGeometry = () => {
+    const segments = 28;
+    const geometry = new THREE.BufferGeometry();
+    const positions = [];
+    const uvs = [];
+    const indices = [];
+    for (let y = 0; y <= segments; y += 1) {
+      const v = 1 - y / segments;
+      for (let x = 0; x <= segments; x += 1) {
+        const u = x / segments;
+        const p = interpolateViewerQuadPoint(points, u, v);
+        positions.push(p.x, p.y, p.z);
+        uvs.push(u, v);
+      }
+    }
+    for (let y = 0; y < segments; y += 1) {
+      for (let x = 0; x < segments; x += 1) {
+        const row = y * (segments + 1);
+        const nextRow = (y + 1) * (segments + 1);
+        const a = row + x;
+        const b = row + x + 1;
+        const c = nextRow + x + 1;
+        const d = nextRow + x;
+        indices.push(a, b, d, b, c, d);
+      }
+    }
+    const vertices = new Float32Array(positions);
+    const uvArray = new Float32Array(uvs);
+    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("uv", new THREE.BufferAttribute(uvArray, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  };
+  const addTexturedMesh = (texture, tintHex = "#ffffff") => {
+    if (!viewer3d.initialized || !targetGroup || !targetGroup.parent) {
+      return;
+    }
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.generateMipmaps = false;
+    // 上面視点（平面図と同じ向き）での貼り付けに合わせる。
+    texture.flipY = false;
+    if ("colorSpace" in texture && window.THREE?.SRGBColorSpace) {
+      texture.colorSpace = window.THREE.SRGBColorSpace;
+    }
+    const geometry = buildGeometry();
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      color: new THREE.Color(tintHex),
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+      alphaTest: 0,
+      opacity: 1,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 6;
+    targetGroup.add(mesh);
+  };
+  const loadFromImagePath = () =>
+    getOrLoadPlanLargeShapeTintedCanvas(imagePath, shape.color, shape?.imageType)
+      .then((canvas) => {
+        const texture = new THREE.CanvasTexture(canvas);
+        addTexturedMesh(texture, "#ffffff");
+        return true;
+      })
+      .catch(() =>
+        getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType)
+          .then((image) => {
+            const texture = new THREE.Texture(image);
+            const tint = parseHexColor(shape?.color).hex;
+            addTexturedMesh(texture, tint);
+            return true;
+          })
+          .catch(() => false)
+      );
+
+  const tintedDataUrl = getPlanLargeShapeTintedDataUrl(imagePath, shape?.color);
+  if (tintedDataUrl) {
+    getOrLoadPlanLargeShapeImage(tintedDataUrl, shape?.imageType)
+      .then((image) => {
+        const texture = new THREE.Texture(image);
+        addTexturedMesh(texture, "#ffffff");
+      })
+      .catch(() => {
+        void loadFromImagePath();
+      });
+    return;
+  }
+  void loadFromImagePath();
+}
+
+function addViewerImageStrokeOverlay(points, imageSource, colorRaw, targetGroup, renderNonce) {
+  if (!Array.isArray(points) || points.length !== 4 || !targetGroup || !targetGroup.parent || !viewer3d.initialized) {
+    return;
+  }
+  const canvas = ensureCanvasFromImageSource(imageSource);
+  if (!canvas) {
+    return;
+  }
+  const width = Number(canvas.width);
+  const height = Number(canvas.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 1 || height <= 1) {
+    return;
+  }
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    return;
+  }
+  let imageData;
+  try {
+    imageData = ctx.getImageData(0, 0, width, height);
+  } catch (_error) {
+    return;
+  }
+  const data = imageData.data;
+  const minDim = Math.max(1, Math.min(width, height));
+  const stride = Math.max(1, Math.floor(minDim / 180));
+  const maxPoints = 18000;
+  const positions = [];
+  const zOffset = 0.004;
+  let useLineMask = false;
+  for (let y = 0; y < height && !useLineMask; y += Math.max(1, stride * 2)) {
+    for (let x = 0; x < width; x += Math.max(1, stride * 2)) {
+      const idx = (y * width + x) * 4;
+      const alpha = data[idx + 3];
+      if (alpha < 1) {
+        continue;
+      }
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const isNearWhite = r >= 244 && g >= 244 && b >= 244;
+      if (!isNearWhite) {
+        useLineMask = true;
+        break;
+      }
+    }
+  }
+  for (let y = 0; y < height; y += stride) {
+    for (let x = 0; x < width; x += stride) {
+      const index = (y * width + x) * 4;
+      const alpha = data[index + 3];
+      if (alpha < 1) {
+        continue;
+      }
+      if (useLineMask) {
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const isNearWhite = r >= 244 && g >= 244 && b >= 244;
+        if (isNearWhite) {
+          continue;
+        }
+      }
+      const u = width <= 1 ? 0 : x / (width - 1);
+      const v = height <= 1 ? 0 : y / (height - 1);
+      const world = interpolateViewerQuadPoint(points, u, v);
+      positions.push(world.x, world.y, world.z + zOffset);
+      if (positions.length / 3 >= maxPoints) {
+        break;
+      }
+    }
+    if (positions.length / 3 >= maxPoints) {
+      break;
+    }
+  }
+  if (positions.length < 9) {
+    return;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: new THREE.Color(parseHexColor(colorRaw).hex),
+    size: 3.2,
+    sizeAttenuation: false,
+    transparent: true,
+    opacity: 0.98,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const cloud = new THREE.Points(geometry, material);
+  cloud.renderOrder = 7;
+  targetGroup.add(cloud);
+}
+
+function ensureCanvasFromImageSource(imageSource) {
+  if (!imageSource) {
+    return null;
+  }
+  const isCanvas =
+    typeof HTMLCanvasElement !== "undefined" && imageSource instanceof HTMLCanvasElement && Number(imageSource.width) > 0;
+  if (isCanvas) {
+    return imageSource;
+  }
+  const width = Math.max(1, Number(imageSource.naturalWidth || imageSource.width) || 0);
+  const height = Math.max(1, Number(imageSource.naturalHeight || imageSource.height) || 0);
+  if (!width || !height) {
+    return null;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    return null;
+  }
+  ctx.drawImage(imageSource, 0, 0, width, height);
+  return canvas;
+}
+
+function interpolateViewerQuadPoint(points, uRaw, vRaw) {
+  const u = clampNumber(Number(uRaw), 0, 1);
+  const v = clampNumber(Number(vRaw), 0, 1);
+  const p0 = points[0];
+  const p1 = points[1];
+  const p2 = points[2];
+  const p3 = points[3];
+  const w0 = (1 - u) * (1 - v);
+  const w1 = u * (1 - v);
+  const w2 = u * v;
+  const w3 = (1 - u) * v;
+  return {
+    x: p0.x * w0 + p1.x * w1 + p2.x * w2 + p3.x * w3,
+    y: p0.y * w0 + p1.y * w1 + p2.y * w2 + p3.y * w3,
+    z: p0.z * w0 + p1.z * w1 + p2.z * w2 + p3.z * w3,
+  };
+}
+
+function clampNumber(valueRaw, min, max) {
+  const valueNum = Number(valueRaw);
+  if (!Number.isFinite(valueNum)) {
+    return min;
+  }
+  if (valueNum < min) {
+    return min;
+  }
+  if (valueNum > max) {
+    return max;
+  }
+  return valueNum;
+}
+
+function getOrLoadPlanLargeShapeImage(imagePathRaw, shapeTypeRaw = "") {
+  const candidates = getLargeShapeImagePathCandidates(shapeTypeRaw, imagePathRaw);
+  if (!candidates.length) {
+    return Promise.reject(new Error("imagePath is empty"));
+  }
+  const cacheKey = candidates.join("|");
+  const cached = planLargeShapeImageCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const promise = new Promise((resolve, reject) => {
+    const tryLoad = (index) => {
+      if (index >= candidates.length) {
+        reject(new Error("image load failed"));
+        return;
+      }
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => tryLoad(index + 1);
+      image.src = candidates[index];
+    };
+    tryLoad(0);
+  });
+  promise.catch(() => {
+    if (planLargeShapeImageCache.get(cacheKey) === promise) {
+      planLargeShapeImageCache.delete(cacheKey);
+    }
+  });
+  planLargeShapeImageCache.set(cacheKey, promise);
+  return promise;
+}
+
+function dilateAlphaMask(alphaRaw, width, height, iterations = 1) {
+  const w = Math.max(1, Math.floor(width));
+  const h = Math.max(1, Math.floor(height));
+  let src = alphaRaw instanceof Uint8ClampedArray ? alphaRaw : new Uint8ClampedArray(w * h);
+  const iterCount = Math.max(0, Math.floor(iterations));
+  for (let iter = 0; iter < iterCount; iter += 1) {
+    const dst = new Uint8ClampedArray(src.length);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        let maxAlpha = 0;
+        for (let dy = -1; dy <= 1; dy += 1) {
+          const ny = y + dy;
+          if (ny < 0 || ny >= h) {
+            continue;
+          }
+          for (let dx = -1; dx <= 1; dx += 1) {
+            const nx = x + dx;
+            if (nx < 0 || nx >= w) {
+              continue;
+            }
+            const alpha = src[ny * w + nx];
+            if (alpha > maxAlpha) {
+              maxAlpha = alpha;
+              if (maxAlpha >= 255) {
+                break;
+              }
+            }
+          }
+          if (maxAlpha >= 255) {
+            break;
+          }
+        }
+        dst[y * w + x] = maxAlpha;
+      }
+    }
+    src = dst;
+  }
+  return src;
+}
+
+function getOrLoadPlanLargeShapeTintedCanvas(imagePathRaw, colorRaw, shapeTypeRaw = "") {
+  const candidates = getLargeShapeImagePathCandidates(shapeTypeRaw, imagePathRaw);
+  if (!candidates.length) {
+    return Promise.reject(new Error("imagePath is empty"));
+  }
+  const tint = parseHexColor(colorRaw);
+  const key = `${candidates.join("|")}::${tint.hex}`;
+  const cached = planLargeShapeTintedCanvasCache.get(key);
+  if (cached) {
+    return cached;
+  }
+  const promise = getOrLoadPlanLargeShapeImage(candidates[0], shapeTypeRaw).then((image) => {
+    const width = Math.max(1, Number(image.naturalWidth || image.width) || 1);
+    const height = Math.max(1, Number(image.naturalHeight || image.height) || 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) {
+      throw new Error("2d context unavailable");
+    }
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    let imageData;
+    try {
+      imageData = ctx.getImageData(0, 0, width, height);
+    } catch (_error) {
+      // ローカル環境等で getImageData が失敗する場合は、原画像のまま表示する。
+      return canvas;
+    }
+    const data = imageData.data;
+    const alphaMask = new Uint8ClampedArray(width * height);
+    const lineMask = new Uint8ClampedArray(width * height);
+    for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
+      const alpha = data[i + 3];
+      alphaMask[p] = alpha;
+      if (alpha === 0) {
+        continue;
+      }
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const isNearWhite = r >= 244 && g >= 244 && b >= 244;
+      if (!isNearWhite) {
+        lineMask[p] = alpha;
+      }
+    }
+    let useLineMask = false;
+    for (let i = 0; i < lineMask.length; i += 1) {
+      if (lineMask[i] > 0) {
+        useLineMask = true;
+        break;
+      }
+    }
+    const sourceMask = useLineMask ? lineMask : alphaMask;
+    const expandedAlpha = dilateAlphaMask(sourceMask, width, height, IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS);
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = expandedAlpha[i / 4];
+      if (alpha === 0) {
+        data[i + 3] = 0;
+        continue;
+      }
+      data[i] = tint.r;
+      data[i + 1] = tint.g;
+      data[i + 2] = tint.b;
+      data[i + 3] = alpha;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  });
+  promise.catch(() => {
+    if (planLargeShapeTintedCanvasCache.get(key) === promise) {
+      planLargeShapeTintedCanvasCache.delete(key);
+    }
+  });
+  planLargeShapeTintedCanvasCache.set(key, promise);
+  return promise;
+}
+
+function getPlanLargeShapeTintedDataUrl(imagePathRaw, colorRaw) {
+  const candidates = getLargeShapeImagePathCandidates("", imagePathRaw);
+  if (!candidates.length) {
+    return "";
+  }
+  const tint = parseHexColor(colorRaw);
+  const key = `${candidates.join("|")}::${tint.hex}`;
+  const cached = planLargeShapeTintedDataUrlCache.get(key);
+  if (cached === "loading") {
+    return "";
+  }
+  if (typeof cached === "string") {
+    return cached;
+  }
+  planLargeShapeTintedDataUrlCache.set(key, "loading");
+  getOrLoadPlanLargeShapeTintedCanvas(candidates[0], tint.hex)
+    .then((canvas) => {
+      const dataUrl = canvas.toDataURL("image/png");
+      planLargeShapeTintedDataUrlCache.set(key, dataUrl);
+      renderOutputs();
+    })
+    .catch(() => {
+      planLargeShapeTintedDataUrlCache.delete(key);
+    });
+  return "";
+}
+
+function createViewerTextSprite(textRaw, colorRaw, options = {}) {
+  const fontPx = Math.max(12, Number(options?.fontPx) || 44);
+  const scaleX = Math.max(0.05, Number(options?.scaleX) || 0.95);
+  const scaleY = Math.max(0.05, Number(options?.scaleY) || 0.24);
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = `700 ${fontPx}px 'Yu Gothic', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = value(colorRaw) || "#111827";
+  ctx.strokeStyle = "rgba(255,255,255,0.96)";
+  ctx.lineWidth = 8;
+  ctx.strokeText(value(textRaw) || "-", canvas.width / 2, canvas.height / 2);
+  ctx.fillText(value(textRaw) || "-", canvas.width / 2, canvas.height / 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(scaleX, scaleY, 1);
+  return sprite;
+}
+
+function computeViewerBounds(shapes, metrics) {
+  const xs = [];
+  const ys = [];
+  const zs = [];
+  const axisMinZ = applyViewerVerticalScale(metrics.minZ, metrics.minZ);
+  const axisMaxZ = applyViewerVerticalScale(metrics.maxZ, metrics.minZ);
+  zs.push(axisMinZ, axisMaxZ);
+  shapes.forEach((shape) => {
+    if (shape.type === "point") {
+      xs.push(shape.x);
+      ys.push(shape.y);
+      zs.push(shape.z);
+      return;
+    }
+    (shape.points || []).forEach((point) => {
+      xs.push(point.x);
+      ys.push(point.y);
+      zs.push(point.z);
+    });
+  });
+  if (!xs.length || !ys.length || !zs.length) {
+    return {
+      minX: 0,
+      maxX: metrics.gridWidthM,
+      minY: 0,
+      maxY: metrics.gridHeightM,
+      minZ: axisMinZ,
+      maxZ: axisMaxZ,
+    };
+  }
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+    minZ: Math.min(...zs),
+    maxZ: Math.max(...zs),
+  };
+}
+
+function applyViewerPerspective() {
+  if (!viewer3d.initialized || !viewer3d.camera) {
+    return;
+  }
+  const bounds = viewer3d.bounds;
+  if (!bounds) {
+    return;
+  }
+  const center = new THREE.Vector3(
+    (bounds.minX + bounds.maxX) / 2,
+    (bounds.minY + bounds.maxY) / 2,
+    (bounds.minZ + bounds.maxZ) / 2
+  );
+  const spanX = Math.max(1, bounds.maxX - bounds.minX);
+  const spanY = Math.max(1, bounds.maxY - bounds.minY);
+  const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
+  const scale = normalizeViewerVerticalScale(viewerVerticalScale);
+  const unscaledSpanZ = Math.max(1, spanZ / scale);
+  const baseDist = Math.max(spanX, spanY) * 1.1 + Math.max(8, unscaledSpanZ * 5);
+  const zoomInFactor = Math.pow(scale, -0.7);
+  const dist = baseDist * zoomInFactor;
+  if (selectedViewerPerspective === "top") {
+    viewer3d.camera.up.set(0, 1, 0);
+    viewer3d.camera.position.set(center.x, center.y, center.z + dist);
+  } else {
+    viewer3d.camera.up.set(0, 0, 1);
+    viewer3d.camera.position.set(center.x + dist * 0.75, center.y - dist * 0.75, center.z + dist * 0.6);
+  }
+  if (viewer3d.controls) {
+    viewer3d.controls.target.copy(center);
+    viewer3d.controls.update();
+  } else {
+    viewer3d.camera.lookAt(center);
+  }
+}
+
+function handleViewerPointerMove(event) {
+  if (!viewer3d.initialized || !viewer3d.raycaster || !viewer3d.camera || !viewer3d.pickMeshes.length || !viewerCanvasWrap) {
+    hideViewerTooltip();
+    return;
+  }
+  const rect = viewerCanvasWrap.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    hideViewerTooltip();
+    return;
+  }
+  const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  viewer3d.pointer.set(x, y);
+  viewer3d.raycaster.setFromCamera(viewer3d.pointer, viewer3d.camera);
+  const intersects = viewer3d.raycaster.intersectObjects(viewer3d.pickMeshes, false);
+  if (!intersects.length) {
+    hideViewerTooltip();
+    return;
+  }
+  const picked = intersects[0].object?.userData || {};
+  showViewerTooltip(event, picked);
+}
+
+function showViewerTooltip(event, data) {
+  if (!viewerTooltip || !viewerCanvasWrap) {
+    return;
+  }
+  const hasAltitude = Number.isFinite(Number(data.altitudeM));
+  const altitudeTextBase = hasAltitude ? Number(data.altitudeM).toFixed(3).replace(/\.?0+$/, "") : "-";
+  const altitudeText = data.altitudeEstimated ? `${altitudeTextBase}（仮）` : altitudeTextBase;
+  viewerTooltip.innerHTML = `
+    <div><strong>標本番号:</strong> ${escapeHtml(value(data.label) || "-")}</div>
+    <div><strong>名称:</strong> ${escapeHtml(value(data.nameMemo) || "-")}</div>
+    <div><strong>ユニット:</strong> ${escapeHtml(value(data.unit) || "-")}</div>
+    <div><strong>サブユニット:</strong> ${escapeHtml(value(data.detail) || "-")}</div>
+    <div><strong>区画:</strong> ${escapeHtml(value(data.kuwaku) || "-")}</div>
+    <div><strong>標高(m):</strong> ${escapeHtml(altitudeText)}</div>
+  `;
+  viewerTooltip.hidden = false;
+  const rect = viewerCanvasWrap.getBoundingClientRect();
+  const maxX = Math.max(8, rect.width - 240);
+  const maxY = Math.max(8, rect.height - 132);
+  const x = clamp(event.clientX - rect.left + 14, 8, maxX);
+  const y = clamp(event.clientY - rect.top + 12, 8, maxY);
+  viewerTooltip.style.left = `${x}px`;
+  viewerTooltip.style.top = `${y}px`;
+}
+
+function hideViewerTooltip() {
+  if (!viewerTooltip) {
+    return;
+  }
+  viewerTooltip.hidden = true;
+}
+
+function blockIndexToLabel(indexRaw) {
+  let index = Number(indexRaw);
+  if (!Number.isFinite(index) || index < 1) {
+    return "A";
+  }
+  let label = "";
+  while (index > 0) {
+    const remainder = (index - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    index = Math.floor((index - 1) / 26);
+  }
+  return label || "A";
+}
+
+function normalizeViewerHead(headRaw) {
+  const head = value(headRaw).toUpperCase();
+  if (head === "Ⅲ" || head === "3" || head === "III") {
+    return "Ⅲ";
+  }
+  if (head === "Ⅱ" || head === "2" || head === "II") {
+    return "Ⅱ";
+  }
+  return "Ⅰ";
+}
+
+function kuwakuToViewerXIndex(kuwakuParts) {
+  const parts = kuwakuParts || {};
+  const head = normalizeViewerHead(parts.headB);
+  const headIndex = VIEWER_HEAD_INDEX_MAP.get(head);
+  const block = normalizeKuwakuBlock(parts.block);
+  const baseLetterIndex = block ? block.charCodeAt(0) - 65 : 0;
+  const letterIndex = Number.isFinite(baseLetterIndex) && baseLetterIndex >= 0 && baseLetterIndex < 26 ? baseLetterIndex : 0;
+  if (!Number.isFinite(headIndex)) {
+    return blockLabelToIndex(block) - 1;
+  }
+  return headIndex * 26 + letterIndex;
+}
+
+function viewerXIndexToHeadBlock(indexRaw) {
+  const index = Number(indexRaw);
+  if (!Number.isFinite(index)) {
+    return { head: "Ⅰ", block: "A" };
+  }
+  const seqLength = VIEWER_HEAD_SEQUENCE.length;
+  const normalized = ((Math.floor(index) % (26 * seqLength)) + 26 * seqLength) % (26 * seqLength);
+  const headIndex = Math.floor(normalized / 26) % seqLength;
+  const letterIndex = normalized % 26;
+  return {
+    head: VIEWER_HEAD_SEQUENCE[headIndex] || "Ⅰ",
+    block: String.fromCharCode(65 + letterIndex),
+  };
 }
 
 function buildDetailText(detailRaw, detailSubRaw = "") {
@@ -4151,16 +6019,77 @@ function pointsToAzimuthDeg(pointA, pointB) {
   return (deg + 360) % 360;
 }
 
+function parseImageQuadPlanPoints(record, center = null) {
+  const corner1 = convertPositionToPlanCoords(record?.imgP1NsDir, record?.imgP1NsCm, record?.imgP1EwDir, record?.imgP1EwCm);
+  const corner2 = convertPositionToPlanCoords(record?.imgP2NsDir, record?.imgP2NsCm, record?.imgP2EwDir, record?.imgP2EwCm);
+  const corner3 = convertPositionToPlanCoords(record?.imgP3NsDir, record?.imgP3NsCm, record?.imgP3EwDir, record?.imgP3EwCm);
+  const corner4 = convertPositionToPlanCoords(record?.imgP4NsDir, record?.imgP4NsCm, record?.imgP4EwDir, record?.imgP4EwCm);
+  if (!corner1 || !corner2 || !corner3 || !corner4) {
+    if (!center) {
+      return null;
+    }
+    const candidates = [corner1, corner2, corner3, corner4, center].filter(Boolean);
+    if (!candidates.length) {
+      return null;
+    }
+    let minX = Math.min(...candidates.map((point) => point.x));
+    let maxX = Math.max(...candidates.map((point) => point.x));
+    let minY = Math.min(...candidates.map((point) => point.y));
+    let maxY = Math.max(...candidates.map((point) => point.y));
+    const fallbackHalfSize = 20;
+    if (Math.abs(maxX - minX) < 1) {
+      minX = center.x - fallbackHalfSize;
+      maxX = center.x + fallbackHalfSize;
+    }
+    if (Math.abs(maxY - minY) < 1) {
+      minY = center.y - fallbackHalfSize;
+      maxY = center.y + fallbackHalfSize;
+    }
+    return [
+      { x: minX, y: minY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+      { x: minX, y: maxY },
+    ];
+  }
+  return [corner1, corner2, corner3, corner4];
+}
+
+function collectImageCornerPoints(record) {
+  const corners = [
+    convertPositionToPlanCoords(record?.imgP1NsDir, record?.imgP1NsCm, record?.imgP1EwDir, record?.imgP1EwCm),
+    convertPositionToPlanCoords(record?.imgP2NsDir, record?.imgP2NsCm, record?.imgP2EwDir, record?.imgP2EwCm),
+    convertPositionToPlanCoords(record?.imgP3NsDir, record?.imgP3NsCm, record?.imgP3EwDir, record?.imgP3EwCm),
+    convertPositionToPlanCoords(record?.imgP4NsDir, record?.imgP4NsCm, record?.imgP4EwDir, record?.imgP4EwCm),
+  ].filter(Boolean);
+  return corners;
+}
+
 function buildPlanDrawable(record) {
   const meta = buildPlanDrawableMeta(record);
-  const center = convertPositionToPlanCoords(record.nsDir, record.nsCm, record.ewDir, record.ewCm);
-  if (!center) {
-    return null;
-  }
 
   const planSizeMode = normalizePlanSizeMode(record.planSizeMode);
   const shapeType = normalizeLargeShapeType(record.largeShapeType);
-  const axisAzimuth = parseLargeAxisAzimuth(record.largeAxisDirection);
+  const normalizedShapeLabel = normalizeLargeShapeLabel(record.largeShapeType);
+  const isImageShape = isLargeShapeImageType(shapeType);
+  const hasMappedImageType = largeShapeImagePathMap.has(normalizedShapeLabel);
+  const rawImageCorners = collectImageCornerPoints(record);
+  let center = convertPositionToPlanCoords(record.nsDir, record.nsCm, record.ewDir, record.ewCm);
+  if (!center && (isImageShape || rawImageCorners.length)) {
+    if (rawImageCorners.length) {
+      center = rawImageCorners.reduce(
+        (acc, point) => ({ x: acc.x + point.x / rawImageCorners.length, y: acc.y + point.y / rawImageCorners.length }),
+        { x: 0, y: 0 }
+      );
+    }
+  }
+  if (!center) {
+    return null;
+  }
+  const resolvedImageType = isImageShape ? shapeType : hasMappedImageType ? normalizedShapeLabel : "";
+  const shouldUseImageQuad =
+    planSizeMode === "大きなもの" && (isImageShape || (resolvedImageType && rawImageCorners.length > 0));
+  const axisAzimuth = shouldUseImageQuad ? null : parseLargeAxisAzimuth(record.largeAxisDirection);
 
   if (planSizeMode !== "大きなもの" || !shapeType) {
     return {
@@ -4239,10 +6168,30 @@ function buildPlanDrawable(record) {
     };
   }
 
+  if (shouldUseImageQuad) {
+    const points = parseImageQuadPlanPoints(record, center);
+    if (!points) {
+      return null;
+    }
+    const centroid = points.reduce(
+      (acc, point) => ({ x: acc.x + point.x / points.length, y: acc.y + point.y / points.length }),
+      { x: 0, y: 0 }
+    );
+    return {
+      type: "imageQuad",
+      points,
+      imageType: resolvedImageType,
+      imagePath: getLargeShapeImagePath(resolvedImageType),
+      x: centroid.x,
+      y: centroid.y,
+      ...meta,
+    };
+  }
+
   return null;
 }
 
-function renderPlanDrawableSvg(drawable) {
+function renderPlanDrawableSvg(drawable, index = 0) {
   const labelX = Math.min(PLAN_SIZE_CM - 2, drawable.x + 6);
   const labelY = Math.max(8, drawable.y - 6);
   const ariaLabel = [
@@ -4265,9 +6214,21 @@ function renderPlanDrawableSvg(drawable) {
       ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
       : "";
     shapeSvg = `<ellipse class="plan-shape-ellipse" cx="${drawable.x}" cy="${drawable.y}" rx="${drawable.rx}" ry="${drawable.ry}" stroke="${drawable.color}"${transform} />`;
+  } else if (drawable.type === "imageQuad") {
+    const imageSvg = buildPlanImageWarpSvg(drawable, index);
+    const polygonPoints = (drawable.points || []).map((point) => `${point.x},${point.y}`).join(" ");
+    const outlineSvg = `<polygon class="plan-shape-image-outline" points="${polygonPoints}" fill="none" stroke="${drawable.color}" />`;
+    shapeSvg = imageSvg ? `${imageSvg}${outlineSvg}` : outlineSvg;
   } else {
     shapeSvg = `<circle class="plan-point-hit" cx="${drawable.x}" cy="${drawable.y}" r="5" fill="${drawable.color}" />`;
   }
+
+  const hotspotSvg =
+    drawable.type === "imageQuad"
+      ? `<polygon class="plan-point-hotspot plan-image-hotspot" points="${(drawable.points || [])
+          .map((point) => `${point.x},${point.y}`)
+          .join(" ")}" fill="transparent" />`
+      : `<circle class="plan-point-hotspot" cx="${drawable.x}" cy="${drawable.y}" r="12" fill="transparent" />`;
 
   return `
       <g
@@ -4283,10 +6244,76 @@ function renderPlanDrawableSvg(drawable) {
         aria-label="${escapeHtml(ariaLabel)}"
       >
         ${shapeSvg}
-        <circle class="plan-point-hotspot" cx="${drawable.x}" cy="${drawable.y}" r="12" fill="transparent" />
+        ${hotspotSvg}
         <text x="${labelX}" y="${labelY}">${escapeHtml(drawable.label || "")}</text>
       </g>
     `;
+}
+
+function parseHexColor(colorRaw, fallback = "#6b7280") {
+  const text = value(colorRaw);
+  const fallbackText = value(fallback) || "#6b7280";
+  const normalized = /^#[0-9a-f]{3}$/i.test(text)
+    ? `#${text[1]}${text[1]}${text[2]}${text[2]}${text[3]}${text[3]}`
+    : /^#[0-9a-f]{6}$/i.test(text)
+      ? text
+      : fallbackText;
+  const matched = normalized.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!matched) {
+    return { hex: "#6b7280", r: 107, g: 114, b: 128 };
+  }
+  return {
+    hex: `#${matched[1]}${matched[2]}${matched[3]}`.toLowerCase(),
+    r: Number.parseInt(matched[1], 16),
+    g: Number.parseInt(matched[2], 16),
+    b: Number.parseInt(matched[3], 16),
+  };
+}
+
+function buildPlanImageWarpSvg(drawable, index = 0) {
+  const points = Array.isArray(drawable?.points) ? drawable.points : [];
+  const imagePath = value(drawable?.imagePath);
+  const imageCandidates = getLargeShapeImagePathCandidates(drawable?.imageType, imagePath);
+  const imageFallback = imageCandidates[0] || imagePath;
+  const tintedDataUrl = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color);
+  const imageRef = tintedDataUrl || imageFallback;
+  if (points.length !== 4 || !imageRef) {
+    return "";
+  }
+  const [p1, p2, p3, p4] = points;
+  const labelKey = value(drawable.label || "x").replace(/[^a-zA-Z0-9_-]/g, "");
+  const clipIdA = `plan-img-clip-a-${index}-${labelKey || "x"}`;
+  const clipIdB = `plan-img-clip-b-${index}-${labelKey || "x"}`;
+  const clipIdRect = `plan-img-clip-rect-${index}-${labelKey || "x"}`;
+  const matrixA = [p2.x - p1.x, p2.y - p1.y, p3.x - p2.x, p3.y - p2.y, p1.x, p1.y];
+  const matrixB = [p3.x - p4.x, p3.y - p4.y, p4.x - p1.x, p4.y - p1.y, p1.x, p1.y];
+  const triA = `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`;
+  const triB = `${p1.x},${p1.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`;
+  const quadPoints = `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`;
+  const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
+  const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
+  const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
+  const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
+  const boxWidth = Math.max(1, maxX - minX);
+  const boxHeight = Math.max(1, maxY - minY);
+  const matrixAText = matrixA.map((num) => (Number.isFinite(num) ? Number(num).toFixed(4) : "0")).join(" ");
+  const matrixBText = matrixB.map((num) => (Number.isFinite(num) ? Number(num).toFixed(4) : "0")).join(" ");
+  return `
+    <defs>
+      <clipPath id="${clipIdA}">
+        <polygon points="${triA}" />
+      </clipPath>
+      <clipPath id="${clipIdB}">
+        <polygon points="${triB}" />
+      </clipPath>
+      <clipPath id="${clipIdRect}">
+        <polygon points="${quadPoints}" />
+      </clipPath>
+    </defs>
+    <image href="${escapeHtml(imageRef)}" x="${minX}" y="${minY}" width="${boxWidth}" height="${boxHeight}" preserveAspectRatio="none" clip-path="url(#${clipIdRect})" />
+    <image href="${escapeHtml(imageRef)}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixAText})" clip-path="url(#${clipIdA})" />
+    <image href="${escapeHtml(imageRef)}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixBText})" clip-path="url(#${clipIdB})" />
+  `;
 }
 
 function parseDistanceToCm(distanceRaw) {
@@ -4763,6 +6790,8 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     value(fallbackSite.kuwaku) || buildKuwaku(fallbackSite.kuwakuHeadA, fallbackSite.kuwakuHeadB, fallbackSite.kuwakuBlock, fallbackSite.kuwakuNo)
   );
   const kuwaku = !rawKuwaku || isDefaultKuwaku(rawKuwaku) ? fallbackKuwaku : rawKuwaku;
+  const rawLargeShapeType = value(item.largeShapeType);
+  const normalizedLargeShapeType = normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType);
 
   return {
     id,
@@ -4796,7 +6825,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     ewDir: normalizeEwDir(value(item.ewDir)),
     ewCm: value(item.ewCm),
     planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)),
-    largeShapeType: normalizeLargeShapeType(value(item.largeShapeType)),
+    largeShapeType: normalizedLargeShapeType,
     largeAxisDirection: normalizeLargeAxisDirection(value(item.largeAxisDirection)),
     lineLengthCm: value(item.lineLengthCm),
     line1NsDir: normalizeNsDir(value(item.line1NsDir)),
@@ -4811,6 +6840,22 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     rectSide2Cm: value(item.rectSide2Cm),
     ellipseLongRadiusCm: value(item.ellipseLongRadiusCm),
     ellipseShortRadiusCm: value(item.ellipseShortRadiusCm),
+    imgP1NsDir: normalizeNsDir(value(item.imgP1NsDir)),
+    imgP1NsCm: value(item.imgP1NsCm),
+    imgP1EwDir: normalizeEwDir(value(item.imgP1EwDir)),
+    imgP1EwCm: value(item.imgP1EwCm),
+    imgP2NsDir: normalizeNsDir(value(item.imgP2NsDir)),
+    imgP2NsCm: value(item.imgP2NsCm),
+    imgP2EwDir: normalizeEwDir(value(item.imgP2EwDir)),
+    imgP2EwCm: value(item.imgP2EwCm),
+    imgP3NsDir: normalizeNsDir(value(item.imgP3NsDir)),
+    imgP3NsCm: value(item.imgP3NsCm),
+    imgP3EwDir: normalizeEwDir(value(item.imgP3EwDir)),
+    imgP3EwCm: value(item.imgP3EwCm),
+    imgP4NsDir: normalizeNsDir(value(item.imgP4NsDir)),
+    imgP4NsCm: value(item.imgP4NsCm),
+    imgP4EwDir: normalizeEwDir(value(item.imgP4EwDir)),
+    imgP4EwCm: value(item.imgP4EwCm),
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),
@@ -5089,7 +7134,8 @@ async function bootstrapCloudSync() {
     const remoteHasData = hasAnyStateData(remoteState);
     const localHasData = hasAnyStateData(state);
     const activeTabId = getActiveTabId();
-    const canApplyRemote = activeTabId === "output-tab" || activeTabId === "plan-tab" || activeTabId === "export-tab";
+    const canApplyRemote =
+      activeTabId === "output-tab" || activeTabId === "plan-tab" || activeTabId === "viewer-tab" || activeTabId === "export-tab";
     if (remoteHasData) {
       cloudLastPulledAt = value(response.updatedAt) || nowIso();
       if (canApplyRemote) {
@@ -5200,7 +7246,7 @@ function startCloudPullTimer() {
   }
   cloudPullTimer = window.setInterval(() => {
     const activeTabId = getActiveTabId();
-    if (activeTabId === "output-tab" || activeTabId === "plan-tab" || activeTabId === "export-tab") {
+    if (activeTabId === "output-tab" || activeTabId === "plan-tab" || activeTabId === "viewer-tab" || activeTabId === "export-tab") {
       void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
     }
   }, CLOUD_PULL_INTERVAL_MS);
@@ -5232,7 +7278,7 @@ async function pullStateFromCloud({ force = false, showToastOnSuccess = false, s
     return false;
   }
   const tabAtRequest = getActiveTabId();
-  if (!force && tabAtRequest !== "output-tab" && tabAtRequest !== "plan-tab" && tabAtRequest !== "export-tab") {
+  if (!force && tabAtRequest !== "output-tab" && tabAtRequest !== "plan-tab" && tabAtRequest !== "viewer-tab" && tabAtRequest !== "export-tab") {
     return false;
   }
   cloudPullInProgress = true;
@@ -5680,6 +7726,7 @@ function buildListCsv() {
     "判定者",
     "レベル読値_上面(cm)",
     "レベル読値_下底(cm)",
+    "標高(m)",
     "産出状況断面",
     "産状スケッチ",
     "平面位置_NS",
@@ -5704,6 +7751,7 @@ function buildListCsv() {
     record.identifier,
     formatCmValue(record.levelUpperCm),
     formatCmValue(record.levelLowerCm),
+    formatRecordAltitudeM(record),
     record.occurrenceSection,
     record.occurrenceSketch,
     record.nsDir,
@@ -5862,6 +7910,7 @@ function buildListPdfHtml(records, options = {}) {
           <td>${escapeHtml(record.discoverer || "")}</td>
           <td>${escapeHtml(record.identifier || "")}</td>
           <td>${escapeHtml(formatLevelRead(record))}</td>
+          <td>${escapeHtml(formatRecordAltitudeM(record))}</td>
           <td>${escapeHtml(formatPlanPosition(record))}</td>
           <td class="${complete ? "pdf-status-complete" : "pdf-status-incomplete"}">${complete ? "○" : "未記入"}</td>
         </tr>
@@ -5896,6 +7945,7 @@ function buildListPdfHtml(records, options = {}) {
             <th>発見者</th>
             <th>判定者</th>
             <th>レベル読値</th>
+            <th>標高(m)</th>
             <th>平面位置</th>
             <th>データ</th>
           </tr>
@@ -6217,7 +8267,7 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
   const horizontalGrid = [100, 200, 300]
     .map((y) => `<line class="pdf-plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
-  const pointsSvg = drawables.map((drawable) => renderPlanPdfDrawableSvg(drawable)).join("");
+  const pointsSvg = drawables.map((drawable, index) => renderPlanPdfDrawableSvg(drawable, index)).join("");
   const cornerLabels = buildPlanCornerLabels(kuwakuRaw);
 
   return `
@@ -6240,7 +8290,7 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
   `;
 }
 
-function renderPlanPdfDrawableSvg(drawable) {
+function renderPlanPdfDrawableSvg(drawable, index = 0) {
   const labelX = Math.min(PLAN_SIZE_CM - 2, drawable.x + 6);
   const labelY = Math.max(8, drawable.y - 6);
   let shapeSvg = "";
@@ -6256,6 +8306,8 @@ function renderPlanPdfDrawableSvg(drawable) {
       ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
       : "";
     shapeSvg = `<ellipse class="pdf-plan-shape-ellipse" cx="${drawable.x}" cy="${drawable.y}" rx="${drawable.rx}" ry="${drawable.ry}" stroke="${drawable.color}"${transform} />`;
+  } else if (drawable.type === "imageQuad") {
+    shapeSvg = buildPlanImageWarpSvg(drawable, `pdf-${index}`);
   } else {
     shapeSvg = `<circle cx="${drawable.x}" cy="${drawable.y}" r="5" fill="${drawable.color}" />`;
   }
@@ -6411,7 +8463,7 @@ function buildPdfPrintStyles(pageSizeRaw) {
       background: #f3f4f6;
       white-space: nowrap;
     }
-    .pdf-list-table td:nth-child(13) {
+    .pdf-list-table td:nth-child(14) {
       text-align: center;
       font-weight: 700;
     }
@@ -7055,10 +9107,11 @@ function getMissingRequiredKeys(record) {
   const planSizeMode = normalizePlanSizeMode(value(record.planSizeMode));
   if (planSizeMode === "大きなもの") {
     const largeShapeType = normalizeLargeShapeType(value(record.largeShapeType));
+    const isImageShape = isLargeShapeImageType(largeShapeType);
     if (!largeShapeType) {
       missing.add("largeShapeType");
     }
-    if (parseLargeAxisAzimuth(value(record.largeAxisDirection)) == null) {
+    if (!isImageShape && parseLargeAxisAzimuth(value(record.largeAxisDirection)) == null) {
       missing.add("largeAxisDirection");
     }
     if (largeShapeType === "直線状") {
@@ -7079,6 +9132,21 @@ function getMissingRequiredKeys(record) {
       if (!value(record.ellipseShortRadiusCm)) {
         missing.add("ellipseShortRadiusCm");
       }
+    } else if (isImageShape) {
+      [
+        "imgP1NsCm",
+        "imgP1EwCm",
+        "imgP2NsCm",
+        "imgP2EwCm",
+        "imgP3NsCm",
+        "imgP3EwCm",
+        "imgP4NsCm",
+        "imgP4EwCm",
+      ].forEach((key) => {
+        if (!value(record[key])) {
+          missing.add(key);
+        }
+      });
     }
   }
 
@@ -7220,11 +9288,82 @@ function normalizePlanSizeMode(valueRaw) {
 }
 
 function normalizeLargeShapeType(valueRaw) {
-  const text = value(valueRaw);
-  if (text === "直線状" || text === "長方形" || text === "楕円") {
+  const raw = value(valueRaw);
+  const normalizedRaw = typeof raw.normalize === "function" ? raw.normalize("NFC") : raw;
+  let text = normalizeLargeShapeLabel(normalizedRaw);
+  if (text === "ゾウ下顎臼歯" || text === "ゾウ上顎臼歯") {
+    return "";
+  }
+  if (text === "直線状" || text === "長方形" || text === "楕円" || largeShapeImagePathMap.has(text)) {
     return text;
   }
   return "";
+}
+
+function isLargeShapeImageType(shapeTypeRaw) {
+  return largeShapeImagePathMap.has(normalizeLargeShapeType(shapeTypeRaw));
+}
+
+function getLargeShapeImagePath(shapeTypeRaw) {
+  const shapeType = normalizeLargeShapeType(shapeTypeRaw);
+  if (!shapeType) {
+    return "";
+  }
+  const fallbackList = Array.isArray(LARGE_SHAPE_IMAGE_FALLBACK_PATHS[shapeType])
+    ? LARGE_SHAPE_IMAGE_FALLBACK_PATHS[shapeType]
+    : [];
+  for (const fallback of fallbackList) {
+    const safe = toSafeAssetUrl(fallback);
+    if (safe) {
+      return safe;
+    }
+  }
+  return toSafeAssetUrl(largeShapeImagePathMap.get(shapeType) || "");
+}
+
+function getLargeShapeImagePathCandidates(shapeTypeRaw, imagePathRaw = "") {
+  const candidates = [];
+  const pushCandidate = (pathRaw) => {
+    const safe = toSafeAssetUrl(pathRaw);
+    if (!safe || candidates.includes(safe)) {
+      return;
+    }
+    candidates.push(safe);
+  };
+  const pushInlineCandidate = (pathRaw) => {
+    const inline = getInlineLargeShapeDataUrl(pathRaw);
+    if (!inline) {
+      return;
+    }
+    pushCandidate(inline);
+  };
+  const shapeType = normalizeLargeShapeType(shapeTypeRaw);
+  const explicitPath = toSafeAssetUrl(imagePathRaw);
+  const hasExplicitPath = Boolean(explicitPath);
+  if (hasExplicitPath) {
+    pushInlineCandidate(explicitPath);
+    pushCandidate(explicitPath);
+  }
+  if (shapeType) {
+    const fallbackList = LARGE_SHAPE_IMAGE_FALLBACK_PATHS[shapeType] || [];
+    const mappedPath = largeShapeImagePathMap.get(shapeType) || "";
+    if (!hasExplicitPath) {
+      fallbackList.forEach((pathRaw) => {
+        pushInlineCandidate(pathRaw);
+        pushCandidate(pathRaw);
+      });
+      pushInlineCandidate(mappedPath);
+      pushCandidate(mappedPath);
+    } else {
+      pushInlineCandidate(mappedPath);
+      pushCandidate(mappedPath);
+      fallbackList.forEach((pathRaw) => {
+        pushInlineCandidate(pathRaw);
+        pushCandidate(pathRaw);
+      });
+    }
+  }
+  return candidates;
 }
 
 function normalizeLargeAxisDirection(valueRaw) {
@@ -7315,6 +9454,24 @@ function formatLevelRead(record) {
     return "";
   }
   return `${formatCmValue(upper, "-")} / ${formatCmValue(lower, "-")}`;
+}
+
+function getRecordAltitudeMValue(record) {
+  const levelHeightM = parseDistanceToCm(getRecordLevelHeight(record));
+  const lowerCm = parseDistanceToCm(record?.levelLowerCm);
+  if (levelHeightM == null || lowerCm == null) {
+    return null;
+  }
+  const altitudeM = levelHeightM - lowerCm / 100;
+  return Number.isFinite(altitudeM) ? altitudeM : null;
+}
+
+function formatRecordAltitudeM(record) {
+  const altitudeM = getRecordAltitudeMValue(record);
+  if (altitudeM == null) {
+    return "";
+  }
+  return altitudeM.toFixed(3).replace(/\.?0+$/, "");
 }
 
 function formatLayerPosition(record) {
