@@ -96,13 +96,13 @@
               <legend>標本番号 <span class="required">*</span></legend>
               <div id="specimen-tabs" class="specimen-tabs" role="tablist" aria-label="標本番号の区分">
                 <button class="specimen-tab active" data-prefix="m" type="button">m: 哺乳類</button>
-                <button class="specimen-tab" data-prefix="a" type="button">a: 分析用資料</button>
                 <button class="specimen-tab" data-prefix="b" type="button">b: 植物</button>
                 <button class="specimen-tab" data-prefix="l" type="button">l: 生痕</button>
                 <button class="specimen-tab" data-prefix="s" type="button">s: 貝類</button>
                 <button class="specimen-tab" data-prefix="i" type="button">i: 昆虫</button>
                 <button class="specimen-tab" data-prefix="g" type="button">g: 人類考古</button>
                 <button class="specimen-tab" data-prefix="h" type="button">h: その他</button>
+                <button class="specimen-tab" data-prefix="a" type="button">a: 分析用試料</button>
               </div>
               <div class="specimen-number-row">
                 <span id="specimen-prefix-label" class="specimen-prefix-chip">m</span>
@@ -117,7 +117,7 @@
                 />
               </div>
               <p id="specimen-duplicate-warning" class="duplicate-warning hidden" role="alert" aria-live="polite"></p>
-              <label id="analysis-type-row" class="hidden">分析用資料の区分
+              <label id="analysis-type-row" class="hidden">分析用試料の区分
                 <select id="analysis-type-select" name="analysisType">
                   <option value="">選択してください</option>
                   <option value="A: 火山灰">A: 火山灰</option>
@@ -141,19 +141,22 @@
             <label>化石・遺物名称
               <input name="nameMemo" type="text" />
             </label>
-            <label>重要品指定
-              <select name="importantFlag">
-                <option value="">未設定</option>
-                <option value="有">有</option>
-                <option value="無">無</option>
-              </select>
-            </label>
-            <label>簡易記載（専門班の指示による）
-              <select name="simpleRecordFlag">
-                <option value="-">-</option>
-                <option value="○">○</option>
-              </select>
-            </label>
+            <fieldset class="inline-fieldset">
+              <legend>重要品指定</legend>
+              <div class="dir-tabs" role="tablist" aria-label="重要品指定">
+                <button class="dir-tab active" data-group="importantFlag" data-value="無" type="button">無</button>
+                <button class="dir-tab danger-option" data-group="importantFlag" data-value="有" type="button">有</button>
+              </div>
+              <input id="important-flag-input" name="importantFlag" type="hidden" value="無" />
+            </fieldset>
+            <fieldset class="inline-fieldset">
+              <legend>簡易記載（専門班の指示による）</legend>
+              <div class="dir-tabs" role="tablist" aria-label="簡易記載（専門班の指示による）">
+                <button class="dir-tab active" data-group="simpleRecordFlag" data-value="-" type="button">-</button>
+                <button class="dir-tab" data-group="simpleRecordFlag" data-value="○" type="button">○</button>
+              </div>
+              <input id="simple-record-flag-input" name="simpleRecordFlag" type="hidden" value="-" />
+            </fieldset>
             <div class="two-inline-labels span-2">
               <label>発見者氏名
                 <input name="discoverer" type="text" />
@@ -179,18 +182,22 @@
                 </label>
               </div>
             </fieldset>
-            <label>産出状況断面
-              <select name="occurrenceSection">
-                <option value="要">要</option>
-                <option value="否">否</option>
-              </select>
-            </label>
-            <label>産状スケッチ
-              <select name="occurrenceSketch">
-                <option value="要">要</option>
-                <option value="否">否</option>
-              </select>
-            </label>
+            <fieldset class="inline-fieldset">
+              <legend>産出状況断面</legend>
+              <div class="dir-tabs" role="tablist" aria-label="産出状況断面">
+                <button class="dir-tab active" data-group="occurrenceSection" data-value="要" type="button">要</button>
+                <button class="dir-tab" data-group="occurrenceSection" data-value="否" type="button">否</button>
+              </div>
+              <input id="occurrence-section-input" name="occurrenceSection" type="hidden" value="要" />
+            </fieldset>
+            <fieldset class="inline-fieldset">
+              <legend>産状スケッチ</legend>
+              <div class="dir-tabs" role="tablist" aria-label="産状スケッチ">
+                <button class="dir-tab active" data-group="occurrenceSketch" data-value="要" type="button">要</button>
+                <button class="dir-tab" data-group="occurrenceSketch" data-value="否" type="button">否</button>
+              </div>
+              <input id="occurrence-sketch-input" name="occurrenceSketch" type="hidden" value="要" />
+            </fieldset>
 
             <fieldset class="inline-fieldset">
               <legend>平面位置 [北から・南から]</legend>
@@ -247,7 +254,11 @@
                 <span>から</span>
               </div>
               <div class="layer-position-row bottom">
-                <input name="layerRelative" type="text" placeholder="上もしくは下" />
+                <div class="dir-tabs" role="tablist" aria-label="地層中の位置（上/下）">
+                  <button class="dir-tab" data-group="layerRelative" data-value="上" type="button">上</button>
+                  <button class="dir-tab" data-group="layerRelative" data-value="下" type="button">下</button>
+                </div>
+                <input id="layer-relative-input" name="layerRelative" type="hidden" value="" />
                 <span>に</span>
                 <input name="layerFromCm" type="text" />
                 <span>cm</span>

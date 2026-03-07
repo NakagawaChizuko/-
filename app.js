@@ -7,13 +7,13 @@ const CLOUD_AUTO_PULL_ENABLED = false;
 const DEFAULT_SPECIMEN_PREFIX = "m";
 const SPECIMEN_CATEGORY_MAP = {
   m: "哺乳類",
-  a: "分析用資料",
   b: "植物",
   l: "生痕",
   s: "貝類",
   i: "昆虫",
   g: "人類考古",
   h: "その他",
+  a: "分析用試料",
 };
 const VALID_SPECIMEN_PREFIXES = new Set(Object.keys(SPECIMEN_CATEGORY_MAP));
 const ANALYSIS_TYPE_MAP = {
@@ -71,6 +71,18 @@ const SPECIMEN_POINT_COLORS = {
   i: "#6d597a",
   g: "#8f5a2b",
   h: "#6b7280",
+};
+const UNIT_CELL_COLOR_MAP = {
+  U1: { background: "hsl(272, 64%, 93%)", border: "hsl(272, 38%, 80%)", color: "#111827" },
+  U2: { background: "hsl(286, 62%, 93%)", border: "hsl(286, 36%, 80%)", color: "#111827" },
+  U3: { background: "hsl(258, 60%, 93%)", border: "hsl(258, 36%, 80%)", color: "#111827" },
+  T1: { background: "hsl(28, 58%, 92%)", border: "hsl(28, 34%, 78%)", color: "#111827" },
+  T2: { background: "hsl(34, 56%, 92%)", border: "hsl(34, 34%, 78%)", color: "#111827" },
+  T3: { background: "hsl(20, 58%, 92%)", border: "hsl(20, 34%, 78%)", color: "#111827" },
+  T4: { background: "hsl(196, 74%, 92%)", border: "hsl(196, 42%, 79%)", color: "#111827" },
+  T5: { background: "hsl(52, 84%, 92%)", border: "hsl(52, 46%, 79%)", color: "#111827" },
+  T6: { background: "hsl(0, 82%, 93%)", border: "hsl(0, 44%, 80%)", color: "#111827" },
+  T7: { background: "hsl(88, 62%, 91%)", border: "hsl(88, 34%, 77%)", color: "#111827" },
 };
 const PHOTO_COMPRESSION_STEPS = [
   { maxLength: 1280, quality: 0.72 },
@@ -168,6 +180,11 @@ const analysisTypeSelect = document.getElementById("analysis-type-select");
 const dirTabButtons = document.querySelectorAll(".dir-tab");
 const nsDirInput = document.getElementById("ns-dir-input");
 const ewDirInput = document.getElementById("ew-dir-input");
+const importantFlagInput = document.getElementById("important-flag-input");
+const simpleRecordFlagInput = document.getElementById("simple-record-flag-input");
+const occurrenceSectionInput = document.getElementById("occurrence-section-input");
+const occurrenceSketchInput = document.getElementById("occurrence-sketch-input");
+const layerRelativeInput = document.getElementById("layer-relative-input");
 const layerTabButtons = document.querySelectorAll(".layer-tab");
 const layerNameInput = document.getElementById("layer-name-input");
 const layerOtherInput = document.getElementById("layer-other-input");
@@ -409,7 +426,7 @@ function bindEvents() {
     }
     const analysisType = specimenPrefix === "a" ? normalizeAnalysisType(value(formData.get("analysisType"))) : "";
     if (specimenPrefix === "a" && !analysisType) {
-      showToast("a: 分析用資料を選んだ場合は、区分を選択してください");
+      showToast("a: 分析用試料を選んだ場合は、区分を選択してください");
       return;
     }
 
@@ -954,6 +971,7 @@ function activateSpecimenPrefix(prefixRaw) {
   const prefix = normalizeSpecimenPrefix(prefixRaw);
   specimenPrefixInput.value = prefix;
   specimenPrefixLabel.textContent = prefix;
+  specimenPrefixLabel.dataset.prefix = prefix;
   specimenTabButtons.forEach((button) => {
     button.classList.toggle("active", normalizeSpecimenPrefix(button.dataset.prefix) === prefix);
   });
@@ -1055,26 +1073,80 @@ function syncAnalysisTypeInput(prefixRaw) {
 }
 
 function activateDirectionTab(group, valueRaw) {
-  if (group === "ns") {
-    nsDirInput.value = normalizeNsDir(valueRaw);
-  }
-  if (group === "ew") {
-    ewDirInput.value = normalizeEwDir(valueRaw);
-  }
+  setDirectionGroupValue(group, valueRaw);
   syncDirectionTabsFromForm();
 }
 
 function syncDirectionTabsFromForm() {
-  const nsValue = normalizeNsDir(nsDirInput.value);
-  const ewValue = normalizeEwDir(ewDirInput.value);
-  nsDirInput.value = nsValue;
-  ewDirInput.value = ewValue;
+  setDirectionGroupValue("ns", nsDirInput?.value);
+  setDirectionGroupValue("ew", ewDirInput?.value);
+  setDirectionGroupValue("importantFlag", importantFlagInput?.value);
+  setDirectionGroupValue("simpleRecordFlag", simpleRecordFlagInput?.value);
+  setDirectionGroupValue("occurrenceSection", occurrenceSectionInput?.value);
+  setDirectionGroupValue("occurrenceSketch", occurrenceSketchInput?.value);
+  setDirectionGroupValue("layerRelative", layerRelativeInput?.value);
 
   dirTabButtons.forEach((button) => {
-    const group = button.dataset.group;
-    const selected = group === "ns" ? nsValue : ewValue;
+    const group = value(button.dataset.group);
+    const selected = getDirectionGroupValue(group);
     button.classList.toggle("active", normalizeDirectionValue(group, button.dataset.value) === selected);
   });
+}
+
+function setDirectionGroupValue(group, valueRaw) {
+  const normalized = normalizeDirectionValue(group, valueRaw);
+  if (group === "ns" && nsDirInput) {
+    nsDirInput.value = normalized;
+    return;
+  }
+  if (group === "ew" && ewDirInput) {
+    ewDirInput.value = normalized;
+    return;
+  }
+  if (group === "importantFlag" && importantFlagInput) {
+    importantFlagInput.value = normalized;
+    return;
+  }
+  if (group === "simpleRecordFlag" && simpleRecordFlagInput) {
+    simpleRecordFlagInput.value = normalized;
+    return;
+  }
+  if (group === "occurrenceSection" && occurrenceSectionInput) {
+    occurrenceSectionInput.value = normalized;
+    return;
+  }
+  if (group === "occurrenceSketch" && occurrenceSketchInput) {
+    occurrenceSketchInput.value = normalized;
+    return;
+  }
+  if (group === "layerRelative" && layerRelativeInput) {
+    layerRelativeInput.value = normalized;
+  }
+}
+
+function getDirectionGroupValue(group) {
+  if (group === "ns") {
+    return normalizeDirectionValue(group, nsDirInput?.value);
+  }
+  if (group === "ew") {
+    return normalizeDirectionValue(group, ewDirInput?.value);
+  }
+  if (group === "importantFlag") {
+    return normalizeDirectionValue(group, importantFlagInput?.value);
+  }
+  if (group === "simpleRecordFlag") {
+    return normalizeDirectionValue(group, simpleRecordFlagInput?.value);
+  }
+  if (group === "occurrenceSection") {
+    return normalizeDirectionValue(group, occurrenceSectionInput?.value);
+  }
+  if (group === "occurrenceSketch") {
+    return normalizeDirectionValue(group, occurrenceSketchInput?.value);
+  }
+  if (group === "layerRelative") {
+    return normalizeDirectionValue(group, layerRelativeInput?.value);
+  }
+  return "";
 }
 
 function activateLayerTab(layerRaw) {
@@ -1125,6 +1197,7 @@ function applyCarryForwardFields(saved) {
   recordForm.elements.layerRef.value = value(saved?.layerRef);
   recordForm.elements.layerFromCm.value = value(saved?.layerFromCm);
   recordForm.elements.layerRelative.value = value(saved?.layerRelative);
+  syncDirectionTabsFromForm();
 }
 
 function markCarryForwardSavedFields(saved) {
@@ -1376,7 +1449,9 @@ function resetRecordForm({ showMessage }) {
 
   recordForm.elements.occurrenceSection.value = "要";
   recordForm.elements.occurrenceSketch.value = "要";
+  recordForm.elements.importantFlag.value = "無";
   recordForm.elements.simpleRecordFlag.value = "-";
+  recordForm.elements.layerRelative.value = "";
   setLayerFromValue(PRESET_LAYER_NAMES[0]);
 
   nsDirInput.value = "北から";
@@ -1416,6 +1491,9 @@ function populateRecordForm(record) {
   recordForm.elements.levelLowerCm.value = record.levelLowerCm || "";
   recordForm.elements.occurrenceSection.value = normalizeNeedFlag(record.occurrenceSection);
   recordForm.elements.occurrenceSketch.value = normalizeNeedFlag(record.occurrenceSketch);
+  recordForm.elements.importantFlag.value = normalizeHasFlag(record.importantFlag);
+  recordForm.elements.simpleRecordFlag.value = normalizeCircleDashFlag(record.simpleRecordFlag);
+  recordForm.elements.layerRelative.value = normalizeLayerRelative(record.layerRelative);
 
   nsDirInput.value = normalizeNsDir(record.nsDir);
   recordForm.elements.nsCm.value = record.nsCm || "";
@@ -1423,14 +1501,11 @@ function populateRecordForm(record) {
   recordForm.elements.ewCm.value = record.ewCm || "";
   syncDirectionTabsFromForm();
 
-  recordForm.elements.importantFlag.value = normalizeHasFlag(record.importantFlag);
-  recordForm.elements.simpleRecordFlag.value = normalizeCircleDashFlag(record.simpleRecordFlag);
   setLayerFromValue(record.layerName);
   recordForm.elements.detail.value = record.detail || "";
   recordForm.elements.detailSub.value = record.detailSub || "";
   recordForm.elements.layerRef.value = record.layerRef || "";
   recordForm.elements.layerFromCm.value = record.layerFromCm || "";
-  recordForm.elements.layerRelative.value = record.layerRelative || "";
   recordForm.elements.notes.value = record.notes || "";
   clearCarryForwardSavedFields();
   clearOverwriteUpdatedState();
@@ -1610,15 +1685,27 @@ function renderListOutput() {
     .map((record) => {
       const selectedClass = record.id === selectedCardRecordId ? "selected-card-row" : "";
       const cardButtonLabel = record.id === selectedCardRecordId ? "プレビュー表示中" : "カード";
+      const kuwakuText = getRecordKuwaku(record);
+      const kuwakuStyle = getKuwakuCellStyle(kuwakuText);
+      const categoryColor = getRecordSpecimenColor(record);
+      const categoryBackground = toRgbaColor(categoryColor, 0.2);
+      const categoryBorderColor = toRgbaColor(categoryColor, 0.45);
+      const unitStyle = getUnitCellStyle(record.unit);
       return `
       <tr class="${selectedClass}">
-        <td>${escapeHtml(getRecordKuwaku(record))}</td>
+        <td class="kuwaku-color-cell" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};">${escapeHtml(
+          kuwakuText
+        )}</td>
         <td>${escapeHtml(getRecordTeamValue(record))}</td>
         <td>${escapeHtml(record.specimenNo)}</td>
-        <td>${escapeHtml(formatCategoryForRecord(record))}</td>
+        <td class="category-color-cell" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};">${escapeHtml(
+          formatCategoryForRecord(record)
+        )}</td>
         <td>${escapeHtml(record.nameMemo || "")}</td>
-        <td>${escapeHtml(record.importantFlag || "")}</td>
-        <td>${escapeHtml(record.unit || "")}</td>
+        <td class="${record.importantFlag === "有" ? "important-cell-important" : ""}">${escapeHtml(record.importantFlag || "")}</td>
+        <td class="unit-color-cell" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};">${escapeHtml(
+          record.unit || ""
+        )}</td>
         <td>${escapeHtml(formatDetailForRecord(record))}</td>
         <td>${escapeHtml(record.discoverer || "")}</td>
         <td>${escapeHtml(record.identifier || "")}</td>
@@ -2121,7 +2208,7 @@ function buildPlanPoint(record) {
 
   const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
   const prefix = normalizeSpecimenPrefix(specimen.prefix);
-  const color = SPECIMEN_POINT_COLORS[prefix] || SPECIMEN_POINT_COLORS.h;
+  const color = getSpecimenPrefixColor(prefix);
   return {
     x,
     y,
@@ -2205,14 +2292,97 @@ function incrementGridNo(noRaw, step) {
 }
 
 function buildPlanLegendHtml() {
-  const order = ["m", "a", "b", "l", "s", "i", "g", "h"];
+  const order = ["m", "b", "l", "s", "i", "g", "h", "a"];
   return order
     .map((prefix) => {
-      const color = SPECIMEN_POINT_COLORS[prefix] || SPECIMEN_POINT_COLORS.h;
+      const color = getSpecimenPrefixColor(prefix);
       const label = SPECIMEN_CATEGORY_MAP[prefix] || "";
       return `<span class="plan-legend-item"><span class="plan-legend-dot" style="background:${color}"></span>${prefix}: ${label}</span>`;
     })
     .join("");
+}
+
+function getSpecimenPrefixColor(prefixRaw) {
+  const prefix = normalizeSpecimenPrefix(prefixRaw);
+  return SPECIMEN_POINT_COLORS[prefix] || SPECIMEN_POINT_COLORS.h;
+}
+
+function getRecordSpecimenColor(record) {
+  const specimen = parseSpecimenNo(record?.specimenNo, record?.specimenPrefix, record?.specimenSerial);
+  return getSpecimenPrefixColor(specimen.prefix);
+}
+
+function getKuwakuCellStyle(kuwakuRaw) {
+  const kuwaku = normalizeKuwakuText(kuwakuRaw);
+  if (!kuwaku) {
+    return {
+      background: "#f3f4f6",
+      border: "#d1d5db",
+      color: "#111827",
+    };
+  }
+  const parts = parseKuwaku(kuwaku);
+  const blockIndex = blockLabelToIndex(parts.block);
+  const noSeed = /^-?\d+$/.test(parts.no) ? Number(parts.no) : (hashText(parts.no || kuwaku) % 97) + 1;
+  const headSeed = hashText(`${parts.headA}-${parts.headB}`) % 360;
+  const hue = (((blockIndex * 41 + noSeed * 17 + headSeed) % 360) + 360) % 360;
+  const sat = 66;
+  const bgLightness = 93;
+  const borderLightness = 82;
+  return {
+    background: `hsl(${hue}, ${sat}%, ${bgLightness}%)`,
+    border: `hsl(${hue}, 48%, ${borderLightness}%)`,
+    color: "#111827",
+  };
+}
+
+function getUnitCellStyle(unitRaw) {
+  const normalized = compactNoSpaceValue(unitRaw).toUpperCase();
+  if (UNIT_CELL_COLOR_MAP[normalized]) {
+    return UNIT_CELL_COLOR_MAP[normalized];
+  }
+  if (!normalized) {
+    return { background: "#f3f4f6", border: "#d1d5db", color: "#111827" };
+  }
+  const hue = hashText(normalized) % 360;
+  return {
+    background: `hsl(${hue}, 58%, 93%)`,
+    border: `hsl(${hue}, 38%, 80%)`,
+    color: "#111827",
+  };
+}
+
+function blockLabelToIndex(blockRaw) {
+  const block = normalizeKuwakuBlock(blockRaw);
+  if (!block || !/^[A-Z]+$/.test(block)) {
+    return (hashText(block) % 26) + 1;
+  }
+  let index = 0;
+  for (const char of block) {
+    index = index * 26 + (char.charCodeAt(0) - 64);
+  }
+  return index;
+}
+
+function hashText(textRaw) {
+  const text = value(textRaw);
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function toRgbaColor(hexColorRaw, alphaRaw) {
+  const hexColor = value(hexColorRaw).replace("#", "");
+  const alpha = clamp(Number(alphaRaw), 0, 1);
+  if (!/^[0-9a-fA-F]{6}$/.test(hexColor)) {
+    return `rgba(107, 114, 128, ${alpha})`;
+  }
+  const r = Number.parseInt(hexColor.slice(0, 2), 16);
+  const g = Number.parseInt(hexColor.slice(2, 4), 16);
+  const b = Number.parseInt(hexColor.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function attachPlanMapTooltips() {
@@ -3712,7 +3882,7 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   }
   const specimenPrefix = normalizeSpecimenPrefix(value(recordFormData.get("specimenPrefix")));
   if (specimenPrefix === "a" && !normalizeAnalysisType(value(recordFormData.get("analysisType")))) {
-    return "a: 分析用資料を選んだ場合は、区分を選択してください";
+    return "a: 分析用試料を選んだ場合は、区分を選択してください";
   }
 
   return "";
@@ -3755,7 +3925,44 @@ function normalizeEwDir(valueRaw) {
 }
 
 function normalizeDirectionValue(group, valueRaw) {
-  return group === "ns" ? normalizeNsDir(valueRaw) : normalizeEwDir(valueRaw);
+  if (group === "ns") {
+    return normalizeNsDir(valueRaw);
+  }
+  if (group === "ew") {
+    return normalizeEwDir(valueRaw);
+  }
+  if (group === "importantFlag") {
+    return normalizeHasFlag(valueRaw) || "無";
+  }
+  if (group === "simpleRecordFlag") {
+    return normalizeCircleDashFlag(valueRaw);
+  }
+  if (group === "occurrenceSection" || group === "occurrenceSketch") {
+    return normalizeNeedFlag(valueRaw);
+  }
+  if (group === "layerRelative") {
+    return normalizeLayerRelative(valueRaw);
+  }
+  return value(valueRaw);
+}
+
+function normalizeLayerRelative(valueRaw) {
+  const text = value(valueRaw);
+  if (text === "上") {
+    return "上";
+  }
+  if (text === "下") {
+    return "下";
+  }
+  const hasUpper = text.includes("上");
+  const hasLower = text.includes("下");
+  if (hasUpper && !hasLower) {
+    return "上";
+  }
+  if (hasLower && !hasUpper) {
+    return "下";
+  }
+  return "";
 }
 
 function formatLevelRead(record) {
