@@ -23,6 +23,8 @@
    例: `http://192.168.1.10:8080/kaseki_mobile_app/`
 
 ## 共有Googleドライブ保存の設定
+この配布版は、起動時に既定のWebアプリURLへ自動接続する設定です（手動設定なしで共有保存を開始）。
+
 1. `google_apps_script.gs` の内容をGoogle Apps Scriptに貼り付けてデプロイします。
 2. ウェブアプリURLをコピーします。
 3. 本アプリ右上の `Google Apps Script WebアプリURL` に貼り付けます。

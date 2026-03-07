@@ -1,6 +1,7 @@
 const STORAGE_KEY = "nojiri-kaseki-mobile-v1";
 const CLOUD_ENDPOINT_KEY = "nojiri-kaseki-cloud-endpoint-v1";
 const CLOUD_CLIENT_ID_KEY = "nojiri-kaseki-cloud-client-id-v1";
+const DEFAULT_CLOUD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw70bPigsRo6HrTzSqUl0--N0Bsno2ybgdfJmtpmmMbQYPqKw-Z9ssOnt5PsGtMT1WSWg/exec";
 const CLOUD_PULL_INTERVAL_MS = 20000;
 const CLOUD_SAVE_DEBOUNCE_MS = 900;
 const CLOUD_AUTO_PULL_ENABLED = false;
@@ -5415,9 +5416,13 @@ function normalizeCloudEndpoint(urlRaw) {
 
 function loadCloudEndpoint() {
   try {
-    return value(localStorage.getItem(CLOUD_ENDPOINT_KEY));
+    const saved = normalizeCloudEndpoint(value(localStorage.getItem(CLOUD_ENDPOINT_KEY)));
+    if (saved) {
+      return saved;
+    }
+    return DEFAULT_CLOUD_ENDPOINT;
   } catch (_error) {
-    return "";
+    return DEFAULT_CLOUD_ENDPOINT;
   }
 }
 
