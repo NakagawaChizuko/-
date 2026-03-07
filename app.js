@@ -7,6 +7,7 @@ const CLOUD_AUTO_PULL_ENABLED = false;
 const DEFAULT_SPECIMEN_PREFIX = "m";
 const SPECIMEN_CATEGORY_MAP = {
   m: "哺乳類",
+  a: "分析用資料",
   b: "植物",
   l: "生痕",
   s: "貝類",
@@ -15,23 +16,55 @@ const SPECIMEN_CATEGORY_MAP = {
   h: "その他",
 };
 const VALID_SPECIMEN_PREFIXES = new Set(Object.keys(SPECIMEN_CATEGORY_MAP));
+const ANALYSIS_TYPE_MAP = {
+  A: "火山灰",
+  C: "14C",
+  M: "古地磁気",
+  F: "フィッショントラック",
+  P: "花粉",
+  B: "植物",
+  I: "昆虫",
+  D: "珪藻",
+  R: "粒度",
+  S: "貝類",
+  H: "その他",
+  MG: "はぎとり資料",
+};
+const HISTORY_SNAPSHOT_FIELDS = [
+  { key: "specimenNo", label: "標本番号" },
+  { key: "nameMemo", label: "名称" },
+  { key: "category", label: "分類" },
+  { key: "layerName", label: "地層名" },
+  { key: "unit", label: "ユニット" },
+  { key: "detail", label: "細別" },
+  { key: "layerPosition", label: "地層中の位置" },
+];
+const HISTORY_SNAPSHOT_FIELD_KEYS = new Set(HISTORY_SNAPSHOT_FIELDS.map((field) => field.key));
 const PRESET_LAYER_NAMES = [
   "1.芙蓉湖砂シルト部層",
-  "2.立が花砂部層",
+  "2.立が鼻砂部層",
   "3.海端砂シルト部層",
   "4.その他",
 ];
 const OTHER_LAYER_NAME = "4.その他";
+const LEGACY_LAYER_NAME_ALIASES = {
+  "2.立が花砂部層": "2.立が鼻砂部層",
+};
 const PRESET_TEAMS = ["1", "2", "3", "4", "その他"];
 const OTHER_TEAM_NAME = "その他";
-const DEFAULT_KUWAKU = "24-Ⅰ--";
+const DEFAULT_KUWAKU_HEAD_A = "24";
+const DEFAULT_KUWAKU_HEAD_B = "Ⅰ";
+const DEFAULT_KUWAKU = `${DEFAULT_KUWAKU_HEAD_A}-${DEFAULT_KUWAKU_HEAD_B}--`;
 const ALL_GRIDS_VALUE = "__KUWAKU_ALL__";
 const EMPTY_KUWAKU_VALUE = "__KUWAKU_EMPTY__";
 const PLAN_SIZE_CM = 400;
 const ALL_UNITS_VALUE = "__UNIT_ALL__";
 const EMPTY_UNIT_VALUE = "__UNIT_EMPTY__";
+const ALL_DETAILS_VALUE = "__DETAIL_ALL__";
+const EMPTY_DETAIL_VALUE = "__DETAIL_EMPTY__";
 const SPECIMEN_POINT_COLORS = {
   m: "#d62828",
+  a: "#5b21b6",
   b: "#2a9d8f",
   l: "#f4a261",
   s: "#457b9d",
@@ -49,6 +82,8 @@ const PHOTO_COMPRESSION_STEPS = [
 const createInitialState = () => ({
   site: {
     kuwaku: DEFAULT_KUWAKU,
+    kuwakuHeadA: DEFAULT_KUWAKU_HEAD_A,
+    kuwakuHeadB: DEFAULT_KUWAKU_HEAD_B,
     kuwakuBlock: "",
     kuwakuNo: "",
     levelHeight: "",
@@ -70,6 +105,7 @@ let selectedCardRecordId = "";
 let selectedOutputKuwaku = ALL_GRIDS_VALUE;
 let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
+let selectedPlanDetail = ALL_DETAILS_VALUE;
 let isOverwriteMode = false;
 let overwriteOriginalRecord = null;
 let toastTimer = null;
@@ -90,6 +126,10 @@ const siteForm = document.getElementById("site-form");
 const recordForm = document.getElementById("record-form");
 const recordFormHost = document.getElementById("record-form-host");
 const editRecordFormHost = document.getElementById("edit-record-form-host");
+const editHistoryPanel = document.getElementById("edit-history-panel");
+const editHistoryList = document.getElementById("edit-history-list");
+const editKuwakuHeadAInput = document.getElementById("edit-kuwaku-head-a");
+const editKuwakuHeadBInput = document.getElementById("edit-kuwaku-head-b");
 const editKuwakuBlockInput = document.getElementById("edit-kuwaku-block");
 const editKuwakuNoInput = document.getElementById("edit-kuwaku-no");
 const editLevelHeightInput = document.getElementById("edit-level-height");
@@ -107,6 +147,7 @@ const cardOutputList = document.getElementById("card-output-list");
 const outputKuwakuSelect = document.getElementById("output-kuwaku-select");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
 const planUnitSelect = document.getElementById("plan-unit-select");
+const planDetailSelect = document.getElementById("plan-detail-select");
 const planMapLegend = document.getElementById("plan-map-legend");
 const planMapWrap = document.getElementById("plan-map-wrap");
 const planKuwakuInfo = document.getElementById("plan-kuwaku-info");
@@ -116,6 +157,8 @@ const specimenPrefixInput = document.getElementById("specimen-prefix-input");
 const specimenSerialInput = document.getElementById("specimen-serial-input");
 const specimenNoInput = document.getElementById("specimen-no-input");
 const specimenPrefixLabel = document.getElementById("specimen-prefix-label");
+const analysisTypeRow = document.getElementById("analysis-type-row");
+const analysisTypeSelect = document.getElementById("analysis-type-select");
 
 const dirTabButtons = document.querySelectorAll(".dir-tab");
 const nsDirInput = document.getElementById("ns-dir-input");
@@ -190,13 +233,17 @@ function bindEvents() {
   siteForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(siteForm);
+    const kuwakuHeadA = value(formData.get("kuwakuHeadA"));
+    const kuwakuHeadB = value(formData.get("kuwakuHeadB"));
     const kuwakuBlock = value(formData.get("kuwakuBlock"));
     const kuwakuNo = value(formData.get("kuwakuNo"));
     const teamState = normalizeTeamState(value(formData.get("team")), value(formData.get("teamOther")));
-    const nextSiteKuwaku = buildKuwaku(kuwakuBlock, kuwakuNo);
+    const nextSiteKuwaku = buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo);
 
     state.site = {
       kuwaku: nextSiteKuwaku,
+      kuwakuHeadA,
+      kuwakuHeadB,
       kuwakuBlock,
       kuwakuNo,
       levelHeight: value(formData.get("levelHeight")),
@@ -237,6 +284,12 @@ function bindEvents() {
   specimenSerialInput.addEventListener("input", () => {
     updateSpecimenNoFromParts();
   });
+  if (analysisTypeSelect) {
+    analysisTypeSelect.addEventListener("change", () => {
+      analysisTypeSelect.value = normalizeAnalysisType(analysisTypeSelect.value);
+      analysisTypeSelect.classList.remove("overwrite-updated");
+    });
+  }
 
   dirTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -261,9 +314,11 @@ function bindEvents() {
     let editSiteSnapshot = null;
 
     if (isEditTab) {
+      const headA = value(editKuwakuHeadAInput?.value);
+      const headB = value(editKuwakuHeadBInput?.value);
       const block = value(editKuwakuBlockInput?.value);
       const no = value(editKuwakuNoInput?.value);
-      recordKuwaku = buildKuwaku(block, no);
+      recordKuwaku = buildKuwaku(headA, headB, block, no);
       const editTeamState = normalizeTeamState(value(editTeamInput?.value), value(editTeamOtherInput?.value));
       editSiteSnapshot = {
         levelHeight: value(editLevelHeightInput?.value),
@@ -276,12 +331,16 @@ function bindEvents() {
     } else {
       // 入力画面は従来どおり、区画（グリッド）情報フォームの現在値を反映。
       const siteFormData = new FormData(siteForm);
+      const siteKuwakuHeadA = value(siteFormData.get("kuwakuHeadA"));
+      const siteKuwakuHeadB = value(siteFormData.get("kuwakuHeadB"));
       const siteKuwakuBlock = value(siteFormData.get("kuwakuBlock"));
       const siteKuwakuNo = value(siteFormData.get("kuwakuNo"));
       const siteTeamState = normalizeTeamState(value(siteFormData.get("team")), value(siteFormData.get("teamOther")));
-      const nextSiteKuwaku = buildKuwaku(siteKuwakuBlock, siteKuwakuNo);
+      const nextSiteKuwaku = buildKuwaku(siteKuwakuHeadA, siteKuwakuHeadB, siteKuwakuBlock, siteKuwakuNo);
       siteSnapshot = {
         kuwaku: nextSiteKuwaku,
+        kuwakuHeadA: siteKuwakuHeadA,
+        kuwakuHeadB: siteKuwakuHeadB,
         kuwakuBlock: siteKuwakuBlock,
         kuwakuNo: siteKuwakuNo,
         levelHeight: value(siteFormData.get("levelHeight")),
@@ -303,6 +362,8 @@ function bindEvents() {
       }
       state.site = {
         kuwaku: siteSnapshot.kuwaku,
+        kuwakuHeadA: siteSnapshot.kuwakuHeadA,
+        kuwakuHeadB: siteSnapshot.kuwakuHeadB,
         kuwakuBlock: siteSnapshot.kuwakuBlock,
         kuwakuNo: siteSnapshot.kuwakuNo,
         levelHeight: siteSnapshot.levelHeight,
@@ -325,6 +386,11 @@ function bindEvents() {
     }
     if (!/^\d+$/.test(specimenSerial)) {
       showToast("標本番号の数字部分は半角数字で入力してください");
+      return;
+    }
+    const analysisType = specimenPrefix === "a" ? normalizeAnalysisType(value(formData.get("analysisType"))) : "";
+    if (specimenPrefix === "a" && !analysisType) {
+      showToast("a: 分析用資料を選んだ場合は、区分を選択してください");
       return;
     }
 
@@ -363,13 +429,14 @@ function bindEvents() {
         };
     const recordTeamState = normalizeTeamState(recordSiteSnapshot.team, recordSiteSnapshot.teamOther);
 
-    const record = {
+    const recordBase = {
       id: recordId,
       kuwaku: recordKuwaku,
       specimenPrefix,
       specimenSerial,
       specimenNo,
       category: categoryFromPrefix(specimenPrefix),
+      analysisType,
       levelHeight: recordSiteSnapshot.levelHeight,
       date: recordSiteSnapshot.date,
       team: recordTeamState.team,
@@ -394,6 +461,7 @@ function bindEvents() {
       detail: value(formData.get("detail")),
       layerRef: value(formData.get("layerRef")),
       layerFromCm: value(formData.get("layerFromCm")),
+      layerRelative: value(formData.get("layerRelative")),
       notes: value(formData.get("notes")),
       sectionDiagrams: clonePhotos(currentSectionDiagrams),
       photos: clonePhotos(currentPhotos),
@@ -402,7 +470,14 @@ function bindEvents() {
       deletedAt: "",
     };
 
-    const targetIndex = state.records.findIndex((item) => item.id === record.id);
+    const targetIndex = state.records.findIndex((item) => item.id === recordBase.id);
+    const previousRecord = targetIndex >= 0 ? state.records[targetIndex] : null;
+    const historyAction = isEditTab ? "上書き保存" : targetIndex >= 0 ? "更新保存" : "新規保存";
+    const record = {
+      ...recordBase,
+      history: buildNextRecordHistory(previousRecord, recordBase, historyAction),
+    };
+
     if (targetIndex >= 0) {
       state.records[targetIndex] = record;
     } else {
@@ -415,6 +490,7 @@ function bindEvents() {
       renderOutputs();
       markOverwriteUpdatedState(found, record, value(found?.kuwaku), recordKuwaku);
       overwriteOriginalRecord = { ...record };
+      renderEditHistory(record);
       return;
     }
 
@@ -424,6 +500,7 @@ function bindEvents() {
       detail: record.detail,
       layerRef: record.layerRef,
       layerFromCm: record.layerFromCm,
+      layerRelative: record.layerRelative,
     };
 
     persist("記録を保存しました");
@@ -536,7 +613,23 @@ function bindEvents() {
       renderPlanOutput();
     });
   }
+  if (planDetailSelect) {
+    planDetailSelect.addEventListener("change", () => {
+      selectedPlanDetail = value(planDetailSelect.value) || ALL_DETAILS_VALUE;
+      renderPlanOutput();
+    });
+  }
 
+  if (editKuwakuHeadAInput) {
+    editKuwakuHeadAInput.addEventListener("input", () => {
+      editKuwakuHeadAInput.classList.remove("overwrite-updated");
+    });
+  }
+  if (editKuwakuHeadBInput) {
+    editKuwakuHeadBInput.addEventListener("input", () => {
+      editKuwakuHeadBInput.classList.remove("overwrite-updated");
+    });
+  }
   if (editKuwakuBlockInput) {
     editKuwakuBlockInput.addEventListener("input", () => {
       editKuwakuBlockInput.classList.remove("overwrite-updated");
@@ -743,6 +836,7 @@ function setActiveTab(tabId) {
     panel.classList.toggle("active", panel.id === tabId);
   });
   syncRecordFormPlacement(tabId);
+  syncEditHistoryVisibility(tabId);
   if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
   }
@@ -782,6 +876,8 @@ function getActiveTabId() {
 }
 
 function hydrateSiteForm() {
+  siteForm.elements.kuwakuHeadA.value = state.site.kuwakuHeadA || DEFAULT_KUWAKU_HEAD_A;
+  siteForm.elements.kuwakuHeadB.value = state.site.kuwakuHeadB || DEFAULT_KUWAKU_HEAD_B;
   siteForm.elements.kuwakuBlock.value = state.site.kuwakuBlock || "";
   siteForm.elements.kuwakuNo.value = state.site.kuwakuNo || "";
   siteForm.elements.levelHeight.value = state.site.levelHeight || "";
@@ -801,6 +897,7 @@ function activateSpecimenPrefix(prefixRaw) {
   specimenTabButtons.forEach((button) => {
     button.classList.toggle("active", normalizeSpecimenPrefix(button.dataset.prefix) === prefix);
   });
+  syncAnalysisTypeInput(prefix);
 }
 
 function updateSpecimenNoFromParts() {
@@ -808,6 +905,20 @@ function updateSpecimenNoFromParts() {
   const serial = value(specimenSerialInput.value);
   specimenPrefixInput.value = prefix;
   specimenNoInput.value = buildSpecimenNo(prefix, serial);
+}
+
+function syncAnalysisTypeInput(prefixRaw) {
+  if (!analysisTypeRow || !analysisTypeSelect) {
+    return;
+  }
+  const prefix = normalizeSpecimenPrefix(prefixRaw);
+  const isAnalysis = prefix === "a";
+  analysisTypeRow.classList.toggle("hidden", !isAnalysis);
+  if (!isAnalysis) {
+    analysisTypeSelect.value = "";
+  } else {
+    analysisTypeSelect.value = normalizeAnalysisType(analysisTypeSelect.value);
+  }
 }
 
 function activateDirectionTab(group, valueRaw) {
@@ -848,7 +959,7 @@ function activateLayerTab(layerRaw) {
 }
 
 function setLayerFromValue(layerRaw) {
-  const layerValue = value(layerRaw);
+  const layerValue = normalizeLayerName(value(layerRaw));
   if (!layerValue) {
     activateLayerTab(PRESET_LAYER_NAMES[0]);
     return;
@@ -879,6 +990,7 @@ function applyCarryForwardFields(saved) {
   recordForm.elements.detail.value = value(saved?.detail);
   recordForm.elements.layerRef.value = value(saved?.layerRef);
   recordForm.elements.layerFromCm.value = value(saved?.layerFromCm);
+  recordForm.elements.layerRelative.value = value(saved?.layerRelative);
 }
 
 function markCarryForwardSavedFields(saved) {
@@ -896,6 +1008,9 @@ function markCarryForwardSavedFields(saved) {
   if (value(saved?.layerFromCm)) {
     recordForm.elements.layerFromCm.classList.add("saved-carry-value");
   }
+  if (value(saved?.layerRelative)) {
+    recordForm.elements.layerRelative.classList.add("saved-carry-value");
+  }
 
   markLayerSavedTabState();
   if (layerNameInput.value === OTHER_LAYER_NAME && value(layerOtherInput.value)) {
@@ -908,6 +1023,7 @@ function clearCarryForwardSavedFields() {
   recordForm.elements.detail.classList.remove("saved-carry-value");
   recordForm.elements.layerRef.classList.remove("saved-carry-value");
   recordForm.elements.layerFromCm.classList.remove("saved-carry-value");
+  recordForm.elements.layerRelative.classList.remove("saved-carry-value");
   layerOtherInput.classList.remove("saved-carry-value");
   clearLayerSavedTabState();
 }
@@ -924,6 +1040,12 @@ function clearOverwriteUpdatedState() {
   }
   if (editKuwakuNoInput) {
     editKuwakuNoInput.classList.remove("overwrite-updated");
+  }
+  if (editKuwakuHeadAInput) {
+    editKuwakuHeadAInput.classList.remove("overwrite-updated");
+  }
+  if (editKuwakuHeadBInput) {
+    editKuwakuHeadBInput.classList.remove("overwrite-updated");
   }
   if (editLevelHeightInput) {
     editLevelHeightInput.classList.remove("overwrite-updated");
@@ -963,11 +1085,13 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
     "occurrenceSketch",
     "importantFlag",
     "simpleRecordFlag",
+    "analysisType",
     "nsCm",
     "ewCm",
     "detail",
     "layerRef",
     "layerFromCm",
+    "layerRelative",
     "notes",
   ];
 
@@ -1019,6 +1143,12 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
 
   const previousParts = parseKuwaku(previousKuwakuRaw);
   const nextParts = parseKuwaku(nextKuwakuRaw);
+  if (editKuwakuHeadAInput && previousParts.headA !== nextParts.headA) {
+    editKuwakuHeadAInput.classList.add("overwrite-updated");
+  }
+  if (editKuwakuHeadBInput && previousParts.headB !== nextParts.headB) {
+    editKuwakuHeadBInput.classList.add("overwrite-updated");
+  }
   if (editKuwakuBlockInput && previousParts.block !== nextParts.block) {
     editKuwakuBlockInput.classList.add("overwrite-updated");
   }
@@ -1071,7 +1201,11 @@ function handleRecordFormFieldEdit(event) {
 
   const isCarryField =
     target instanceof HTMLInputElement &&
-    (target.name === "unit" || target.name === "detail" || target.name === "layerRef" || target.name === "layerFromCm");
+    (target.name === "unit" ||
+      target.name === "detail" ||
+      target.name === "layerRef" ||
+      target.name === "layerFromCm" ||
+      target.name === "layerRelative");
   if (isCarryField) {
     target.classList.remove("saved-carry-value");
     return;
@@ -1095,6 +1229,9 @@ function resetRecordForm({ showMessage }) {
 
   activateSpecimenPrefix(DEFAULT_SPECIMEN_PREFIX);
   specimenSerialInput.value = "";
+  if (analysisTypeSelect) {
+    analysisTypeSelect.value = "";
+  }
   updateSpecimenNoFromParts();
 
   recordForm.elements.occurrenceSection.value = "要";
@@ -1110,6 +1247,7 @@ function resetRecordForm({ showMessage }) {
   currentSectionDiagrams = [];
   renderSectionDiagramList();
   renderPhotoList();
+  clearEditHistory();
 
   if (showMessage) {
     showToast("入力をクリアしました");
@@ -1124,6 +1262,9 @@ function populateRecordForm(record) {
   recordSubmitBtn.textContent = "記録を保存";
 
   activateSpecimenPrefix(parsedSpecimen.prefix);
+  if (analysisTypeSelect) {
+    analysisTypeSelect.value = normalizeAnalysisType(record.analysisType);
+  }
   specimenSerialInput.value = parsedSpecimen.serial;
   updateSpecimenNoFromParts();
 
@@ -1148,6 +1289,7 @@ function populateRecordForm(record) {
   recordForm.elements.detail.value = record.detail || "";
   recordForm.elements.layerRef.value = record.layerRef || "";
   recordForm.elements.layerFromCm.value = record.layerFromCm || "";
+  recordForm.elements.layerRelative.value = record.layerRelative || "";
   recordForm.elements.notes.value = record.notes || "";
   clearCarryForwardSavedFields();
   clearOverwriteUpdatedState();
@@ -1165,6 +1307,12 @@ function openRecordForEdit(recordId, preferredKuwaku = "") {
   }
   const kuwakuSource = value(preferredKuwaku) || value(record.kuwaku) || getRecordKuwaku(record);
   const kuwakuParts = parseKuwaku(kuwakuSource);
+  if (editKuwakuHeadAInput) {
+    editKuwakuHeadAInput.value = kuwakuParts.headA;
+  }
+  if (editKuwakuHeadBInput) {
+    editKuwakuHeadBInput.value = kuwakuParts.headB;
+  }
   if (editKuwakuBlockInput) {
     editKuwakuBlockInput.value = kuwakuParts.block;
   }
@@ -1198,7 +1346,56 @@ function openRecordForEdit(recordId, preferredKuwaku = "") {
   overwriteOriginalRecord = { ...record };
   clearOverwriteUpdatedState();
   populateRecordForm(record);
+  renderEditHistory(record);
   setActiveTab("edit-tab");
+}
+
+function syncEditHistoryVisibility(activeTabId = getActiveTabId()) {
+  if (!editHistoryPanel) {
+    return;
+  }
+  const shouldShow = activeTabId === "edit-tab" && Boolean(editingRecordId);
+  editHistoryPanel.classList.toggle("hidden", !shouldShow);
+}
+
+function clearEditHistory() {
+  if (editHistoryList) {
+    editHistoryList.innerHTML = "";
+  }
+  if (editHistoryPanel) {
+    editHistoryPanel.classList.add("hidden");
+  }
+}
+
+function renderEditHistory(record) {
+  if (!editHistoryList || !editHistoryPanel) {
+    return;
+  }
+  const history = normalizeRecordHistory(record?.history);
+  if (!history.length) {
+    editHistoryList.innerHTML = "<p class=\"muted\">履歴はまだありません。</p>";
+  } else {
+    const displayHistory = history
+      .map((entry, index) => ({
+        entry,
+        prevEntry: index > 0 ? history[index - 1] : null,
+      }))
+      .reverse();
+    editHistoryList.innerHTML = displayHistory
+      .map(({ entry, prevEntry }) => {
+        const contentHtml = renderHistoryContentHtml(entry, prevEntry);
+        return `
+          <article class="edit-history-item">
+            <p><strong>入力内容:</strong> ${contentHtml}</p>
+            <p><strong>年・月日・時間:</strong> ${escapeHtml(formatHistoryDateTime(entry.at))}</p>
+          </article>
+        `;
+      })
+      .join("");
+  }
+  if (getActiveTabId() === "edit-tab") {
+    editHistoryPanel.classList.remove("hidden");
+  }
 }
 
 function renderRecordTable() {
@@ -1220,7 +1417,7 @@ function renderRecordTable() {
         <td>${escapeHtml(getRecordKuwaku(record))}</td>
         <td>${escapeHtml(getRecordTeamValue(record))}</td>
         <td>${escapeHtml(record.specimenNo)}</td>
-        <td>${escapeHtml(record.category || "")}</td>
+        <td>${escapeHtml(formatCategoryForRecord(record))}</td>
         <td>${escapeHtml(record.nameMemo || "")}</td>
         <td>${escapeHtml(record.discoverer || "")}</td>
         <td>${escapeHtml(formatLevelRead(record))}</td>
@@ -1279,7 +1476,7 @@ function renderListOutput() {
         <td>${escapeHtml(getRecordKuwaku(record))}</td>
         <td>${escapeHtml(getRecordTeamValue(record))}</td>
         <td>${escapeHtml(record.specimenNo)}</td>
-        <td>${escapeHtml(record.category || "")}</td>
+        <td>${escapeHtml(formatCategoryForRecord(record))}</td>
         <td>${escapeHtml(record.nameMemo || "")}</td>
         <td>${escapeHtml(record.discoverer || "")}</td>
         <td>${escapeHtml(record.identifier || "")}</td>
@@ -1355,7 +1552,7 @@ function renderCardOutput() {
     <article class="card-output-item">
       <h3>${escapeHtml(selectedRecord.specimenNo)} / ${escapeHtml(selectedRecord.nameMemo || "")}</h3>
       <div class="kv-grid">
-        <div><span>分類</span><strong>${escapeHtml(selectedRecord.category || "")}</strong></div>
+        <div><span>分類</span><strong>${escapeHtml(formatCategoryForRecord(selectedRecord))}</strong></div>
         <div><span>重要品指定</span><strong>${escapeHtml(selectedRecord.importantFlag || "")}</strong></div>
         <div><span>簡易記載</span><strong>${escapeHtml(selectedRecord.simpleRecordFlag || "-")}</strong></div>
         <div><span>地層名</span><strong>${escapeHtml(selectedRecord.layerName || "")}</strong></div>
@@ -1422,7 +1619,7 @@ function collectOutputKuwakuOptions(records) {
 }
 
 function renderPlanOutput() {
-  if (!planMapWrap || !planMapLegend || !planUnitSelect) {
+  if (!planMapWrap || !planMapLegend || !planUnitSelect || !planDetailSelect) {
     return;
   }
   planMapLegend.innerHTML = buildPlanLegendHtml();
@@ -1430,8 +1627,10 @@ function renderPlanOutput() {
   if (!state.records.length) {
     selectedPlanKuwaku = "";
     selectedPlanUnit = "";
+    selectedPlanDetail = ALL_DETAILS_VALUE;
     syncPlanKuwakuSelect([]);
     planUnitSelect.innerHTML = "";
+    planDetailSelect.innerHTML = "";
     if (planKuwakuInfo) {
       planKuwakuInfo.textContent = "区画: -";
     }
@@ -1446,7 +1645,9 @@ function renderPlanOutput() {
   }
   if (!kuwakuFilteredRecords.length) {
     selectedPlanUnit = "";
+    selectedPlanDetail = ALL_DETAILS_VALUE;
     planUnitSelect.innerHTML = "";
+    planDetailSelect.innerHTML = "";
     planMapWrap.innerHTML = "<p class=\"muted\">この区画（グリッド）には表示対象データがありません。</p>";
     return;
   }
@@ -1468,11 +1669,29 @@ function renderPlanOutput() {
     selectedPlanUnit === ALL_UNITS_VALUE
       ? kuwakuFilteredRecords
       : kuwakuFilteredRecords.filter((record) => unitValueForSelect(record.unit) === selectedPlanUnit);
-  const points = unitRecords.map((record) => buildPlanPoint(record)).filter(Boolean);
+
+  const details = collectPlanDetails(unitRecords);
+  if (!details.some((detail) => detail.value === selectedPlanDetail)) {
+    selectedPlanDetail = details[0].value;
+  }
+  planDetailSelect.innerHTML = details
+    .map(
+      (detail) =>
+        `<option value="${escapeHtml(detail.value)}" ${detail.value === selectedPlanDetail ? "selected" : ""}>${escapeHtml(
+          detail.label
+        )}</option>`
+    )
+    .join("");
+
+  const detailRecords =
+    selectedPlanDetail === ALL_DETAILS_VALUE
+      ? unitRecords
+      : unitRecords.filter((record) => detailValueForSelect(record.detail) === selectedPlanDetail);
+  const points = detailRecords.map((record) => buildPlanPoint(record)).filter(Boolean);
 
   if (!points.length) {
     planMapWrap.innerHTML =
-      "<p class=\"muted\">このユニットは、平面位置の数値が未入力のため点を表示できません。</p>";
+      "<p class=\"muted\">このユニット/細別は、平面位置の数値が未入力のため点を表示できません。</p>";
     return;
   }
 
@@ -1508,6 +1727,7 @@ function renderPlanOutput() {
       `;
     })
     .join("");
+  const cornerLabels = buildPlanCornerLabels(selectedPlanKuwaku);
 
   planMapWrap.innerHTML = `
     <div class="plan-map-shell">
@@ -1515,6 +1735,10 @@ function renderPlanOutput() {
       <div class="plan-axis east">東</div>
       <div class="plan-axis south">南</div>
       <div class="plan-axis west">西</div>
+      <div class="plan-grid-corner top-left">${escapeHtml(cornerLabels.topLeft)}</div>
+      <div class="plan-grid-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
+      <div class="plan-grid-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
+      <div class="plan-grid-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
       <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="ユニット別平面図">
         <rect x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
@@ -1577,6 +1801,26 @@ function unitValueForSelect(unitRaw) {
 
 function unitLabelForSelect(unitValue) {
   return unitValue === EMPTY_UNIT_VALUE ? "（未設定）" : unitValue;
+}
+
+function collectPlanDetails(records) {
+  const detailSet = new Set(records.map((record) => detailValueForSelect(record.detail)));
+  const detailOptions = Array.from(detailSet)
+    .sort((a, b) => detailLabelForSelect(a).localeCompare(detailLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" }))
+    .map((detailValue) => ({
+      value: detailValue,
+      label: detailLabelForSelect(detailValue),
+    }));
+  return [{ value: ALL_DETAILS_VALUE, label: "全細別" }, ...detailOptions];
+}
+
+function detailValueForSelect(detailRaw) {
+  const detail = value(detailRaw);
+  return detail || EMPTY_DETAIL_VALUE;
+}
+
+function detailLabelForSelect(detailValue) {
+  return detailValue === EMPTY_DETAIL_VALUE ? "（未設定）" : detailValue;
 }
 
 function getRecordKuwaku(record) {
@@ -1661,13 +1905,71 @@ function parseDistanceToCm(distanceRaw) {
   return Number.isFinite(num) ? num : null;
 }
 
+function buildPlanCornerLabels(kuwakuRaw) {
+  const parts = parseKuwaku(kuwakuLabelForSelect(kuwakuRaw));
+  const block = value(parts.block).toUpperCase();
+  const no = value(parts.no);
+  if (!block || !no) {
+    return {
+      topLeft: "-",
+      topRight: "-",
+      bottomLeft: "-",
+      bottomRight: "-",
+    };
+  }
+  const rightBlock = incrementGridBlock(block, 1);
+  const lowerNo = incrementGridNo(no, 1);
+  return {
+    topLeft: `${block}-${no}`,
+    topRight: `${rightBlock}-${no}`,
+    bottomLeft: `${block}-${lowerNo}`,
+    bottomRight: `${rightBlock}-${lowerNo}`,
+  };
+}
+
+function incrementGridBlock(blockRaw, step) {
+  const block = value(blockRaw).toUpperCase();
+  if (!/^[A-Z]+$/.test(block)) {
+    return block;
+  }
+  if (/^[A-Z]$/.test(block)) {
+    const base = block.charCodeAt(0) - 65;
+    const next = ((base + step) % 26 + 26) % 26;
+    return String.fromCharCode(65 + next);
+  }
+  let colNumber = 0;
+  for (const char of block) {
+    colNumber = colNumber * 26 + (char.charCodeAt(0) - 64);
+  }
+  colNumber += step;
+  if (colNumber <= 0) {
+    return block;
+  }
+  let next = "";
+  let current = colNumber;
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    next = String.fromCharCode(65 + remainder) + next;
+    current = Math.floor((current - 1) / 26);
+  }
+  return next;
+}
+
+function incrementGridNo(noRaw, step) {
+  const raw = value(noRaw);
+  if (!/^-?\d+$/.test(raw)) {
+    return raw;
+  }
+  return String(Number(raw) + step);
+}
+
 function buildPlanLegendHtml() {
-  const order = ["m", "b", "l", "s", "i", "g", "h"];
+  const order = ["m", "a", "b", "l", "s", "i", "g", "h"];
   return order
     .map((prefix) => {
       const color = SPECIMEN_POINT_COLORS[prefix] || SPECIMEN_POINT_COLORS.h;
       const label = SPECIMEN_CATEGORY_MAP[prefix] || "";
-      return `<span class="plan-legend-item"><span class="plan-legend-dot" style="background:${color}"></span>${prefix}:${label}</span>`;
+      return `<span class="plan-legend-item"><span class="plan-legend-dot" style="background:${color}"></span>${prefix}: ${label}</span>`;
     })
     .join("");
 }
@@ -1825,12 +2127,16 @@ function normalizeState(candidate) {
   }
 
   const kuwakuParts = parseKuwaku(value(candidate.site?.kuwaku));
+  const kuwakuHeadA = value(candidate.site?.kuwakuHeadA) || kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
+  const kuwakuHeadB = value(candidate.site?.kuwakuHeadB) || kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
   const kuwakuBlock = value(candidate.site?.kuwakuBlock) || kuwakuParts.block;
   const kuwakuNo = value(candidate.site?.kuwakuNo) || kuwakuParts.no;
   const teamState = normalizeTeamState(value(candidate.site?.team), value(candidate.site?.teamOther));
 
   safe.site = {
-    kuwaku: buildKuwaku(kuwakuBlock, kuwakuNo),
+    kuwaku: buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo),
+    kuwakuHeadA,
+    kuwakuHeadB,
     kuwakuBlock,
     kuwakuNo,
     levelHeight: value(candidate.site?.levelHeight),
@@ -1870,6 +2176,7 @@ function normalizeState(candidate) {
         specimenSerial: value(artifact.specimenSerial),
         category:
           value(artifact.category) || value(artifact.categories?.[0]) || categoryFromPrefix(value(artifact.specimenPrefix)),
+        analysisType: value(artifact.analysisType) || value(card.analysisType) || extractAnalysisTypeFromCategory(value(artifact.category)),
         levelHeight: value(artifact.levelHeight) || value(candidate.site?.levelHeight),
         date: value(artifact.date) || value(candidate.site?.date),
         team: value(artifact.team) || value(candidate.site?.team),
@@ -1894,6 +2201,7 @@ function normalizeState(candidate) {
         detail: value(card.detail),
         layerRef: value(card.layerRef) || value(card.layerPosition),
         layerFromCm: value(card.layerFromCm),
+        layerRelative: value(card.layerRelative),
         notes: mergeLegacyNotes({
           notes: value(artifact.notes),
           occurrenceNote: value(card.occurrenceNote),
@@ -1919,6 +2227,9 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
   const id = value(item.id) || newId("record");
   const parsedSpecimen = parseSpecimenNo(value(item.specimenNo), value(item.specimenPrefix), value(item.specimenSerial));
   const category = normalizeCategory(value(item.category), parsedSpecimen.prefix);
+  const analysisType = normalizeAnalysisType(
+    value(item.analysisType) || extractAnalysisTypeFromCategory(value(item.category))
+  );
   const teamState = normalizeTeamState(
     value(item.team) || value(fallbackSite.team),
     value(item.teamOther) || value(fallbackSite.teamOther)
@@ -1933,6 +2244,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     specimenSerial: parsedSpecimen.serial,
     specimenNo: parsedSpecimen.specimenNo,
     category,
+    analysisType: parsedSpecimen.prefix === "a" ? analysisType : "",
     levelHeight: value(item.levelHeight) || value(fallbackSite.levelHeight),
     date: value(item.date) || value(fallbackSite.date),
     team: teamState.team,
@@ -1953,10 +2265,11 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     ewCm: value(item.ewCm),
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
-    layerName: value(item.layerName),
+    layerName: normalizeLayerName(value(item.layerName)),
     detail: value(item.detail),
     layerRef: value(item.layerRef) || value(item.layerPosition),
     layerFromCm: value(item.layerFromCm),
+    layerRelative: value(item.layerRelative),
     notes: mergeLegacyNotes({
       notes: value(item.notes),
       occurrenceNote: value(item.occurrenceNote),
@@ -1964,9 +2277,166 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     }),
     sectionDiagrams: normalizePhotos(item.sectionDiagrams),
     photos: normalizePhotos(item.photos),
+    history: normalizeRecordHistory(item.history),
     createdAt: value(item.createdAt) || new Date().toISOString(),
     updatedAt: value(item.updatedAt) || new Date().toISOString(),
   };
+}
+
+function buildNextRecordHistory(previousRecord, nextRecord, actionRaw) {
+  const previousHistory = normalizeRecordHistory(previousRecord?.history);
+  const previousSnapshot = previousRecord ? createHistorySnapshot(previousRecord) : null;
+  const snapshot = createHistorySnapshot(nextRecord);
+  const entry = {
+    id: newId("history"),
+    action: value(actionRaw) || "保存",
+    content: buildHistoryContent(nextRecord, snapshot),
+    snapshot,
+    changedKeys: getHistoryChangedKeys(previousSnapshot, snapshot),
+    at: nowIso(),
+  };
+  return [...previousHistory, entry].slice(-50);
+}
+
+function createHistorySnapshot(record) {
+  return {
+    specimenNo: value(record?.specimenNo),
+    nameMemo: value(record?.nameMemo),
+    category: formatCategoryForRecord(record),
+    layerName: value(record?.layerName),
+    unit: value(record?.unit),
+    detail: value(record?.detail),
+    layerPosition: formatLayerPosition(record),
+  };
+}
+
+function buildHistoryContent(record, snapshotRaw = null) {
+  const snapshot = snapshotRaw || createHistorySnapshot(record);
+  const summaryParts = HISTORY_SNAPSHOT_FIELDS.map((field) => {
+    const fieldValue = value(snapshot?.[field.key]) || "-";
+    return `${field.label} ${fieldValue}`;
+  });
+  return summaryParts.join(" / ");
+}
+
+function normalizeRecordHistory(historyRaw) {
+  if (!Array.isArray(historyRaw)) {
+    return [];
+  }
+  return historyRaw
+    .filter((entry) => entry && typeof entry === "object")
+    .map((entry) => ({
+      id: value(entry.id) || newId("history"),
+      action: value(entry.action) || "保存",
+      content: value(entry.content),
+      snapshot: normalizeHistorySnapshot(entry.snapshot) || extractHistorySnapshotFromContent(value(entry.content)),
+      changedKeys: normalizeHistoryChangedKeys(entry.changedKeys),
+      at: value(entry.at) || nowIso(),
+    }))
+    .filter((entry) => entry.content || entry.snapshot);
+}
+
+function normalizeHistorySnapshot(snapshotRaw) {
+  if (!snapshotRaw || typeof snapshotRaw !== "object") {
+    return null;
+  }
+  const snapshot = {};
+  HISTORY_SNAPSHOT_FIELDS.forEach((field) => {
+    snapshot[field.key] = value(snapshotRaw[field.key]);
+  });
+  return snapshot;
+}
+
+function normalizeHistoryChangedKeys(changedKeysRaw) {
+  if (!Array.isArray(changedKeysRaw)) {
+    return [];
+  }
+  const seen = new Set();
+  return changedKeysRaw
+    .map((key) => value(key))
+    .filter((key) => HISTORY_SNAPSHOT_FIELD_KEYS.has(key))
+    .filter((key) => {
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function historyComparableValue(rawValue) {
+  return value(rawValue) || "-";
+}
+
+function getHistoryChangedKeys(previousSnapshot, currentSnapshot) {
+  if (!previousSnapshot) {
+    return [];
+  }
+  return HISTORY_SNAPSHOT_FIELDS
+    .map((field) => field.key)
+    .filter((key) => historyComparableValue(currentSnapshot?.[key]) !== historyComparableValue(previousSnapshot?.[key]));
+}
+
+function extractHistorySnapshotFromContent(contentRaw) {
+  const content = value(contentRaw);
+  if (!content) {
+    return null;
+  }
+
+  const parts = content.split(/\s*\/\s*/);
+  const snapshot = {};
+  HISTORY_SNAPSHOT_FIELDS.forEach((field) => {
+    const part = parts.find((item) => value(item).startsWith(field.label));
+    if (!part) {
+      snapshot[field.key] = "";
+      return;
+    }
+    const stripped = value(part)
+      .slice(field.label.length)
+      .replace(/^[:：]?\s*/, "");
+    snapshot[field.key] = value(stripped);
+  });
+
+  const hasAny = HISTORY_SNAPSHOT_FIELDS.some((field) => value(snapshot[field.key]));
+  return hasAny ? snapshot : null;
+}
+
+function renderHistoryContentHtml(entry, prevEntry) {
+  const snapshot = entry?.snapshot || extractHistorySnapshotFromContent(value(entry?.content));
+  if (!snapshot) {
+    return escapeHtml(entry?.content || "");
+  }
+  const changedKeys = normalizeHistoryChangedKeys(entry?.changedKeys);
+  const changedKeySet = new Set(changedKeys);
+  const hasExplicitChangedKeys = changedKeySet.size > 0;
+  const prevSnapshot = prevEntry?.snapshot || extractHistorySnapshotFromContent(value(prevEntry?.content));
+  return HISTORY_SNAPSHOT_FIELDS.map((field) => {
+    const currentValueRaw = value(snapshot[field.key]);
+    const currentValue = currentValueRaw || "-";
+    const isChanged = hasExplicitChangedKeys
+      ? changedKeySet.has(field.key)
+      : Boolean(prevSnapshot) &&
+        historyComparableValue(currentValueRaw) !== historyComparableValue(prevSnapshot?.[field.key]);
+    const className = isChanged ? "edit-history-value changed" : "edit-history-value";
+    return `<span class="${className}">${escapeHtml(field.label)}: ${escapeHtml(currentValue)}</span>`;
+  }).join(" / ");
+}
+
+function formatHistoryDateTime(isoRaw) {
+  const iso = value(isoRaw);
+  if (!iso) {
+    return "-";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${y}/${m}/${d} ${hh}:${mm}`;
 }
 
 function mergeLegacyNotes({ notes = "", occurrenceNote = "", sketchNote = "" }) {
@@ -2385,7 +2855,9 @@ function hasAnyStateData(candidateState) {
   }
   const site = normalized.site || {};
   return Boolean(
-    value(site.kuwakuBlock) ||
+    value(site.kuwakuHeadA) !== DEFAULT_KUWAKU_HEAD_A ||
+      value(site.kuwakuHeadB) !== DEFAULT_KUWAKU_HEAD_B ||
+      value(site.kuwakuBlock) ||
       value(site.kuwakuNo) ||
       value(site.levelHeight) ||
       value(site.date) ||
@@ -2461,7 +2933,7 @@ function buildListCsv() {
     getRecordTeamLead(record),
     getRecordRecorder(record),
     record.specimenNo,
-    record.category,
+    formatCategoryForRecord(record),
     record.nameMemo,
     record.unit,
     record.discoverer,
@@ -2492,6 +2964,7 @@ function buildCardCsv() {
     "細別",
     "層理面もしくは鍵層名",
     "地層中の位置_から(cm)",
+    "地層中の位置_上もしくは下",
     "レベル読値_上面(cm)",
     "レベル読値_下底(cm)",
     "平面位置_NS",
@@ -2510,7 +2983,7 @@ function buildCardCsv() {
   const rows = state.records.map((record) => [
     getRecordKuwaku(record),
     record.specimenNo,
-    record.category,
+    formatCategoryForRecord(record),
     record.nameMemo,
     record.importantFlag,
     record.simpleRecordFlag,
@@ -2518,6 +2991,7 @@ function buildCardCsv() {
     record.detail,
     record.layerRef,
     record.layerFromCm,
+    record.layerRelative,
     record.levelUpperCm,
     record.levelLowerCm,
     record.nsDir,
@@ -2542,20 +3016,35 @@ function csvCell(valueRaw) {
   return `"${escaped}"`;
 }
 
-function buildKuwaku(block, no) {
-  return `24-Ⅰ-${value(block)}-${value(no)}`;
+function buildKuwaku(headARaw, headBRaw, blockRaw, noRaw) {
+  const headA = value(headARaw) || DEFAULT_KUWAKU_HEAD_A;
+  const headB = value(headBRaw) || DEFAULT_KUWAKU_HEAD_B;
+  const block = value(blockRaw);
+  const no = value(noRaw);
+  return `${headA}-${headB}-${block}-${no}`;
 }
 
 function parseKuwaku(kuwakuText) {
   const text = value(kuwakuText)
     .replaceAll("－", "-")
     .replaceAll("―", "-")
-    .replaceAll("ー", "-");
-  const matched = text.match(/^24-(?:Ⅰ|I)-([^-]*)-([^-]*)$/i);
-  if (matched) {
-    return { block: matched[1], no: matched[2] };
+    .replaceAll("ー", "-")
+    .replaceAll("−", "-");
+  const parts = text.split("-").map((part) => part.trim());
+  if (parts.length >= 4) {
+    return {
+      headA: parts[0] || DEFAULT_KUWAKU_HEAD_A,
+      headB: parts[1] || DEFAULT_KUWAKU_HEAD_B,
+      block: parts[2] || "",
+      no: parts[3] || "",
+    };
   }
-  return { block: "", no: "" };
+  return {
+    headA: DEFAULT_KUWAKU_HEAD_A,
+    headB: DEFAULT_KUWAKU_HEAD_B,
+    block: "",
+    no: "",
+  };
 }
 
 function normalizeSpecimenPrefix(prefixRaw) {
@@ -2654,7 +3143,7 @@ function compareRecordsByKuwakuThenSpecimen(a, b) {
 
 function categoryFromPrefix(prefixRaw) {
   const prefix = normalizeSpecimenPrefix(prefixRaw);
-  return `${prefix}:${SPECIMEN_CATEGORY_MAP[prefix] || ""}`;
+  return `${prefix}: ${SPECIMEN_CATEGORY_MAP[prefix] || ""}`;
 }
 
 function normalizeCategory(categoryRaw, prefixRaw) {
@@ -2662,13 +3151,83 @@ function normalizeCategory(categoryRaw, prefixRaw) {
   const matched = categoryText.match(/^([A-Za-z]{1,2})\s*:\s*(.*)$/);
   if (matched) {
     const prefix = normalizeSpecimenPrefix(matched[1]);
-    return `${prefix}:${SPECIMEN_CATEGORY_MAP[prefix] || value(matched[2])}`;
+    return `${prefix}: ${SPECIMEN_CATEGORY_MAP[prefix] || value(matched[2])}`;
   }
-  return categoryText || categoryFromPrefix(prefixRaw);
+  if (categoryText) {
+    return categoryText;
+  }
+  return categoryFromPrefix(prefixRaw);
+}
+
+function normalizeAnalysisType(typeRaw) {
+  const text = value(typeRaw);
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/^([A-Za-z]{1,2})\s*:/);
+  const code = (matched ? matched[1] : text).replaceAll(" ", "").toUpperCase();
+  if (!ANALYSIS_TYPE_MAP[code]) {
+    return "";
+  }
+  const displayCode = code === "MG" ? "Mg" : code;
+  return `${displayCode}: ${ANALYSIS_TYPE_MAP[code]}`;
+}
+
+function extractAnalysisTypeFromCategory(categoryRaw) {
+  const text = value(categoryRaw);
+  if (!text) {
+    return "";
+  }
+  const slashIndex = text.indexOf("/");
+  if (slashIndex < 0 && /^a\s*:/i.test(text)) {
+    return "";
+  }
+  const candidate = slashIndex >= 0 ? text.slice(slashIndex + 1) : text;
+  const matched = candidate.match(/([A-Za-z]{1,2})\s*:/);
+  if (!matched) {
+    return "";
+  }
+  return normalizeAnalysisType(matched[1]);
+}
+
+function formatCategoryForRecord(record) {
+  const base = normalizeCategory(value(record?.category), value(record?.specimenPrefix));
+  const prefix = normalizeSpecimenPrefix(value(record?.specimenPrefix));
+  if (prefix !== "a") {
+    return base;
+  }
+  const analysisType = normalizeAnalysisType(value(record?.analysisType));
+  if (!analysisType) {
+    return base;
+  }
+  return `${base} / ${analysisType}`;
+}
+
+function normalizeLayerName(layerRaw) {
+  const layer = value(layerRaw);
+  if (!layer) {
+    return "";
+  }
+  if (LEGACY_LAYER_NAME_ALIASES[layer]) {
+    return LEGACY_LAYER_NAME_ALIASES[layer];
+  }
+  const legacyEntries = Object.entries(LEGACY_LAYER_NAME_ALIASES);
+  for (const [legacy, latest] of legacyEntries) {
+    if (layer.startsWith(`${legacy}:`)) {
+      return `${latest}:${layer.slice(`${legacy}:`.length)}`;
+    }
+    if (layer.startsWith(`${legacy}：`)) {
+      return `${latest}：${layer.slice(`${legacy}：`.length)}`;
+    }
+    if (layer.startsWith(`${legacy}(`) && layer.endsWith(")")) {
+      return `${latest}${layer.slice(legacy.length)}`;
+    }
+  }
+  return layer;
 }
 
 function extractOtherLayerText(layerRaw) {
-  const layer = value(layerRaw);
+  const layer = normalizeLayerName(layerRaw);
   if (!layer) {
     return "";
   }
@@ -2755,6 +3314,8 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   }
 
   const siteRequiredFields = [
+    ["区画（グリッド）名の1番目", siteSnapshot.kuwakuHeadA],
+    ["区画（グリッド）名の2番目", siteSnapshot.kuwakuHeadB],
     ["区画（グリッド）の英字", siteSnapshot.kuwakuBlock],
     ["区画（グリッド）の番号", siteSnapshot.kuwakuNo],
     ["レベル高", siteSnapshot.levelHeight],
@@ -2791,7 +3352,7 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     ["地層名", selectedLayerName],
     ["ユニット", recordFormData.get("unit")],
     ["細別", recordFormData.get("detail")],
-    ["層理面もしくは鍵層名", recordFormData.get("layerRef")],
+    ["層理面や鍵層名", recordFormData.get("layerRef")],
     ["地層中の位置（cm）", recordFormData.get("layerFromCm")],
   ];
   for (const [label, fieldValue] of recordRequiredFields) {
@@ -2801,6 +3362,10 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   }
   if (selectedLayerName === OTHER_LAYER_NAME && !value(layerOtherInput.value)) {
     return "地層名が「4.その他」の場合は内容を入力してください";
+  }
+  const specimenPrefix = normalizeSpecimenPrefix(value(recordFormData.get("specimenPrefix")));
+  if (specimenPrefix === "a" && !normalizeAnalysisType(value(recordFormData.get("analysisType")))) {
+    return "a: 分析用資料を選んだ場合は、区分を選択してください";
   }
 
   return "";
@@ -2858,16 +3423,27 @@ function formatLevelRead(record) {
 function formatLayerPosition(record) {
   const ref = value(record?.layerRef);
   const fromCm = value(record?.layerFromCm);
-  if (!ref && !fromCm) {
+  const relative = value(record?.layerRelative);
+  const line1 = ref;
+  let line2 = "";
+  if (relative && fromCm) {
+    line2 = `${relative} に ${fromCm}cm`;
+  } else if (relative) {
+    line2 = relative;
+  } else if (fromCm) {
+    line2 = `${fromCm}cm`;
+  }
+
+  if (!line1 && !line2) {
     return "";
   }
-  if (!ref) {
-    return `${fromCm}cm`;
+  if (!line1) {
+    return line2;
   }
-  if (!fromCm) {
-    return ref;
+  if (!line2) {
+    return line1;
   }
-  return `${ref} から ${fromCm}cm`;
+  return `${line1} / ${line2}`;
 }
 
 function clonePhotos(photos) {

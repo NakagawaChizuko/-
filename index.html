@@ -38,11 +38,11 @@
         <form id="site-form" class="panel">
           <h2>区画（グリッド）情報</h2>
           <div class="grid cols-3">
-            <label class="span-2">区画　例：（24-Ⅰ-C-4）
+            <label class="span-2">区画（グリッド）名　　　　例：（24 - １ - C - 4 )
               <div class="kuwaku-input">
-                <span class="fixed-chip">24</span>
+                <input name="kuwakuHeadA" type="text" value="24" />
                 <span class="sep">-</span>
-                <span class="fixed-chip">Ⅰ</span>
+                <input name="kuwakuHeadB" type="text" value="Ⅰ" />
                 <span class="sep">-</span>
                 <input name="kuwakuBlock" type="text" maxlength="3" />
                 <span class="sep">-</span>
@@ -92,13 +92,14 @@
             <fieldset class="inline-fieldset span-3">
               <legend>標本番号 <span class="required">*</span></legend>
               <div id="specimen-tabs" class="specimen-tabs" role="tablist" aria-label="標本番号の区分">
-                <button class="specimen-tab active" data-prefix="m" type="button">m:哺乳類</button>
-                <button class="specimen-tab" data-prefix="b" type="button">b:植物</button>
-                <button class="specimen-tab" data-prefix="l" type="button">l:生痕</button>
-                <button class="specimen-tab" data-prefix="s" type="button">s:貝類</button>
-                <button class="specimen-tab" data-prefix="i" type="button">i:昆虫</button>
-                <button class="specimen-tab" data-prefix="g" type="button">g:人類考古</button>
-                <button class="specimen-tab" data-prefix="h" type="button">h:その他</button>
+                <button class="specimen-tab active" data-prefix="m" type="button">m: 哺乳類</button>
+                <button class="specimen-tab" data-prefix="a" type="button">a: 分析用資料</button>
+                <button class="specimen-tab" data-prefix="b" type="button">b: 植物</button>
+                <button class="specimen-tab" data-prefix="l" type="button">l: 生痕</button>
+                <button class="specimen-tab" data-prefix="s" type="button">s: 貝類</button>
+                <button class="specimen-tab" data-prefix="i" type="button">i: 昆虫</button>
+                <button class="specimen-tab" data-prefix="g" type="button">g: 人類考古</button>
+                <button class="specimen-tab" data-prefix="h" type="button">h: その他</button>
               </div>
               <div class="specimen-number-row">
                 <span id="specimen-prefix-label" class="specimen-prefix-chip">m</span>
@@ -112,6 +113,23 @@
                   required
                 />
               </div>
+              <label id="analysis-type-row" class="hidden">分析用資料の区分
+                <select id="analysis-type-select" name="analysisType">
+                  <option value="">選択してください</option>
+                  <option value="A: 火山灰">A: 火山灰</option>
+                  <option value="C: 14C">C: 14C</option>
+                  <option value="M: 古地磁気">M: 古地磁気</option>
+                  <option value="F: フィッショントラック">F: フィッショントラック</option>
+                  <option value="P: 花粉">P: 花粉</option>
+                  <option value="B: 植物">B: 植物</option>
+                  <option value="I: 昆虫">I: 昆虫</option>
+                  <option value="D: 珪藻">D: 珪藻</option>
+                  <option value="R: 粒度">R: 粒度</option>
+                  <option value="S: 貝類">S: 貝類</option>
+                  <option value="H: その他">H: その他</option>
+                  <option value="Mg: はぎとり資料">Mg: はぎとり資料</option>
+                </select>
+              </label>
               <input id="specimen-prefix-input" name="specimenPrefix" type="hidden" value="m" />
               <input id="specimen-no-input" name="specimenNo" type="hidden" />
             </fieldset>
@@ -200,7 +218,7 @@
               <legend>地層名</legend>
               <div id="layer-tabs" class="layer-tabs" role="tablist" aria-label="地層名">
                 <button class="layer-tab active" data-layer="1.芙蓉湖砂シルト部層" type="button">1.芙蓉湖砂シルト部層</button>
-                <button class="layer-tab" data-layer="2.立が花砂部層" type="button">2.立が花砂部層</button>
+                <button class="layer-tab" data-layer="2.立が鼻砂部層" type="button">2.立が鼻砂部層</button>
                 <button class="layer-tab" data-layer="3.海端砂シルト部層" type="button">3.海端砂シルト部層</button>
                 <button class="layer-tab" data-layer="4.その他" type="button">4.その他</button>
               </div>
@@ -215,9 +233,13 @@
             </label>
             <fieldset class="inline-fieldset span-2">
               <legend>地層中の位置</legend>
-              <div class="layer-position-row">
-                <input name="layerRef" type="text" placeholder="層理面もしくは鍵層名" />
+              <div class="layer-position-row top">
+                <input name="layerRef" type="text" placeholder="層理面や鍵層名" />
                 <span>から</span>
+              </div>
+              <div class="layer-position-row bottom">
+                <input name="layerRelative" type="text" placeholder="上もしくは下" />
+                <span>に</span>
                 <input name="layerFromCm" type="text" />
                 <span>cm</span>
               </div>
@@ -334,6 +356,10 @@
               ユニット
               <select id="plan-unit-select"></select>
             </label>
+            <label class="plan-detail-row">
+              細別
+              <select id="plan-detail-select"></select>
+            </label>
           </div>
           <div id="plan-map-legend" class="plan-map-legend"></div>
           <div id="plan-map-wrap"></div>
@@ -343,13 +369,12 @@
       <section id="edit-tab" class="tab-panel">
         <section class="panel">
           <h2>編集画面</h2>
-          <p class="hint-text">リストから選んだ記録を上書き保存します（区画情報の単独保存はしません）。</p>
           <div class="grid cols-3">
-            <label class="span-2">区画　例：（24-Ⅰ-C-4）
+            <label class="span-2">区画（グリッド）名　　　　例：（24 - １ - C - 4 )
               <div class="kuwaku-input">
-                <span class="fixed-chip">24</span>
+                <input id="edit-kuwaku-head-a" type="text" value="24" />
                 <span class="sep">-</span>
-                <span class="fixed-chip">Ⅰ</span>
+                <input id="edit-kuwaku-head-b" type="text" value="Ⅰ" />
                 <span class="sep">-</span>
                 <input id="edit-kuwaku-block" type="text" maxlength="3" placeholder="C" />
                 <span class="sep">-</span>
@@ -387,6 +412,10 @@
           </div>
         </section>
         <div id="edit-record-form-host"></div>
+        <section id="edit-history-panel" class="panel hidden">
+          <h2>入力履歴</h2>
+          <div id="edit-history-list"></div>
+        </section>
       </section>
     </main>
 

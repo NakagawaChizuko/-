@@ -145,6 +145,12 @@ main {
   margin-bottom: 12px;
 }
 
+#input-tab .panel,
+#edit-tab .panel {
+  background: #eceff3;
+  border-color: #c4ccd6;
+}
+
 .panel h2 {
   margin: 0 0 10px;
   font-size: 1.03rem;
@@ -186,7 +192,8 @@ main {
 }
 
 .plan-grid-row,
-.plan-unit-row {
+.plan-unit-row,
+.plan-detail-row {
   width: min(100%, 280px);
 }
 
@@ -335,6 +342,39 @@ main {
   transform: translateY(-50%);
 }
 
+.plan-grid-corner {
+  position: absolute;
+  z-index: 2;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0f172a;
+  background: #eef4ff;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  padding: 2px 6px;
+  line-height: 1.2;
+}
+
+.plan-grid-corner.top-left {
+  top: 8px;
+  left: 8px;
+}
+
+.plan-grid-corner.top-right {
+  top: 8px;
+  right: 8px;
+}
+
+.plan-grid-corner.bottom-left {
+  bottom: 8px;
+  left: 8px;
+}
+
+.plan-grid-corner.bottom-right {
+  bottom: 8px;
+  right: 8px;
+}
+
 .grid {
   display: grid;
   gap: 8px;
@@ -372,13 +412,23 @@ textarea {
   font: inherit;
 }
 
+#input-tab input,
+#input-tab select,
+#input-tab textarea,
+#edit-tab input,
+#edit-tab select,
+#edit-tab textarea {
+  background: #ffffff;
+  border-color: #bac4d1;
+}
+
 textarea {
   resize: vertical;
 }
 
 .kuwaku-input {
   display: grid;
-  grid-template-columns: auto auto auto auto minmax(88px, 1fr) auto minmax(88px, 1fr);
+  grid-template-columns: minmax(62px, 0.9fr) auto minmax(62px, 0.9fr) auto minmax(88px, 1fr) auto minmax(88px, 1fr);
   align-items: center;
   gap: 6px;
 }
@@ -452,7 +502,7 @@ textarea {
 
 .specimen-number-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 72px 120px;
   gap: 8px;
   align-items: center;
   margin-top: 6px;
@@ -521,7 +571,6 @@ textarea {
 
 .layer-position-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.5fr) auto minmax(100px, 1fr) auto;
   gap: 6px;
   align-items: center;
 }
@@ -529,6 +578,14 @@ textarea {
 .layer-position-row span {
   color: #5b6777;
   font-size: 0.84rem;
+}
+
+.layer-position-row.top {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.layer-position-row.bottom {
+  grid-template-columns: minmax(120px, 1.2fr) auto minmax(100px, 1fr) auto;
 }
 
 .two-inline-labels {
@@ -623,6 +680,33 @@ select.saved-carry-value {
 
 .upload-file-input {
   display: none;
+}
+
+#edit-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.edit-history-item {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.edit-history-item p {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.edit-history-item p + p {
+  margin-top: 4px;
+}
+
+.edit-history-value.changed {
+  color: #b42318;
+  font-weight: 700;
 }
 
 .card-output-list {
@@ -835,7 +919,7 @@ th {
   }
 
   .kuwaku-input {
-    grid-template-columns: auto auto auto auto 1fr auto 1fr;
+    grid-template-columns: minmax(52px, 0.8fr) auto minmax(52px, 0.8fr) auto 1fr auto 1fr;
   }
 
   .plan-map-shell {
