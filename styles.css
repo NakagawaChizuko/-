@@ -550,15 +550,18 @@ main {
 }
 
 #position-preview-btn {
-  background: #f8fafc;
-  border-color: #9cb2c7;
-  color: #1f3348;
+  background: #ea580c;
+  border-color: #c2410c;
+  color: #ffffff;
   font-size: 0.82rem;
+  font-weight: 700;
   padding: 6px 12px;
+  box-shadow: 0 4px 10px rgb(194 65 12 / 28%);
 }
 
 #position-preview-btn:hover {
-  background: #eef5fb;
+  background: #c2410c;
+  border-color: #9a3412;
 }
 
 .position-preview-modal {
