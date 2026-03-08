@@ -5826,14 +5826,22 @@ function renderViewerImageQuad(shape, renderNonce) {
       .then((canvas) => {
         const texture = new THREE.CanvasTexture(canvas);
         addTexturedMesh(texture, "#ffffff");
+        addViewerImageStrokeOverlay(points, canvas, shape?.color, targetGroup, renderNonce);
         return true;
       })
       .catch(() =>
         getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType)
           .then((image) => {
+            const tintedCanvas = buildTintedCanvasFromImageSource(image, shape?.color);
+            if (tintedCanvas) {
+              const texture = new THREE.CanvasTexture(tintedCanvas);
+              addTexturedMesh(texture, "#ffffff");
+              addViewerImageStrokeOverlay(points, tintedCanvas, shape?.color, targetGroup, renderNonce);
+              return true;
+            }
             const texture = new THREE.Texture(image);
-            const tint = parseHexColor(shape?.color).hex;
-            addTexturedMesh(texture, tint);
+            addTexturedMesh(texture, parseHexColor(shape?.color).hex);
+            addViewerImageStrokeOverlay(points, image, shape?.color, targetGroup, renderNonce);
             return true;
           })
           .catch(() => false)
@@ -5845,6 +5853,7 @@ function renderViewerImageQuad(shape, renderNonce) {
       .then((image) => {
         const texture = new THREE.Texture(image);
         addTexturedMesh(texture, "#ffffff");
+        addViewerImageStrokeOverlay(points, image, shape?.color, targetGroup, renderNonce);
       })
       .catch(() => {
         void loadFromImagePath();
@@ -5970,6 +5979,32 @@ function ensureCanvasFromImageSource(imageSource) {
     return null;
   }
   ctx.drawImage(imageSource, 0, 0, width, height);
+  return canvas;
+}
+
+function buildTintedCanvasFromImageSource(imageSource, colorRaw) {
+  const sourceCanvas = ensureCanvasFromImageSource(imageSource);
+  if (!sourceCanvas) {
+    return null;
+  }
+  const width = Math.max(1, Number(sourceCanvas.width) || 0);
+  const height = Math.max(1, Number(sourceCanvas.height) || 0);
+  if (!width || !height) {
+    return null;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    return null;
+  }
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(sourceCanvas, 0, 0, width, height);
+  ctx.globalCompositeOperation = "source-in";
+  ctx.fillStyle = parseHexColor(colorRaw).hex;
+  ctx.fillRect(0, 0, width, height);
+  ctx.globalCompositeOperation = "source-over";
   return canvas;
 }
 
