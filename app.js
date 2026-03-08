@@ -5795,8 +5795,8 @@ function renderViewerImageQuad(shape, renderNonce) {
       return;
     }
     texture.needsUpdate = true;
-    texture.minFilter = THREE.NearestFilter;
-    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     texture.generateMipmaps = false;
     // 上面視点（平面図と同じ向き）での貼り付けに合わせる。
     texture.flipY = false;
@@ -5822,44 +5822,20 @@ function renderViewerImageQuad(shape, renderNonce) {
     targetGroup.add(mesh);
   };
   const loadFromImagePath = () =>
-    getOrLoadPlanLargeShapeTintedCanvas(imagePath, shape.color, shape?.imageType)
-      .then((canvas) => {
-        const texture = new THREE.CanvasTexture(canvas);
-        addTexturedMesh(texture, "#ffffff");
-        addViewerImageStrokeOverlay(points, canvas, shape?.color, targetGroup, renderNonce);
+    getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType)
+      .then((image) => {
+        const tintedCanvas = buildTintedCanvasFromImageSource(image, shape?.color);
+        if (tintedCanvas) {
+          const texture = new THREE.CanvasTexture(tintedCanvas);
+          addTexturedMesh(texture, "#ffffff");
+          return true;
+        }
+        const texture = new THREE.Texture(image);
+        addTexturedMesh(texture, parseHexColor(shape?.color).hex);
         return true;
       })
-      .catch(() =>
-        getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType)
-          .then((image) => {
-            const tintedCanvas = buildTintedCanvasFromImageSource(image, shape?.color);
-            if (tintedCanvas) {
-              const texture = new THREE.CanvasTexture(tintedCanvas);
-              addTexturedMesh(texture, "#ffffff");
-              addViewerImageStrokeOverlay(points, tintedCanvas, shape?.color, targetGroup, renderNonce);
-              return true;
-            }
-            const texture = new THREE.Texture(image);
-            addTexturedMesh(texture, parseHexColor(shape?.color).hex);
-            addViewerImageStrokeOverlay(points, image, shape?.color, targetGroup, renderNonce);
-            return true;
-          })
-          .catch(() => false)
-      );
-
-  const tintedDataUrl = getPlanLargeShapeTintedDataUrl(imagePath, shape?.color);
-  if (tintedDataUrl) {
-    getOrLoadPlanLargeShapeImage(tintedDataUrl, shape?.imageType)
-      .then((image) => {
-        const texture = new THREE.Texture(image);
-        addTexturedMesh(texture, "#ffffff");
-        addViewerImageStrokeOverlay(points, image, shape?.color, targetGroup, renderNonce);
-      })
-      .catch(() => {
-        void loadFromImagePath();
-      });
-    return;
-  }
+      .catch(() => false);
+  // 3Dは常に着色済みCanvas経路を優先し、黒線化しやすいdataURL経路は使わない。
   void loadFromImagePath();
 }
 
