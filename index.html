@@ -14,7 +14,7 @@
       <div>
         <h1>第24次野尻湖湖底発掘　化石・遺物 入力フォーム</h1>
         <p class="header-update-note">3D表現が可能になりました(2026.03.07)</p>
-        <p class="header-update-note">描画画像のアップが可能になりました(2026.03.08)</p>
+        <p class="header-update-note">画像のアップが可能になりました(2026.03.08)</p>
       </div>
       <div class="header-actions">
         <div class="cloud-controls">
@@ -387,26 +387,27 @@
                         <span>cm</span>
                       </div>
                     </label>
-                    <label>横変形
-                      <div class="inline-degree-row">
-                        <input name="imgSkewXDeg" type="text" placeholder="例：5" />
-                        <span>°</span>
-                      </div>
-                    </label>
-                    <label>縦変形
-                      <div class="inline-degree-row">
-                        <input name="imgSkewYDeg" type="text" placeholder="例：0" />
-                        <span>°</span>
-                      </div>
-                    </label>
-                    <div class="image-toggle-row">
+                    <div class="image-skew-pair">
+                      <label>横変形
+                        <div class="inline-degree-row">
+                          <input name="imgSkewXDeg" type="text" placeholder="例：5" />
+                          <span>°</span>
+                        </div>
+                      </label>
+                      <label>縦変形
+                        <div class="inline-degree-row">
+                          <input name="imgSkewYDeg" type="text" placeholder="例：0" />
+                          <span>°</span>
+                        </div>
+                      </label>
+                    </div>
+                    <div class="image-toggle-grid">
                       <label class="image-toggle-check"><input name="imgFlipH" type="checkbox" value="1" /> 左右反転</label>
                       <label class="image-toggle-check"><input name="imgFlipV" type="checkbox" value="1" /> 上下反転</label>
-                    </div>
-                    <div class="image-toggle-row">
                       <label class="image-toggle-check"><input name="imgLockAspectRatio" type="checkbox" value="1" /> 元の縦横比を固定</label>
                       <label class="image-toggle-check"><input name="imgUseOriginalColor" type="checkbox" value="1" /> 原図の色を利用</label>
                     </div>
+                    <p class="hint-text image-center-note">画像中心は、そのレコードの平面位置（東西cm / 南北cm）です。</p>
                   </div>
                 </section>
               </div>
@@ -679,6 +680,11 @@
           <p id="viewer-status" class="muted">表示対象データがありません。</p>
           <div id="viewer-canvas-wrap" class="viewer-canvas-wrap">
             <div id="viewer-tooltip" class="viewer-tooltip" hidden></div>
+          </div>
+          <div class="viewer-help muted" aria-label="3Dビューアー操作方法">
+            <p><strong>3Dビューアー操作方法</strong></p>
+            <p>マウス: 左ドラッグ=視点回転 / 右ドラッグ=視点の平行移動 / ホイール=拡大・縮小</p>
+            <p>タッチ: 1本指ドラッグ=視点回転 / 2本指ピンチ=拡大・縮小 / 2本指ドラッグ=平行移動</p>
           </div>
         </section>
       </section>

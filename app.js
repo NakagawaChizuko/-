@@ -823,13 +823,16 @@ function bindEvents() {
         ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType)
         : "";
     const isLineShape = largeShapeType === "直線状";
+    const usesAxisDirection = isLineShape || largeShapeType === "長方形" || largeShapeType === "楕円";
     const largeAxisDirection = planSizeMode === "大きなもの" ? normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))) : "";
     const largeAxisPlungeDeg =
       planSizeMode === "大きなもの" ? normalizeLargeAxisPlungeDeg(value(formData.get("largeAxisPlungeDeg"))) : "";
     const largeAxisPlungeDir8 =
       planSizeMode === "大きなもの" ? normalizeCompass8Direction(value(formData.get("largeAxisPlungeDir8"))) : "";
     const planeStrikeDirection =
-      planSizeMode === "大きなもの" ? normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection"))) : "";
+      planSizeMode === "大きなもの"
+        ? normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection")) || (usesAxisDirection ? largeAxisDirection : ""))
+        : "";
     const planeDipDeg = planSizeMode === "大きなもの" ? normalizePlaneDipDeg(value(formData.get("planeDipDeg"))) : "";
     const planeDipDir8 = planSizeMode === "大きなもの" ? normalizeCompass8Direction(value(formData.get("planeDipDir8"))) : "";
     const lineLengthCm = value(formData.get("lineLengthCm"));
@@ -884,7 +887,7 @@ function bindEvents() {
       ewCm: value(formData.get("ewCm")),
       planSizeMode,
       largeShapeType,
-      largeAxisDirection: isLargeImageShape || !isLineShape ? "" : largeAxisDirection,
+      largeAxisDirection: isLargeImageShape || !usesAxisDirection ? "" : largeAxisDirection,
       largeAxisPlungeDeg: isLargeImageShape || !isLineShape ? "" : largeAxisPlungeDeg,
       largeAxisPlungeDir8: isLargeImageShape || !isLineShape ? "" : largeAxisPlungeDir8,
       planeStrikeDirection: isLineShape ? "" : planeStrikeDirection,
@@ -2442,11 +2445,13 @@ function syncLargeShapeSectionFromForm() {
   const isImageShape = isLargeShapeImageType(shapeType);
   const isCustomImageShape = isCustomLargeShapeType(shapeType);
   const isLineShape = shapeType === "直線状";
+  const usesAxisDirection = isLineShape || shapeType === "長方形" || shapeType === "楕円";
   if (largeShapeTypeInput) {
     largeShapeTypeInput.value = shapeType;
   }
   if (largeAxisDirectionInput) {
-    largeAxisDirectionInput.value = isLineShape ? normalizeLargeAxisDirection(largeAxisDirectionInput.value) : "";
+    const fallbackAxis = !isLineShape && planeStrikeInput ? planeStrikeInput.value : "";
+    largeAxisDirectionInput.value = usesAxisDirection ? normalizeLargeAxisDirection(largeAxisDirectionInput.value || fallbackAxis) : "";
   }
   if (largeAxisPlungeInput) {
     largeAxisPlungeInput.value = isLineShape ? normalizeLargeAxisPlungeDeg(largeAxisPlungeInput.value) : "";
@@ -2455,7 +2460,8 @@ function syncLargeShapeSectionFromForm() {
     largeAxisPlungeDirInput.value = isLineShape ? normalizeCompass8Direction(largeAxisPlungeDirInput.value) : "";
   }
   if (planeStrikeInput) {
-    planeStrikeInput.value = isLineShape ? "" : normalizePlaneStrikeDirection(planeStrikeInput.value);
+    const fallbackStrike = usesAxisDirection && largeAxisDirectionInput ? largeAxisDirectionInput.value : "";
+    planeStrikeInput.value = isLineShape ? "" : normalizePlaneStrikeDirection(planeStrikeInput.value || fallbackStrike);
   }
   if (planeDipInput) {
     planeDipInput.value = isLineShape ? "" : normalizePlaneDipDeg(planeDipInput.value);
@@ -2464,7 +2470,7 @@ function syncLargeShapeSectionFromForm() {
     planeDipDirInput.value = isLineShape ? "" : normalizeCompass8Direction(planeDipDirInput.value);
   }
   if (largeAxisDirectionRow) {
-    largeAxisDirectionRow.classList.toggle("hidden", !isLineShape);
+    largeAxisDirectionRow.classList.toggle("hidden", !usesAxisDirection);
   }
   if (largeAxisPlungeRow) {
     largeAxisPlungeRow.classList.toggle("hidden", !isLineShape);
@@ -3396,6 +3402,7 @@ function buildCurrentEditDraftRecord() {
   const draftIsImageShape = isLargeShapeImageType(draftShapeType);
   const draftIsCustomImageShape = draftIsImageShape && isCustomLargeShapeType(draftShapeType);
   const draftIsLineShape = draftShapeType === "直線状";
+  const draftUsesAxisDirection = draftIsLineShape || draftShapeType === "長方形" || draftShapeType === "楕円";
   const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
   const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
   return {
@@ -3438,10 +3445,13 @@ function buildCurrentEditDraftRecord() {
     ewCm: value(formData.get("ewCm")),
     planSizeMode: normalizePlanSizeMode(value(formData.get("planSizeMode"))),
     largeShapeType: draftShapeType,
-    largeAxisDirection: draftIsImageShape || !draftIsLineShape ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
+    largeAxisDirection:
+      draftIsImageShape || !draftUsesAxisDirection ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
     largeAxisPlungeDeg: draftIsImageShape || !draftIsLineShape ? "" : normalizeLargeAxisPlungeDeg(value(formData.get("largeAxisPlungeDeg"))),
     largeAxisPlungeDir8: draftIsImageShape || !draftIsLineShape ? "" : normalizeCompass8Direction(value(formData.get("largeAxisPlungeDir8"))),
-    planeStrikeDirection: draftIsLineShape ? "" : normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection"))),
+    planeStrikeDirection: draftIsLineShape
+      ? ""
+      : normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection")) || (draftUsesAxisDirection ? value(formData.get("largeAxisDirection")) : "")),
     planeDipDeg: draftIsLineShape ? "" : normalizePlaneDipDeg(value(formData.get("planeDipDeg"))),
     planeDipDir8: draftIsLineShape ? "" : normalizeCompass8Direction(value(formData.get("planeDipDir8"))),
     lineLengthCm: value(formData.get("lineLengthCm")),
@@ -8681,13 +8691,15 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     if (!value(normalized.planeStrikeDirection) && value(normalized.largeAxisDirection)) {
       normalized.planeStrikeDirection = normalized.largeAxisDirection;
     }
+    if (!value(normalized.largeAxisDirection) && value(normalized.planeStrikeDirection)) {
+      normalized.largeAxisDirection = normalized.planeStrikeDirection;
+    }
     if (!value(normalized.planeDipDeg) && value(normalized.largeAxisPlungeDeg)) {
       normalized.planeDipDeg = normalized.largeAxisPlungeDeg;
     }
     if (!value(normalized.planeDipDir8) && value(normalized.largeAxisPlungeDir8)) {
       normalized.planeDipDir8 = normalized.largeAxisPlungeDir8;
     }
-    normalized.largeAxisDirection = "";
     normalized.largeAxisPlungeDeg = "";
     normalized.largeAxisPlungeDir8 = "";
   }
