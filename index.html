@@ -241,22 +241,60 @@
                 <div id="large-shape-image-preview" class="large-shape-image-preview hidden" aria-live="polite">
                   <p id="large-shape-image-preview-title" class="large-shape-image-preview-title"></p>
                   <div class="large-shape-image-preview-wrap">
-                    <span class="preview-corner-frame" aria-hidden="true"></span>
+                    <span class="preview-cardinal north" aria-hidden="true">北</span>
+                    <span class="preview-cardinal east" aria-hidden="true">東</span>
+                    <span class="preview-cardinal south" aria-hidden="true">南</span>
+                    <span class="preview-cardinal west" aria-hidden="true">西</span>
                     <img id="large-shape-image-preview-img" alt="" />
-                    <span class="preview-corner-dot p1" aria-hidden="true"></span>
-                    <span class="preview-corner-dot p2" aria-hidden="true"></span>
-                    <span class="preview-corner-dot p3" aria-hidden="true"></span>
-                    <span class="preview-corner-dot p4" aria-hidden="true"></span>
-                    <span class="preview-corner-badge p1">点1</span>
-                    <span class="preview-corner-badge p2">点2</span>
-                    <span class="preview-corner-badge p3">点3</span>
-                    <span class="preview-corner-badge p4">点4</span>
                   </div>
-                  <p class="hint-text">点1=左上 / 点2=右上 / 点3=右下 / 点4=左下</p>
                 </div>
                 <label id="large-axis-direction-row" class="large-axis-direction-label">長軸・長辺・長半径方向
                   <input id="large-axis-direction-input" name="largeAxisDirection" type="text" placeholder="例：N30W" />
                 </label>
+                <label id="large-axis-plunge-row" class="large-axis-plunge-label">プランジ角
+                  <div class="inline-degree-row">
+                    <input id="large-axis-plunge-input" name="largeAxisPlungeDeg" type="text" placeholder="例：20" />
+                    <span>°</span>
+                  </div>
+                </label>
+                <div id="large-axis-plunge-dir-row" class="large-dip-direction-row">
+                  <span class="label-title">プランジ方向（8方位）</span>
+                  <div class="dir-tabs eight-dir-tabs" role="tablist" aria-label="プランジ方向（8方位）">
+                    <button class="dir-tab" data-group="plungeDir8" data-value="北" type="button">北</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="北東" type="button">北東</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="東" type="button">東</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="南東" type="button">南東</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="南" type="button">南</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="南西" type="button">南西</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="西" type="button">西</button>
+                    <button class="dir-tab" data-group="plungeDir8" data-value="北西" type="button">北西</button>
+                  </div>
+                  <input id="large-axis-plunge-dir-input" name="largeAxisPlungeDir8" type="hidden" value="" />
+                </div>
+                <div id="plane-attitude-row" class="plane-attitude-row hidden">
+                  <label class="plane-attitude-field">面の走向
+                    <input id="plane-strike-input" name="planeStrikeDirection" type="text" placeholder="例：N30E" />
+                  </label>
+                  <label class="plane-attitude-field">面の傾斜
+                    <div class="inline-degree-row">
+                      <input id="plane-dip-input" name="planeDipDeg" type="text" placeholder="例：20" />
+                      <span>°</span>
+                    </div>
+                  </label>
+                  <label class="plane-attitude-field plane-dip-dir-field">面の傾斜方向（8方位）
+                    <div class="dir-tabs eight-dir-tabs" role="tablist" aria-label="面の傾斜方向（8方位）">
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="北" type="button">北</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="北東" type="button">北東</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="東" type="button">東</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="南東" type="button">南東</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="南" type="button">南</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="南西" type="button">南西</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="西" type="button">西</button>
+                      <button class="dir-tab" data-group="planeDipDir8" data-value="北西" type="button">北西</button>
+                    </div>
+                    <input id="plane-dip-dir-input" name="planeDipDir8" type="hidden" value="" />
+                  </label>
+                </div>
 
                 <section class="large-shape-panel hidden" data-large-shape-panel="直線状">
                   <div class="large-size-grid">
@@ -306,68 +344,40 @@
                 </section>
 
                 <section class="large-shape-panel hidden" data-large-shape-panel="__IMAGE__">
-                  <p class="hint-text">画像の四隅にあたる4点（化石の輪郭ではないので注意）を点1(左上)→点2(右上)→点3(右下)→点4(左下)の順で入力</p>
-                  <div class="image-corner-grid">
-                    <div class="image-corner-row">
-                      <strong>点1</strong>
-                      <select name="imgP1NsDir">
-                        <option value="北から">北から</option>
-                        <option value="南から">南から</option>
-                      </select>
-                      <input name="imgP1NsCm" type="text" />
-                      <span>cm</span>
-                      <select name="imgP1EwDir">
-                        <option value="東から">東から</option>
-                        <option value="西から">西から</option>
-                      </select>
-                      <input name="imgP1EwCm" type="text" />
-                      <span>cm</span>
-                    </div>
-                    <div class="image-corner-row">
-                      <strong>点2</strong>
-                      <select name="imgP2NsDir">
-                        <option value="北から">北から</option>
-                        <option value="南から">南から</option>
-                      </select>
-                      <input name="imgP2NsCm" type="text" />
-                      <span>cm</span>
-                      <select name="imgP2EwDir">
-                        <option value="東から">東から</option>
-                        <option value="西から">西から</option>
-                      </select>
-                      <input name="imgP2EwCm" type="text" />
-                      <span>cm</span>
-                    </div>
-                    <div class="image-corner-row">
-                      <strong>点3</strong>
-                      <select name="imgP3NsDir">
-                        <option value="北から">北から</option>
-                        <option value="南から">南から</option>
-                      </select>
-                      <input name="imgP3NsCm" type="text" />
-                      <span>cm</span>
-                      <select name="imgP3EwDir">
-                        <option value="東から">東から</option>
-                        <option value="西から">西から</option>
-                      </select>
-                      <input name="imgP3EwCm" type="text" />
-                      <span>cm</span>
-                    </div>
-                    <div class="image-corner-row">
-                      <strong>点4</strong>
-                      <select name="imgP4NsDir">
-                        <option value="北から">北から</option>
-                        <option value="南から">南から</option>
-                      </select>
-                      <input name="imgP4NsCm" type="text" />
-                      <span>cm</span>
-                      <select name="imgP4EwDir">
-                        <option value="東から">東から</option>
-                        <option value="西から">西から</option>
-                      </select>
-                      <input name="imgP4EwCm" type="text" />
-                      <span>cm</span>
-                    </div>
+                  <p class="hint-text">画像を回転・反転・変形して現地形状に合わせ、外枠サイズを入力します（4隅は自動計算）</p>
+                  <div class="image-transform-grid">
+                    <label>北から回転角
+                      <div class="inline-degree-row">
+                        <input name="imgRotateDeg" type="text" placeholder="例：30" />
+                        <span>°</span>
+                      </div>
+                    </label>
+                    <label>外枠 辺1
+                      <div class="inline-cm-row">
+                        <input name="imgFrameWidthCm" type="text" placeholder="例：60" />
+                        <span>cm</span>
+                      </div>
+                    </label>
+                    <label>外枠 辺2
+                      <div class="inline-cm-row">
+                        <input name="imgFrameHeightCm" type="text" placeholder="例：30" />
+                        <span>cm</span>
+                      </div>
+                    </label>
+                    <label>横変形
+                      <div class="inline-degree-row">
+                        <input name="imgSkewXDeg" type="text" placeholder="例：5" />
+                        <span>°</span>
+                      </div>
+                    </label>
+                    <label>縦変形
+                      <div class="inline-degree-row">
+                        <input name="imgSkewYDeg" type="text" placeholder="例：0" />
+                        <span>°</span>
+                      </div>
+                    </label>
+                    <label class="image-toggle-check"><input name="imgFlipH" type="checkbox" value="1" /> 左右反転</label>
+                    <label class="image-toggle-check"><input name="imgFlipV" type="checkbox" value="1" /> 上下反転</label>
                   </div>
                 </section>
               </div>
@@ -501,10 +511,29 @@
       <section id="output-tab" class="tab-panel active">
         <section class="panel">
           <h2>リスト形式プレビュー</h2>
-          <label class="output-grid-row">
-            区画（グリッド）
-            <select id="output-kuwaku-select"></select>
-          </label>
+          <div class="output-filter-row">
+            <label class="output-filter-item output-grid-row">
+              区画（グリッド）
+              <select id="output-kuwaku-select"></select>
+            </label>
+            <label class="output-filter-item">
+              分類
+              <select id="output-category-select"></select>
+            </label>
+            <label class="output-filter-item">
+              データ状態
+              <select id="output-status-select">
+                <option value="all">すべて</option>
+                <option value="complete">必須完了のみ</option>
+                <option value="incomplete">未記入ありのみ</option>
+              </select>
+            </label>
+            <label class="output-filter-item output-search-row">
+              キーワード（標本番号・名称など）
+              <input id="output-search-input" type="text" placeholder="例: m-12 / 肋骨" />
+            </label>
+          </div>
+          <p id="output-filter-summary" class="muted output-filter-summary">表示: 0件 / 全体: 0件</p>
           <div class="table-wrap">
             <table id="output-list-table">
               <thead>
@@ -837,6 +866,6 @@
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260308-3d31"></script>
+    <script src="./app.js?v=20260308-3d33"></script>
   </body>
 </html>

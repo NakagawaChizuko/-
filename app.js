@@ -65,6 +65,11 @@ const REQUIRED_FIELD_LABELS = {
   ewCm: "平面位置（東から/西からの距離）",
   largeShapeType: "大きなもの形状",
   largeAxisDirection: "長軸・長辺・長半径方向（例:N30W）",
+  largeAxisPlungeDeg: "プランジ角（度）",
+  largeAxisPlungeDir8: "プランジ方向（8方位）",
+  planeStrikeDirection: "面の走向（例:N30E）",
+  planeDipDeg: "面の傾斜（度）",
+  planeDipDir8: "面の傾斜方向（8方位）",
   lineLengthCm: "直線状 長さ",
   rectSide1Cm: "長方形 辺1",
   rectSide2Cm: "長方形 辺2",
@@ -78,6 +83,11 @@ const REQUIRED_FIELD_LABELS = {
   imgP3EwCm: "画像点3 東/西距離",
   imgP4NsCm: "画像点4 北/南距離",
   imgP4EwCm: "画像点4 東/西距離",
+  imgRotateDeg: "画像回転角（北から）",
+  imgFrameWidthCm: "画像外枠 辺1",
+  imgFrameHeightCm: "画像外枠 辺2",
+  imgSkewXDeg: "画像 横変形角",
+  imgSkewYDeg: "画像 縦変形角",
   layerName: "地層名",
   layerOther: "地層名（その他）",
   unit: "ユニット",
@@ -216,6 +226,9 @@ let currentSectionDiagrams = [];
 let currentPhotos = [];
 let selectedCardRecordId = "";
 let selectedOutputKuwaku = ALL_GRIDS_VALUE;
+let selectedOutputCategory = EXPORT_CATEGORY_ALL_VALUE;
+let selectedOutputStatus = "all";
+let outputSearchText = "";
 let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
@@ -298,6 +311,10 @@ const outputListBody = document.getElementById("output-list-body");
 const outputListTable = document.getElementById("output-list-table");
 const cardOutputList = document.getElementById("card-output-list");
 const outputKuwakuSelect = document.getElementById("output-kuwaku-select");
+const outputCategorySelect = document.getElementById("output-category-select");
+const outputStatusSelect = document.getElementById("output-status-select");
+const outputSearchInput = document.getElementById("output-search-input");
+const outputFilterSummary = document.getElementById("output-filter-summary");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
 const planUnitSelect = document.getElementById("plan-unit-select");
 const planDetailSelect = document.getElementById("plan-detail-select");
@@ -320,6 +337,9 @@ const viewerResetBtn = document.getElementById("viewer-reset-btn");
 const viewerZScaleInput = document.getElementById("viewer-z-scale-input");
 const viewerZScaleValue = document.getElementById("viewer-z-scale-value");
 const largeAxisDirectionRow = document.getElementById("large-axis-direction-row");
+const largeAxisPlungeRow = document.getElementById("large-axis-plunge-row");
+const largeAxisPlungeDirRow = document.getElementById("large-axis-plunge-dir-row");
+const planeAttitudeRow = document.getElementById("plane-attitude-row");
 const exportListRangeKuwakuSelect = document.getElementById("export-range-kuwaku-select");
 const exportListRangeCategorySelect = document.getElementById("export-range-category-select");
 const exportListRangeStatusSelect = document.getElementById("export-range-status-select");
@@ -371,6 +391,11 @@ const layerRelativeInput = document.getElementById("layer-relative-input");
 const planSizeModeInput = document.getElementById("plan-size-mode-input");
 const largeShapeTypeInput = document.getElementById("large-shape-type-input");
 const largeAxisDirectionInput = document.getElementById("large-axis-direction-input");
+const largeAxisPlungeInput = document.getElementById("large-axis-plunge-input");
+const largeAxisPlungeDirInput = document.getElementById("large-axis-plunge-dir-input");
+const planeStrikeInput = document.getElementById("plane-strike-input");
+const planeDipInput = document.getElementById("plane-dip-input");
+const planeDipDirInput = document.getElementById("plane-dip-dir-input");
 const largeShapeImageButtons = document.getElementById("large-shape-image-buttons");
 const largeShapeImagePreview = document.getElementById("large-shape-image-preview");
 const largeShapeImagePreviewTitle = document.getElementById("large-shape-image-preview-title");
@@ -718,7 +743,16 @@ function bindEvents() {
       planSizeMode === "大きなもの"
         ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType)
         : "";
+    const isLineShape = largeShapeType === "直線状";
     const largeAxisDirection = planSizeMode === "大きなもの" ? normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))) : "";
+    const largeAxisPlungeDeg =
+      planSizeMode === "大きなもの" ? normalizeLargeAxisPlungeDeg(value(formData.get("largeAxisPlungeDeg"))) : "";
+    const largeAxisPlungeDir8 =
+      planSizeMode === "大きなもの" ? normalizeCompass8Direction(value(formData.get("largeAxisPlungeDir8"))) : "";
+    const planeStrikeDirection =
+      planSizeMode === "大きなもの" ? normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection"))) : "";
+    const planeDipDeg = planSizeMode === "大きなもの" ? normalizePlaneDipDeg(value(formData.get("planeDipDeg"))) : "";
+    const planeDipDir8 = planSizeMode === "大きなもの" ? normalizeCompass8Direction(value(formData.get("planeDipDir8"))) : "";
     const lineLengthCm = value(formData.get("lineLengthCm"));
     const rectSide1Cm = value(formData.get("rectSide1Cm"));
     const rectSide2Cm = value(formData.get("rectSide2Cm"));
@@ -727,6 +761,7 @@ function bindEvents() {
     const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
     const isLargeImageShape = planSizeMode === "大きなもの" && isLargeShapeImageType(largeShapeType);
     const keepImageCornerFields = planSizeMode === "大きなもの";
+    const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
 
     const recordBase = {
       id: recordId,
@@ -761,7 +796,12 @@ function bindEvents() {
       ewCm: value(formData.get("ewCm")),
       planSizeMode,
       largeShapeType,
-      largeAxisDirection: isLargeImageShape ? "" : largeAxisDirection,
+      largeAxisDirection: isLargeImageShape || !isLineShape ? "" : largeAxisDirection,
+      largeAxisPlungeDeg: isLargeImageShape || !isLineShape ? "" : largeAxisPlungeDeg,
+      largeAxisPlungeDir8: isLargeImageShape || !isLineShape ? "" : largeAxisPlungeDir8,
+      planeStrikeDirection: isLineShape ? "" : planeStrikeDirection,
+      planeDipDeg: isLineShape ? "" : planeDipDeg,
+      planeDipDir8: isLineShape ? "" : planeDipDir8,
       lineLengthCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? lineLengthCm : "",
       line1NsDir: "",
       line1NsCm: "",
@@ -791,6 +831,13 @@ function bindEvents() {
       imgP4NsCm: keepImageCornerFields ? imageCornerFields.imgP4NsCm : "",
       imgP4EwDir: keepImageCornerFields ? imageCornerFields.imgP4EwDir : "",
       imgP4EwCm: keepImageCornerFields ? imageCornerFields.imgP4EwCm : "",
+      imgRotateDeg: isLargeImageShape ? imageTransformFields.imgRotateDeg : "",
+      imgFrameWidthCm: isLargeImageShape ? imageTransformFields.imgFrameWidthCm : "",
+      imgFrameHeightCm: isLargeImageShape ? imageTransformFields.imgFrameHeightCm : "",
+      imgSkewXDeg: isLargeImageShape ? imageTransformFields.imgSkewXDeg : "",
+      imgSkewYDeg: isLargeImageShape ? imageTransformFields.imgSkewYDeg : "",
+      imgFlipH: isLargeImageShape ? imageTransformFields.imgFlipH : "0",
+      imgFlipV: isLargeImageShape ? imageTransformFields.imgFlipV : "0",
       importantFlag: normalizeHasFlag(value(formData.get("importantFlag"))),
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
@@ -990,6 +1037,27 @@ function bindEvents() {
   if (outputKuwakuSelect) {
     outputKuwakuSelect.addEventListener("change", () => {
       selectedOutputKuwaku = value(outputKuwakuSelect.value) || ALL_GRIDS_VALUE;
+      selectedCardRecordId = "";
+      renderOutputs();
+    });
+  }
+  if (outputCategorySelect) {
+    outputCategorySelect.addEventListener("change", () => {
+      selectedOutputCategory = value(outputCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
+      selectedCardRecordId = "";
+      renderOutputs();
+    });
+  }
+  if (outputStatusSelect) {
+    outputStatusSelect.addEventListener("change", () => {
+      selectedOutputStatus = value(outputStatusSelect.value) || "all";
+      selectedCardRecordId = "";
+      renderOutputs();
+    });
+  }
+  if (outputSearchInput) {
+    outputSearchInput.addEventListener("input", () => {
+      outputSearchText = value(outputSearchInput.value);
       selectedCardRecordId = "";
       renderOutputs();
     });
@@ -1697,6 +1765,8 @@ function syncDirectionTabsFromForm() {
   setDirectionGroupValue("layerRelative", layerRelativeInput?.value);
   setDirectionGroupValue("planSizeMode", planSizeModeInput?.value);
   setDirectionGroupValue("largeShapeType", largeShapeTypeInput?.value);
+  setDirectionGroupValue("plungeDir8", largeAxisPlungeDirInput?.value);
+  setDirectionGroupValue("planeDipDir8", planeDipDirInput?.value);
   syncLargeShapeSectionFromForm();
 
   document.querySelectorAll(".dir-tab").forEach((button) => {
@@ -1758,6 +1828,14 @@ function setDirectionGroupValue(group, valueRaw) {
   }
   if (group === "largeShapeType" && largeShapeTypeInput) {
     largeShapeTypeInput.value = normalized;
+    return;
+  }
+  if (group === "plungeDir8" && largeAxisPlungeDirInput) {
+    largeAxisPlungeDirInput.value = normalized;
+    return;
+  }
+  if (group === "planeDipDir8" && planeDipDirInput) {
+    planeDipDirInput.value = normalized;
   }
 }
 
@@ -1800,6 +1878,12 @@ function getDirectionGroupValue(group) {
   }
   if (group === "largeShapeType") {
     return normalizeDirectionValue(group, largeShapeTypeInput?.value);
+  }
+  if (group === "plungeDir8") {
+    return normalizeDirectionValue(group, largeAxisPlungeDirInput?.value);
+  }
+  if (group === "planeDipDir8") {
+    return normalizeDirectionValue(group, planeDipDirInput?.value);
   }
   return "";
 }
@@ -1972,6 +2056,12 @@ function syncLargeShapeImagePreview(shapeTypeRaw) {
     largeShapeImagePreviewTitle.textContent = "";
     largeShapeImagePreviewImg.removeAttribute("src");
     largeShapeImagePreviewImg.alt = "";
+    largeShapeImagePreviewImg.style.transform = "";
+    largeShapeImagePreviewImg.style.width = "";
+    largeShapeImagePreviewImg.style.height = "";
+    largeShapeImagePreviewImg.style.maxWidth = "";
+    largeShapeImagePreviewImg.style.maxHeight = "";
+    largeShapeImagePreviewImg.style.objectFit = "";
     return;
   }
   largeShapeImagePreview.classList.remove("hidden");
@@ -1987,6 +2077,7 @@ function syncLargeShapeImagePreview(shapeTypeRaw) {
     largeShapeImagePreviewImg.src = candidates[candidateIndex];
   };
   largeShapeImagePreviewImg.src = candidates[candidateIndex];
+  syncLargeShapeImagePreviewTransform();
 }
 
 function syncLargeShapeSectionFromForm() {
@@ -2006,11 +2097,35 @@ function syncLargeShapeSectionFromForm() {
     if (largeAxisDirectionInput) {
       largeAxisDirectionInput.value = "";
     }
+    if (largeAxisPlungeInput) {
+      largeAxisPlungeInput.value = "";
+    }
+    if (largeAxisPlungeDirInput) {
+      largeAxisPlungeDirInput.value = "";
+    }
+    if (planeStrikeInput) {
+      planeStrikeInput.value = "";
+    }
+    if (planeDipInput) {
+      planeDipInput.value = "";
+    }
+    if (planeDipDirInput) {
+      planeDipDirInput.value = "";
+    }
     largeShapePanels.forEach((panel) => {
       panel.classList.add("hidden");
     });
     if (largeAxisDirectionRow) {
       largeAxisDirectionRow.classList.remove("hidden");
+    }
+    if (largeAxisPlungeRow) {
+      largeAxisPlungeRow.classList.remove("hidden");
+    }
+    if (largeAxisPlungeDirRow) {
+      largeAxisPlungeDirRow.classList.remove("hidden");
+    }
+    if (planeAttitudeRow) {
+      planeAttitudeRow.classList.add("hidden");
     }
     syncLargeShapeImagePreview("");
     return;
@@ -2019,14 +2134,39 @@ function syncLargeShapeSectionFromForm() {
   const shapeTypeRaw = normalizeLargeShapeType(largeShapeTypeInput?.value);
   const shapeType = shapeTypeRaw || "直線状";
   const isImageShape = isLargeShapeImageType(shapeType);
+  const isLineShape = shapeType === "直線状";
   if (largeShapeTypeInput) {
     largeShapeTypeInput.value = shapeType;
   }
   if (largeAxisDirectionInput) {
-    largeAxisDirectionInput.value = isImageShape ? "" : normalizeLargeAxisDirection(largeAxisDirectionInput.value);
+    largeAxisDirectionInput.value = isLineShape ? normalizeLargeAxisDirection(largeAxisDirectionInput.value) : "";
+  }
+  if (largeAxisPlungeInput) {
+    largeAxisPlungeInput.value = isLineShape ? normalizeLargeAxisPlungeDeg(largeAxisPlungeInput.value) : "";
+  }
+  if (largeAxisPlungeDirInput) {
+    largeAxisPlungeDirInput.value = isLineShape ? normalizeCompass8Direction(largeAxisPlungeDirInput.value) : "";
+  }
+  if (planeStrikeInput) {
+    planeStrikeInput.value = isLineShape ? "" : normalizePlaneStrikeDirection(planeStrikeInput.value);
+  }
+  if (planeDipInput) {
+    planeDipInput.value = isLineShape ? "" : normalizePlaneDipDeg(planeDipInput.value);
+  }
+  if (planeDipDirInput) {
+    planeDipDirInput.value = isLineShape ? "" : normalizeCompass8Direction(planeDipDirInput.value);
   }
   if (largeAxisDirectionRow) {
-    largeAxisDirectionRow.classList.toggle("hidden", isImageShape);
+    largeAxisDirectionRow.classList.toggle("hidden", !isLineShape);
+  }
+  if (largeAxisPlungeRow) {
+    largeAxisPlungeRow.classList.toggle("hidden", !isLineShape);
+  }
+  if (largeAxisPlungeDirRow) {
+    largeAxisPlungeDirRow.classList.toggle("hidden", !isLineShape);
+  }
+  if (planeAttitudeRow) {
+    planeAttitudeRow.classList.toggle("hidden", isLineShape);
   }
   largeShapePanels.forEach((panel) => {
     const panelType = value(panel.dataset.largeShapePanel);
@@ -2186,6 +2326,18 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
     "analysisType",
     "nsCm",
     "ewCm",
+    "largeAxisPlungeDeg",
+    "largeAxisPlungeDir8",
+    "planeStrikeDirection",
+    "planeDipDeg",
+    "planeDipDir8",
+    "imgRotateDeg",
+    "imgFrameWidthCm",
+    "imgFrameHeightCm",
+    "imgSkewXDeg",
+    "imgSkewYDeg",
+    "imgFlipH",
+    "imgFlipV",
     "detail",
     "detailSub",
     "layerRef",
@@ -2316,6 +2468,9 @@ function handleRecordFormFieldEdit(event) {
     layerOtherInput.classList.remove("saved-carry-value");
     clearLayerSavedTabState();
   }
+  if (target instanceof HTMLElement && target.closest("#large-shape-section")) {
+    syncLargeShapeImagePreviewTransform();
+  }
   updateEditMissingRequiredHighlights();
 }
 
@@ -2353,7 +2508,7 @@ function extractImageCornerFieldsFromFormData(formData) {
   const getEwDir = (name) => normalizeEwDir(value(formData.get(name)));
   const getCm = (name) => value(formData.get(name));
 
-  return {
+  const normalized = {
     imgP1NsDir: getNsDir("imgP1NsDir"),
     imgP1NsCm: getCm("imgP1NsCm"),
     imgP1EwDir: getEwDir("imgP1EwDir"),
@@ -2371,6 +2526,114 @@ function extractImageCornerFieldsFromFormData(formData) {
     imgP4EwDir: getEwDir("imgP4EwDir"),
     imgP4EwCm: getCm("imgP4EwCm"),
   };
+  return normalized;
+}
+
+function normalizeToggleFlag(valueRaw) {
+  const text = value(valueRaw).toLowerCase();
+  return text === "1" || text === "true" || text === "on" || text === "yes" ? "1" : "0";
+}
+
+function normalizeImageRotationDeg(valueRaw) {
+  const text = value(valueRaw).replace(/[°度]/g, "");
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/-?\d+(?:\.\d+)?/);
+  if (!matched) {
+    return "";
+  }
+  const num = Number(matched[0]);
+  if (!Number.isFinite(num)) {
+    return "";
+  }
+  const normalized = ((num % 360) + 360) % 360;
+  return Number.isInteger(normalized) ? String(normalized) : String(normalized).replace(/\.?0+$/, "");
+}
+
+function normalizeImageSkewDeg(valueRaw) {
+  const text = value(valueRaw).replace(/[°度]/g, "");
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/-?\d+(?:\.\d+)?/);
+  if (!matched) {
+    return "";
+  }
+  const num = Number(matched[0]);
+  if (!Number.isFinite(num)) {
+    return "";
+  }
+  const limited = clamp(num, -80, 80);
+  return Number.isInteger(limited) ? String(limited) : String(limited).replace(/\.?0+$/, "");
+}
+
+function extractImageTransformFieldsFromFormData(formData) {
+  return {
+    imgRotateDeg: normalizeImageRotationDeg(formData.get("imgRotateDeg")),
+    imgFrameWidthCm: value(formData.get("imgFrameWidthCm")),
+    imgFrameHeightCm: value(formData.get("imgFrameHeightCm")),
+    imgSkewXDeg: normalizeImageSkewDeg(formData.get("imgSkewXDeg")),
+    imgSkewYDeg: normalizeImageSkewDeg(formData.get("imgSkewYDeg")),
+    imgFlipH: normalizeToggleFlag(formData.get("imgFlipH")),
+    imgFlipV: normalizeToggleFlag(formData.get("imgFlipV")),
+  };
+}
+
+function syncLargeShapeImagePreviewTransform() {
+  if (!largeShapeImagePreviewImg || !recordForm) {
+    return;
+  }
+  const shapeType = normalizeLargeShapeType(largeShapeTypeInput?.value);
+  const isImageShape = isLargeShapeImageType(shapeType);
+  if (!isImageShape) {
+    largeShapeImagePreviewImg.style.transform = "";
+    largeShapeImagePreviewImg.style.width = "";
+    largeShapeImagePreviewImg.style.height = "";
+    largeShapeImagePreviewImg.style.maxWidth = "";
+    largeShapeImagePreviewImg.style.maxHeight = "";
+    largeShapeImagePreviewImg.style.objectFit = "";
+    return;
+  }
+  const formData = new FormData(recordForm);
+  const frameWidthCm = parseDistanceToCm(formData.get("imgFrameWidthCm"));
+  const frameHeightCm = parseDistanceToCm(formData.get("imgFrameHeightCm"));
+  const rotate = Number(normalizeImageRotationDeg(formData.get("imgRotateDeg")) || "0");
+  const skewX = Number(normalizeImageSkewDeg(formData.get("imgSkewXDeg")) || "0");
+  const skewY = Number(normalizeImageSkewDeg(formData.get("imgSkewYDeg")) || "0");
+  const flipH = normalizeToggleFlag(formData.get("imgFlipH")) === "1";
+  const flipV = normalizeToggleFlag(formData.get("imgFlipV")) === "1";
+  const scaleX = flipH ? -1 : 1;
+  const scaleY = flipV ? -1 : 1;
+
+  if (frameWidthCm != null && frameWidthCm > 0 && frameHeightCm != null && frameHeightCm > 0) {
+    const maxSidePx = 280;
+    const minSidePx = 52;
+    const dominant = Math.max(frameWidthCm, frameHeightCm);
+    let widthPx = (frameWidthCm / dominant) * maxSidePx;
+    let heightPx = (frameHeightCm / dominant) * maxSidePx;
+    const shortSide = Math.min(widthPx, heightPx);
+    if (shortSide < minSidePx) {
+      const scaleUp = minSidePx / shortSide;
+      widthPx *= scaleUp;
+      heightPx *= scaleUp;
+    }
+    largeShapeImagePreviewImg.style.width = `${Math.round(widthPx)}px`;
+    largeShapeImagePreviewImg.style.height = `${Math.round(heightPx)}px`;
+    largeShapeImagePreviewImg.style.maxWidth = "none";
+    largeShapeImagePreviewImg.style.maxHeight = "none";
+    // 平面図/3Dと同じく、PNG全体を外枠にマッピングする。
+    largeShapeImagePreviewImg.style.objectFit = "fill";
+  } else {
+    largeShapeImagePreviewImg.style.width = "";
+    largeShapeImagePreviewImg.style.height = "";
+    largeShapeImagePreviewImg.style.maxWidth = "";
+    largeShapeImagePreviewImg.style.maxHeight = "";
+    largeShapeImagePreviewImg.style.objectFit = "contain";
+  }
+
+  largeShapeImagePreviewImg.style.transformOrigin = "center center";
+  largeShapeImagePreviewImg.style.transform = `rotate(${rotate}deg) scale(${scaleX}, ${scaleY}) skew(${skewX}deg, ${skewY}deg)`;
 }
 
 function resetRecordForm({ showMessage }) {
@@ -2404,8 +2667,35 @@ function resetRecordForm({ showMessage }) {
   if (recordForm.elements.largeAxisDirection) {
     recordForm.elements.largeAxisDirection.value = "";
   }
+  if (recordForm.elements.largeAxisPlungeDeg) {
+    recordForm.elements.largeAxisPlungeDeg.value = "";
+  }
+  if (recordForm.elements.largeAxisPlungeDir8) {
+    recordForm.elements.largeAxisPlungeDir8.value = "";
+  }
+  if (recordForm.elements.planeStrikeDirection) {
+    recordForm.elements.planeStrikeDirection.value = "";
+  }
+  if (recordForm.elements.planeDipDeg) {
+    recordForm.elements.planeDipDeg.value = "";
+  }
+  if (recordForm.elements.planeDipDir8) {
+    recordForm.elements.planeDipDir8.value = "";
+  }
   if (recordForm.elements.lineLengthCm) {
     recordForm.elements.lineLengthCm.value = "";
+  }
+  ["imgRotateDeg", "imgFrameWidthCm", "imgFrameHeightCm", "imgSkewXDeg", "imgSkewYDeg"].forEach((name) => {
+    const field = recordForm?.elements?.namedItem(name);
+    if (field instanceof HTMLInputElement) {
+      field.value = "";
+    }
+  });
+  if (recordForm.elements.imgFlipH instanceof HTMLInputElement) {
+    recordForm.elements.imgFlipH.checked = false;
+  }
+  if (recordForm.elements.imgFlipV instanceof HTMLInputElement) {
+    recordForm.elements.imgFlipV.checked = false;
   }
   clearImageCornerCmFields();
   setDefaultImageCornerDirections();
@@ -2477,8 +2767,44 @@ function populateRecordForm(record) {
   if (recordForm.elements.largeAxisDirection) {
     recordForm.elements.largeAxisDirection.value = normalizeLargeAxisDirection(record.largeAxisDirection);
   }
+  if (recordForm.elements.largeAxisPlungeDeg) {
+    recordForm.elements.largeAxisPlungeDeg.value = normalizeLargeAxisPlungeDeg(record.largeAxisPlungeDeg);
+  }
+  if (recordForm.elements.largeAxisPlungeDir8) {
+    recordForm.elements.largeAxisPlungeDir8.value = normalizeCompass8Direction(record.largeAxisPlungeDir8);
+  }
+  if (recordForm.elements.planeStrikeDirection) {
+    recordForm.elements.planeStrikeDirection.value = normalizePlaneStrikeDirection(record.planeStrikeDirection);
+  }
+  if (recordForm.elements.planeDipDeg) {
+    recordForm.elements.planeDipDeg.value = normalizePlaneDipDeg(record.planeDipDeg);
+  }
+  if (recordForm.elements.planeDipDir8) {
+    recordForm.elements.planeDipDir8.value = normalizeCompass8Direction(record.planeDipDir8);
+  }
   if (recordForm.elements.lineLengthCm) {
     recordForm.elements.lineLengthCm.value = value(record.lineLengthCm);
+  }
+  if (recordForm.elements.imgRotateDeg) {
+    recordForm.elements.imgRotateDeg.value = normalizeImageRotationDeg(record.imgRotateDeg);
+  }
+  if (recordForm.elements.imgFrameWidthCm) {
+    recordForm.elements.imgFrameWidthCm.value = value(record.imgFrameWidthCm);
+  }
+  if (recordForm.elements.imgFrameHeightCm) {
+    recordForm.elements.imgFrameHeightCm.value = value(record.imgFrameHeightCm);
+  }
+  if (recordForm.elements.imgSkewXDeg) {
+    recordForm.elements.imgSkewXDeg.value = normalizeImageSkewDeg(record.imgSkewXDeg);
+  }
+  if (recordForm.elements.imgSkewYDeg) {
+    recordForm.elements.imgSkewYDeg.value = normalizeImageSkewDeg(record.imgSkewYDeg);
+  }
+  if (recordForm.elements.imgFlipH instanceof HTMLInputElement) {
+    recordForm.elements.imgFlipH.checked = normalizeToggleFlag(record.imgFlipH) === "1";
+  }
+  if (recordForm.elements.imgFlipV instanceof HTMLInputElement) {
+    recordForm.elements.imgFlipV.checked = normalizeToggleFlag(record.imgFlipV) === "1";
   }
 
   nsDirInput.value = normalizeNsDir(record.nsDir);
@@ -2610,7 +2936,9 @@ function buildCurrentEditDraftRecord() {
   const draftRawShapeType = value(formData.get("largeShapeType"));
   const draftShapeType = normalizeLargeShapeType(draftRawShapeType) || normalizeLargeShapeLabel(draftRawShapeType);
   const draftIsImageShape = isLargeShapeImageType(draftShapeType);
+  const draftIsLineShape = draftShapeType === "直線状";
   const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
+  const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
   return {
     kuwaku: buildKuwaku(
       normalizeKuwakuHeadA(editKuwakuHeadAInput?.value),
@@ -2648,7 +2976,12 @@ function buildCurrentEditDraftRecord() {
     ewCm: value(formData.get("ewCm")),
     planSizeMode: normalizePlanSizeMode(value(formData.get("planSizeMode"))),
     largeShapeType: draftShapeType,
-    largeAxisDirection: draftIsImageShape ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
+    largeAxisDirection: draftIsImageShape || !draftIsLineShape ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
+    largeAxisPlungeDeg: draftIsImageShape || !draftIsLineShape ? "" : normalizeLargeAxisPlungeDeg(value(formData.get("largeAxisPlungeDeg"))),
+    largeAxisPlungeDir8: draftIsImageShape || !draftIsLineShape ? "" : normalizeCompass8Direction(value(formData.get("largeAxisPlungeDir8"))),
+    planeStrikeDirection: draftIsLineShape ? "" : normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection"))),
+    planeDipDeg: draftIsLineShape ? "" : normalizePlaneDipDeg(value(formData.get("planeDipDeg"))),
+    planeDipDir8: draftIsLineShape ? "" : normalizeCompass8Direction(value(formData.get("planeDipDir8"))),
     lineLengthCm: value(formData.get("lineLengthCm")),
     line1NsDir: "",
     line1NsCm: "",
@@ -2678,6 +3011,13 @@ function buildCurrentEditDraftRecord() {
     imgP4NsCm: imageCornerFields.imgP4NsCm,
     imgP4EwDir: imageCornerFields.imgP4EwDir,
     imgP4EwCm: imageCornerFields.imgP4EwCm,
+    imgRotateDeg: draftIsImageShape ? imageTransformFields.imgRotateDeg : "",
+    imgFrameWidthCm: draftIsImageShape ? imageTransformFields.imgFrameWidthCm : "",
+    imgFrameHeightCm: draftIsImageShape ? imageTransformFields.imgFrameHeightCm : "",
+    imgSkewXDeg: draftIsImageShape ? imageTransformFields.imgSkewXDeg : "",
+    imgSkewYDeg: draftIsImageShape ? imageTransformFields.imgSkewYDeg : "",
+    imgFlipH: draftIsImageShape ? imageTransformFields.imgFlipH : "0",
+    imgFlipV: draftIsImageShape ? imageTransformFields.imgFlipV : "0",
     layerName: getSelectedLayerName(),
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
@@ -2925,6 +3265,12 @@ function updateEditMissingRequiredHighlights() {
   if (missingKeys.has("largeAxisDirection")) {
     markEditMissingFieldByName("largeAxisDirection");
   }
+  if (missingKeys.has("largeAxisPlungeDir8")) {
+    markEditMissingGroupByName("largeAxisPlungeDir8");
+  }
+  if (missingKeys.has("planeDipDir8")) {
+    markEditMissingGroupByName("planeDipDir8");
+  }
   if (missingKeys.has("lineLengthCm")) {
     markEditMissingFieldByName("lineLengthCm");
   }
@@ -2941,6 +3287,9 @@ function updateEditMissingRequiredHighlights() {
     markEditMissingFieldByName("ellipseShortRadiusCm");
   }
   [
+    "imgRotateDeg",
+    "imgFrameWidthCm",
+    "imgFrameHeightCm",
     "imgP1NsCm",
     "imgP1EwCm",
     "imgP2NsCm",
@@ -3883,13 +4232,17 @@ function renderListOutput() {
   updateOutputListSortHeader();
   if (!state.records.length) {
     syncOutputKuwakuSelect([]);
+    syncOutputCategorySelect([]);
+    syncOutputStatusSelect();
+    syncOutputSearchInput();
+    updateOutputFilterSummary(0, 0);
     outputListBody.innerHTML = "<tr><td colspan=\"18\">出力対象データがありません。</td></tr>";
     return;
   }
 
   const filteredRecords = getFilteredOutputRecords();
   if (!filteredRecords.length) {
-    outputListBody.innerHTML = "<tr><td colspan=\"18\">選択した区画のデータがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"18\">条件に一致するデータがありません。</td></tr>";
     return;
   }
 
@@ -3936,6 +4289,9 @@ function renderListOutput() {
         "rectSide2Cm",
         "ellipseLongRadiusCm",
         "ellipseShortRadiusCm",
+        "imgRotateDeg",
+        "imgFrameWidthCm",
+        "imgFrameHeightCm",
       ]);
       return `
       <tr class="${selectedClass}">
@@ -4136,29 +4492,45 @@ function formatPlanPosition(record) {
     return base;
   }
   const axisDirection = normalizeLargeAxisDirection(record?.largeAxisDirection);
+  const plungeDeg = normalizeLargeAxisPlungeDeg(record?.largeAxisPlungeDeg);
+  const plungeDir8 = normalizeCompass8Direction(record?.largeAxisPlungeDir8);
+  const plungeText = plungeDeg ? `プランジ:${plungeDeg}${plungeDir8 ? `(${plungeDir8})` : ""}` : "";
+  const planeStrike = normalizePlaneStrikeDirection(record?.planeStrikeDirection);
+  const planeDip = normalizePlaneDipDeg(record?.planeDipDeg);
+  const planeDipDir8 = normalizeCompass8Direction(record?.planeDipDir8);
+  const planeAttitudeText =
+    planeStrike && planeDip ? `走向傾斜:${planeStrike}/${planeDip}${planeDipDir8 ? `(${planeDipDir8})` : ""}` : "";
   const shapeType = normalizeLargeShapeType(record?.largeShapeType);
   const lineLength = shapeType === "直線状" ? formatCmValue(record?.lineLengthCm) : "";
   if (!base) {
     if (shapeType === "直線状") {
       if (axisDirection && lineLength) {
-        return `方位:${axisDirection} / 長さ:${lineLength}`;
+        return [`方位:${axisDirection}`, `長さ:${lineLength}`, plungeText].filter(Boolean).join(" / ");
       }
-      return axisDirection ? `方位:${axisDirection}` : lineLength ? `長さ:${lineLength}` : "";
+      return [axisDirection ? `方位:${axisDirection}` : "", lineLength ? `長さ:${lineLength}` : "", plungeText]
+        .filter(Boolean)
+        .join(" / ");
     }
-    return axisDirection ? `方位:${axisDirection}` : "";
+    return [planeAttitudeText].filter(Boolean).join(" / ");
   }
   if (shapeType === "直線状") {
     if (axisDirection && lineLength) {
-      return `${base} / 方位:${axisDirection} / 長さ:${lineLength}`;
+      return [base, `方位:${axisDirection}`, `長さ:${lineLength}`, plungeText].filter(Boolean).join(" / ");
     }
     if (axisDirection) {
-      return `${base} / 方位:${axisDirection}`;
+      return [base, `方位:${axisDirection}`, plungeText].filter(Boolean).join(" / ");
     }
     if (lineLength) {
-      return `${base} / 長さ:${lineLength}`;
+      return [base, `長さ:${lineLength}`, plungeText].filter(Boolean).join(" / ");
     }
   }
-  return axisDirection ? `${base} / 方位:${axisDirection}` : base;
+  if (shapeType !== "直線状" && planeAttitudeText) {
+    return [base, planeAttitudeText].filter(Boolean).join(" / ");
+  }
+  if (axisDirection || plungeText) {
+    return [base, axisDirection ? `方位:${axisDirection}` : "", plungeText].filter(Boolean).join(" / ");
+  }
+  return base;
 }
 
 function renderCardOutput() {
@@ -4239,10 +4611,35 @@ function renderCardOutput() {
 function getFilteredOutputRecords() {
   const sortedRecords = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
   syncOutputKuwakuSelect(sortedRecords);
-  if (selectedOutputKuwaku === ALL_GRIDS_VALUE) {
-    return sortedRecords;
+  const kuwakuScopedRecords =
+    selectedOutputKuwaku === ALL_GRIDS_VALUE
+      ? sortedRecords
+      : sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === selectedOutputKuwaku);
+
+  syncOutputCategorySelect(kuwakuScopedRecords);
+  syncOutputStatusSelect();
+  syncOutputSearchInput();
+
+  let filteredRecords = kuwakuScopedRecords;
+  if (selectedOutputCategory && selectedOutputCategory !== EXPORT_CATEGORY_ALL_VALUE) {
+    filteredRecords = filteredRecords.filter((record) => {
+      const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+      return normalizeSpecimenPrefix(specimen.prefix) === selectedOutputCategory;
+    });
   }
-  return sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === selectedOutputKuwaku);
+  if (selectedOutputStatus === "complete") {
+    filteredRecords = filteredRecords.filter((record) => isRecordDataComplete(record));
+  } else if (selectedOutputStatus === "incomplete") {
+    filteredRecords = filteredRecords.filter((record) => !isRecordDataComplete(record));
+  }
+
+  const searchText = value(outputSearchText).toLowerCase();
+  if (searchText) {
+    filteredRecords = filteredRecords.filter((record) => buildOutputFilterSearchText(record).includes(searchText));
+  }
+
+  updateOutputFilterSummary(filteredRecords.length, sortedRecords.length);
+  return filteredRecords;
 }
 
 function syncOutputKuwakuSelect(records) {
@@ -4261,6 +4658,70 @@ function syncOutputKuwakuSelect(records) {
         )}</option>`
     )
     .join("");
+}
+
+function syncOutputCategorySelect(records) {
+  if (!outputCategorySelect) {
+    return;
+  }
+  const options = collectExportCategoryOptions(records);
+  if (!options.some((item) => item.value === selectedOutputCategory)) {
+    selectedOutputCategory = EXPORT_CATEGORY_ALL_VALUE;
+  }
+  outputCategorySelect.innerHTML = options
+    .map(
+      (item) =>
+        `<option value="${escapeHtml(item.value)}" ${item.value === selectedOutputCategory ? "selected" : ""}>${escapeHtml(
+          item.label
+        )}</option>`
+    )
+    .join("");
+}
+
+function syncOutputStatusSelect() {
+  if (!outputStatusSelect) {
+    return;
+  }
+  if (!["all", "complete", "incomplete"].includes(selectedOutputStatus)) {
+    selectedOutputStatus = "all";
+  }
+  outputStatusSelect.value = selectedOutputStatus;
+}
+
+function syncOutputSearchInput() {
+  if (!outputSearchInput) {
+    return;
+  }
+  if (outputSearchInput.value !== outputSearchText) {
+    outputSearchInput.value = outputSearchText;
+  }
+}
+
+function buildOutputFilterSearchText(record) {
+  return [
+    getRecordKuwaku(record),
+    record.specimenNo,
+    formatCategoryForRecord(record),
+    record.nameMemo,
+    record.unit,
+    formatDetailForRecord(record),
+    getRecordTeamValue(record),
+    record.discoverer,
+    record.identifier,
+    formatPlanPosition(record),
+    record.notes,
+  ]
+    .map((item) => value(item).toLowerCase())
+    .join(" ");
+}
+
+function updateOutputFilterSummary(filteredCount, totalCount) {
+  if (!outputFilterSummary) {
+    return;
+  }
+  const filtered = Number.isFinite(filteredCount) ? filteredCount : 0;
+  const total = Number.isFinite(totalCount) ? totalCount : 0;
+  outputFilterSummary.textContent = `表示: ${filtered}件 / 全体: ${total}件`;
 }
 
 function collectOutputKuwakuOptions(records) {
@@ -4765,7 +5226,28 @@ function buildViewerGridMetrics(candidates) {
 function buildViewerShapeFromCandidate(candidate, metrics) {
   const drawable = candidate.drawable;
   const altitudeM = candidate.altitudeM;
-  const altitudeZ = applyViewerVerticalScale(altitudeM, metrics.minZ);
+  const centerPlanPoint = { x: drawable.x, y: drawable.y };
+  let tiltAzimuth = null;
+  let tiltDeg = null;
+  if (drawable.type === "line") {
+    tiltAzimuth =
+      parseCompass8Azimuth(candidate?.record?.largeAxisPlungeDir8) ??
+      parseLargeAxisAzimuth(candidate?.record?.largeAxisDirection);
+    tiltDeg = parseLargeAxisPlungeDeg(candidate?.record?.largeAxisPlungeDeg);
+  } else if (drawable.type === "rect" || drawable.type === "ellipse" || drawable.type === "imageQuad") {
+    const strikeAzimuth = parseLargeAxisAzimuth(candidate?.record?.planeStrikeDirection);
+    const dipDeg = parseLargeAxisPlungeDeg(candidate?.record?.planeDipDeg);
+    tiltAzimuth =
+      parseCompass8Azimuth(candidate?.record?.planeDipDir8) ??
+      (Number.isFinite(strikeAzimuth) ? (strikeAzimuth + 90) % 360 : null);
+    tiltDeg = Number.isFinite(dipDeg) ? dipDeg : null;
+  }
+  const getViewerZForPlanPoint = (planPointRaw) => {
+    const planPoint = planPointRaw || centerPlanPoint;
+    const deltaM = computeViewerPlungeDeltaM(planPoint, centerPlanPoint, tiltAzimuth, tiltDeg);
+    return applyViewerVerticalScale(altitudeM + deltaM, metrics.minZ);
+  };
+  const altitudeZ = getViewerZForPlanPoint(centerPlanPoint);
   const worldCenter = convertViewerPointCmToWorld(drawable.x, drawable.y, candidate.grid, metrics);
   const meta = {
     id: value(candidate.record.id),
@@ -4791,11 +5273,13 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   if (drawable.type === "line") {
     const p1 = convertViewerPointCmToWorld(drawable.x1, drawable.y1, candidate.grid, metrics);
     const p2 = convertViewerPointCmToWorld(drawable.x2, drawable.y2, candidate.grid, metrics);
+    const z1 = getViewerZForPlanPoint({ x: drawable.x1, y: drawable.y1 });
+    const z2 = getViewerZForPlanPoint({ x: drawable.x2, y: drawable.y2 });
     return {
       type: "line",
       points: [
-        { x: p1.x, y: p1.y, z: altitudeZ },
-        { x: p2.x, y: p2.y, z: altitudeZ },
+        { x: p1.x, y: p1.y, z: z1 },
+        { x: p2.x, y: p2.y, z: z2 },
       ],
       x: worldCenter.x,
       y: worldCenter.y,
@@ -4815,7 +5299,7 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
     ].map((point) => rotatePlanPoint(point, { x: drawable.x, y: drawable.y }, drawable.rotationDeg));
     const points = localCorners.map((point) => {
       const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
-      return { x: world.x, y: world.y, z: altitudeZ };
+      return { x: world.x, y: world.y, z: getViewerZForPlanPoint(point) };
     });
     points.push(points[0]);
     return {
@@ -4839,7 +5323,7 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
       };
       const rotated = rotatePlanPoint(local, { x: drawable.x, y: drawable.y }, drawable.rotationDeg);
       const world = convertViewerPointCmToWorld(rotated.x, rotated.y, candidate.grid, metrics);
-      points.push({ x: world.x, y: world.y, z: altitudeZ });
+      points.push({ x: world.x, y: world.y, z: getViewerZForPlanPoint(rotated) });
     }
     return {
       type: "polyline",
@@ -4854,7 +5338,7 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   if (drawable.type === "imageQuad") {
     const points = (drawable.points || []).map((point) => {
       const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
-      return { x: world.x, y: world.y, z: altitudeZ };
+      return { x: world.x, y: world.y, z: getViewerZForPlanPoint(point) };
     });
     return {
       type: "imageQuad",
@@ -4884,6 +5368,26 @@ function rotatePlanPoint(point, center, rotationDegRaw) {
     x: center.x + dx * cos - dy * sin,
     y: center.y + dx * sin + dy * cos,
   };
+}
+
+function computeViewerPlungeDeltaM(point, center, axisAzimuthRaw, plungeDegRaw) {
+  if (!point || !center) {
+    return 0;
+  }
+  const axisAzimuth = Number(axisAzimuthRaw);
+  const plungeDeg = Number(plungeDegRaw);
+  if (!Number.isFinite(axisAzimuth) || !Number.isFinite(plungeDeg) || plungeDeg <= 0) {
+    return 0;
+  }
+  const unit = azimuthToPlanUnitVector(axisAzimuth);
+  const alongAxisCm = (point.x - center.x) * unit.dx + (point.y - center.y) * unit.dy;
+  const alongAxisM = alongAxisCm / 100;
+  const tilt = Math.tan((plungeDeg * Math.PI) / 180);
+  if (!Number.isFinite(tilt) || tilt === 0) {
+    return 0;
+  }
+  // 方位方向側へ進むほど深くなる（標高は低くなる）向きで適用する。
+  return -alongAxisM * tilt;
 }
 
 function convertViewerPointCmToWorld(xCmRaw, yCmRaw, grid, metrics) {
@@ -5984,6 +6488,22 @@ function parseLargeAxisAzimuth(valueRaw) {
   return null;
 }
 
+function parseLargeAxisPlungeDeg(valueRaw) {
+  const text = value(valueRaw).replace(/[°度]/g, "");
+  if (!text) {
+    return null;
+  }
+  const matched = text.match(/-?\d+(?:\.\d+)?/);
+  if (!matched) {
+    return null;
+  }
+  const num = Number(matched[0]);
+  if (!Number.isFinite(num)) {
+    return null;
+  }
+  return clamp(Math.abs(num), 0, 90);
+}
+
 function azimuthToPlanUnitVector(azimuthDegRaw) {
   const azimuthDeg = Number(azimuthDegRaw);
   if (!Number.isFinite(azimuthDeg)) {
@@ -6020,15 +6540,60 @@ function pointsToAzimuthDeg(pointA, pointB) {
 }
 
 function parseImageQuadPlanPoints(record, center = null) {
+  const centerPointRaw = center
+    ? { x: Number(center.x), y: Number(center.y) }
+    : convertPositionToPlanCoords(record?.nsDir, record?.nsCm, record?.ewDir, record?.ewCm);
+  const centerPoint =
+    centerPointRaw && Number.isFinite(centerPointRaw.x) && Number.isFinite(centerPointRaw.y) ? centerPointRaw : null;
+  const widthCm = parseDistanceToCm(record?.imgFrameWidthCm);
+  const heightCm = parseDistanceToCm(record?.imgFrameHeightCm);
+  const rotationText = normalizeImageRotationDeg(record?.imgRotateDeg);
+  if (centerPoint && widthCm != null && widthCm > 0 && heightCm != null && heightCm > 0 && rotationText !== "") {
+    const rotationDeg = Number(rotationText);
+    const skewXDeg = Number(normalizeImageSkewDeg(record?.imgSkewXDeg) || "0");
+    const skewYDeg = Number(normalizeImageSkewDeg(record?.imgSkewYDeg) || "0");
+    const flipH = normalizeToggleFlag(record?.imgFlipH) === "1";
+    const flipV = normalizeToggleFlag(record?.imgFlipV) === "1";
+
+    const up = azimuthToPlanUnitVector(rotationDeg);
+    const down = { dx: -up.dx, dy: -up.dy };
+    const right = azimuthToPlanUnitVector((rotationDeg + 90) % 360);
+    const tanSkewX = Math.tan((skewXDeg * Math.PI) / 180);
+    const tanSkewY = Math.tan((skewYDeg * Math.PI) / 180);
+    const baseLocalCorners = [
+      { x: -widthCm / 2, y: -heightCm / 2 }, // tl
+      { x: widthCm / 2, y: -heightCm / 2 }, // tr
+      { x: widthCm / 2, y: heightCm / 2 }, // br
+      { x: -widthCm / 2, y: heightCm / 2 }, // bl
+    ];
+    const shearedWorldCorners = baseLocalCorners.map((local) => {
+      const xSheared = local.x + tanSkewX * local.y;
+      const ySheared = local.y + tanSkewY * local.x;
+      return {
+        x: centerPoint.x + right.dx * xSheared + down.dx * ySheared,
+        y: centerPoint.y + right.dy * xSheared + down.dy * ySheared,
+      };
+    });
+    let order = [0, 1, 2, 3];
+    if (flipH && flipV) {
+      order = [2, 3, 0, 1];
+    } else if (flipH) {
+      order = [1, 0, 3, 2];
+    } else if (flipV) {
+      order = [3, 2, 1, 0];
+    }
+    return order.map((index) => shearedWorldCorners[index]);
+  }
+
   const corner1 = convertPositionToPlanCoords(record?.imgP1NsDir, record?.imgP1NsCm, record?.imgP1EwDir, record?.imgP1EwCm);
   const corner2 = convertPositionToPlanCoords(record?.imgP2NsDir, record?.imgP2NsCm, record?.imgP2EwDir, record?.imgP2EwCm);
   const corner3 = convertPositionToPlanCoords(record?.imgP3NsDir, record?.imgP3NsCm, record?.imgP3EwDir, record?.imgP3EwCm);
   const corner4 = convertPositionToPlanCoords(record?.imgP4NsDir, record?.imgP4NsCm, record?.imgP4EwDir, record?.imgP4EwCm);
   if (!corner1 || !corner2 || !corner3 || !corner4) {
-    if (!center) {
+    if (!centerPoint) {
       return null;
     }
-    const candidates = [corner1, corner2, corner3, corner4, center].filter(Boolean);
+    const candidates = [corner1, corner2, corner3, corner4, centerPoint].filter(Boolean);
     if (!candidates.length) {
       return null;
     }
@@ -6038,12 +6603,12 @@ function parseImageQuadPlanPoints(record, center = null) {
     let maxY = Math.max(...candidates.map((point) => point.y));
     const fallbackHalfSize = 20;
     if (Math.abs(maxX - minX) < 1) {
-      minX = center.x - fallbackHalfSize;
-      maxX = center.x + fallbackHalfSize;
+      minX = centerPoint.x - fallbackHalfSize;
+      maxX = centerPoint.x + fallbackHalfSize;
     }
     if (Math.abs(maxY - minY) < 1) {
-      minY = center.y - fallbackHalfSize;
-      maxY = center.y + fallbackHalfSize;
+      minY = centerPoint.y - fallbackHalfSize;
+      maxY = centerPoint.y + fallbackHalfSize;
     }
     return [
       { x: minX, y: minY },
@@ -6089,7 +6654,11 @@ function buildPlanDrawable(record) {
   const resolvedImageType = isImageShape ? shapeType : hasMappedImageType ? normalizedShapeLabel : "";
   const shouldUseImageQuad =
     planSizeMode === "大きなもの" && (isImageShape || (resolvedImageType && rawImageCorners.length > 0));
-  const axisAzimuth = shouldUseImageQuad ? null : parseLargeAxisAzimuth(record.largeAxisDirection);
+  const orientationAzimuth =
+    shapeType === "直線状"
+      ? parseLargeAxisAzimuth(record.largeAxisDirection)
+      : parseLargeAxisAzimuth(record.planeStrikeDirection) ?? parseLargeAxisAzimuth(record.largeAxisDirection);
+  const axisAzimuth = shouldUseImageQuad ? null : orientationAzimuth;
 
   if (planSizeMode !== "大きなもの" || !shapeType) {
     return {
@@ -6284,18 +6853,10 @@ function buildPlanImageWarpSvg(drawable, index = 0) {
   const labelKey = value(drawable.label || "x").replace(/[^a-zA-Z0-9_-]/g, "");
   const clipIdA = `plan-img-clip-a-${index}-${labelKey || "x"}`;
   const clipIdB = `plan-img-clip-b-${index}-${labelKey || "x"}`;
-  const clipIdRect = `plan-img-clip-rect-${index}-${labelKey || "x"}`;
   const matrixA = [p2.x - p1.x, p2.y - p1.y, p3.x - p2.x, p3.y - p2.y, p1.x, p1.y];
   const matrixB = [p3.x - p4.x, p3.y - p4.y, p4.x - p1.x, p4.y - p1.y, p1.x, p1.y];
   const triA = `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`;
   const triB = `${p1.x},${p1.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`;
-  const quadPoints = `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`;
-  const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
-  const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
-  const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
-  const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
-  const boxWidth = Math.max(1, maxX - minX);
-  const boxHeight = Math.max(1, maxY - minY);
   const matrixAText = matrixA.map((num) => (Number.isFinite(num) ? Number(num).toFixed(4) : "0")).join(" ");
   const matrixBText = matrixB.map((num) => (Number.isFinite(num) ? Number(num).toFixed(4) : "0")).join(" ");
   return `
@@ -6306,11 +6867,7 @@ function buildPlanImageWarpSvg(drawable, index = 0) {
       <clipPath id="${clipIdB}">
         <polygon points="${triB}" />
       </clipPath>
-      <clipPath id="${clipIdRect}">
-        <polygon points="${quadPoints}" />
-      </clipPath>
     </defs>
-    <image href="${escapeHtml(imageRef)}" x="${minX}" y="${minY}" width="${boxWidth}" height="${boxHeight}" preserveAspectRatio="none" clip-path="url(#${clipIdRect})" />
     <image href="${escapeHtml(imageRef)}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixAText})" clip-path="url(#${clipIdA})" />
     <image href="${escapeHtml(imageRef)}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixBText})" clip-path="url(#${clipIdB})" />
   `;
@@ -6827,6 +7384,13 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)),
     largeShapeType: normalizedLargeShapeType,
     largeAxisDirection: normalizeLargeAxisDirection(value(item.largeAxisDirection)),
+    largeAxisPlungeDeg: normalizeLargeAxisPlungeDeg(value(item.largeAxisPlungeDeg)),
+    largeAxisPlungeDir8: normalizeCompass8Direction(
+      value(item.largeAxisPlungeDir8) || value(item.largeAxisPlungeDirection) || value(item.plungeDir8)
+    ),
+    planeStrikeDirection: normalizePlaneStrikeDirection(value(item.planeStrikeDirection)),
+    planeDipDeg: normalizePlaneDipDeg(value(item.planeDipDeg)),
+    planeDipDir8: normalizeCompass8Direction(value(item.planeDipDir8) || value(item.planeDipDirection)),
     lineLengthCm: value(item.lineLengthCm),
     line1NsDir: normalizeNsDir(value(item.line1NsDir)),
     line1NsCm: value(item.line1NsCm),
@@ -6856,6 +7420,13 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     imgP4NsCm: value(item.imgP4NsCm),
     imgP4EwDir: normalizeEwDir(value(item.imgP4EwDir)),
     imgP4EwCm: value(item.imgP4EwCm),
+    imgRotateDeg: normalizeImageRotationDeg(value(item.imgRotateDeg)),
+    imgFrameWidthCm: value(item.imgFrameWidthCm),
+    imgFrameHeightCm: value(item.imgFrameHeightCm),
+    imgSkewXDeg: normalizeImageSkewDeg(value(item.imgSkewXDeg)),
+    imgSkewYDeg: normalizeImageSkewDeg(value(item.imgSkewYDeg)),
+    imgFlipH: normalizeToggleFlag(value(item.imgFlipH)),
+    imgFlipV: normalizeToggleFlag(value(item.imgFlipV)),
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),
@@ -6875,6 +7446,25 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     createdAt: value(item.createdAt) || new Date().toISOString(),
     updatedAt: value(item.updatedAt) || new Date().toISOString(),
   };
+  const isLineShape = normalized.largeShapeType === "直線状";
+  if (isLineShape) {
+    normalized.planeStrikeDirection = "";
+    normalized.planeDipDeg = "";
+    normalized.planeDipDir8 = "";
+  } else {
+    if (!value(normalized.planeStrikeDirection) && value(normalized.largeAxisDirection)) {
+      normalized.planeStrikeDirection = normalized.largeAxisDirection;
+    }
+    if (!value(normalized.planeDipDeg) && value(normalized.largeAxisPlungeDeg)) {
+      normalized.planeDipDeg = normalized.largeAxisPlungeDeg;
+    }
+    if (!value(normalized.planeDipDir8) && value(normalized.largeAxisPlungeDir8)) {
+      normalized.planeDipDir8 = normalized.largeAxisPlungeDir8;
+    }
+    normalized.largeAxisDirection = "";
+    normalized.largeAxisPlungeDeg = "";
+    normalized.largeAxisPlungeDir8 = "";
+  }
   if (!value(normalized.lineLengthCm) && normalized.largeShapeType === "直線状") {
     const p1 = convertPositionToPlanCoords(normalized.line1NsDir, normalized.line1NsCm, normalized.line1EwDir, normalized.line1EwCm);
     const p2 = convertPositionToPlanCoords(normalized.line2NsDir, normalized.line2NsCm, normalized.line2EwDir, normalized.line2EwCm);
@@ -9111,12 +9701,16 @@ function getMissingRequiredKeys(record) {
     if (!largeShapeType) {
       missing.add("largeShapeType");
     }
-    if (!isImageShape && parseLargeAxisAzimuth(value(record.largeAxisDirection)) == null) {
-      missing.add("largeAxisDirection");
-    }
     if (largeShapeType === "直線状") {
+      if (parseLargeAxisAzimuth(value(record.largeAxisDirection)) == null) {
+        missing.add("largeAxisDirection");
+      }
       if (!value(record.lineLengthCm)) {
         missing.add("lineLengthCm");
+      }
+      const plungeDeg = parseLargeAxisPlungeDeg(value(record.largeAxisPlungeDeg));
+      if (Number.isFinite(plungeDeg) && plungeDeg > 0 && !normalizeCompass8Direction(value(record.largeAxisPlungeDir8))) {
+        missing.add("largeAxisPlungeDir8");
       }
     } else if (largeShapeType === "長方形") {
       if (!value(record.rectSide1Cm)) {
@@ -9125,6 +9719,10 @@ function getMissingRequiredKeys(record) {
       if (!value(record.rectSide2Cm)) {
         missing.add("rectSide2Cm");
       }
+      const dipDeg = parseLargeAxisPlungeDeg(value(record.planeDipDeg));
+      if (Number.isFinite(dipDeg) && dipDeg > 0 && !normalizeCompass8Direction(value(record.planeDipDir8))) {
+        missing.add("planeDipDir8");
+      }
     } else if (largeShapeType === "楕円") {
       if (!value(record.ellipseLongRadiusCm)) {
         missing.add("ellipseLongRadiusCm");
@@ -9132,21 +9730,26 @@ function getMissingRequiredKeys(record) {
       if (!value(record.ellipseShortRadiusCm)) {
         missing.add("ellipseShortRadiusCm");
       }
+      const dipDeg = parseLargeAxisPlungeDeg(value(record.planeDipDeg));
+      if (Number.isFinite(dipDeg) && dipDeg > 0 && !normalizeCompass8Direction(value(record.planeDipDir8))) {
+        missing.add("planeDipDir8");
+      }
     } else if (isImageShape) {
-      [
-        "imgP1NsCm",
-        "imgP1EwCm",
-        "imgP2NsCm",
-        "imgP2EwCm",
-        "imgP3NsCm",
-        "imgP3EwCm",
-        "imgP4NsCm",
-        "imgP4EwCm",
-      ].forEach((key) => {
-        if (!value(record[key])) {
-          missing.add(key);
-        }
-      });
+      const hasFrameSpec =
+        parseDistanceToCm(record.imgFrameWidthCm) != null &&
+        parseDistanceToCm(record.imgFrameHeightCm) != null &&
+        normalizeImageRotationDeg(record.imgRotateDeg) !== "";
+      if (!hasFrameSpec) {
+        ["imgRotateDeg", "imgFrameWidthCm", "imgFrameHeightCm"].forEach((key) => {
+          if (!value(record[key])) {
+            missing.add(key);
+          }
+        });
+      }
+      const dipDeg = parseLargeAxisPlungeDeg(value(record.planeDipDeg));
+      if (Number.isFinite(dipDeg) && dipDeg > 0 && !normalizeCompass8Direction(value(record.planeDipDir8))) {
+        missing.add("planeDipDir8");
+      }
     }
   }
 
@@ -9279,6 +9882,71 @@ function normalizeEwDir(valueRaw) {
   return "東から";
 }
 
+function normalizeCompass8Direction(valueRaw) {
+  const raw = value(valueRaw);
+  if (!raw) {
+    return "";
+  }
+  const text = raw.toUpperCase().replace(/\s+/g, "");
+  if (text === "北" || text === "N") {
+    return "北";
+  }
+  if (text === "北東" || text === "NE" || text === "東北") {
+    return "北東";
+  }
+  if (text === "東" || text === "E") {
+    return "東";
+  }
+  if (text === "南東" || text === "SE" || text === "東南") {
+    return "南東";
+  }
+  if (text === "南" || text === "S") {
+    return "南";
+  }
+  if (text === "南西" || text === "SW" || text === "西南") {
+    return "南西";
+  }
+  if (text === "西" || text === "W") {
+    return "西";
+  }
+  if (text === "北西" || text === "NW" || text === "西北") {
+    return "北西";
+  }
+  return "";
+}
+
+function parseCompass8Azimuth(valueRaw) {
+  const direction = normalizeCompass8Direction(valueRaw);
+  if (!direction) {
+    return null;
+  }
+  if (direction === "北") {
+    return 0;
+  }
+  if (direction === "北東") {
+    return 45;
+  }
+  if (direction === "東") {
+    return 90;
+  }
+  if (direction === "南東") {
+    return 135;
+  }
+  if (direction === "南") {
+    return 180;
+  }
+  if (direction === "南西") {
+    return 225;
+  }
+  if (direction === "西") {
+    return 270;
+  }
+  if (direction === "北西") {
+    return 315;
+  }
+  return null;
+}
+
 function normalizePlanSizeMode(valueRaw) {
   const mode = value(valueRaw);
   if (mode === "大きなもの" || mode === "大きいもの") {
@@ -9394,6 +10062,22 @@ function normalizeLargeAxisDirection(valueRaw) {
   return `${ns}${degreeText}${ew}`;
 }
 
+function normalizeLargeAxisPlungeDeg(valueRaw) {
+  const plunge = parseLargeAxisPlungeDeg(valueRaw);
+  if (!Number.isFinite(plunge)) {
+    return "";
+  }
+  return Number.isInteger(plunge) ? String(plunge) : String(plunge).replace(/\.?0+$/, "");
+}
+
+function normalizePlaneStrikeDirection(valueRaw) {
+  return normalizeLargeAxisDirection(valueRaw);
+}
+
+function normalizePlaneDipDeg(valueRaw) {
+  return normalizeLargeAxisPlungeDeg(valueRaw);
+}
+
 function normalizeDirectionValue(group, valueRaw) {
   if (group === "ns") {
     return normalizeNsDir(valueRaw);
@@ -9424,6 +10108,9 @@ function normalizeDirectionValue(group, valueRaw) {
   }
   if (group === "largeShapeType") {
     return normalizeLargeShapeType(valueRaw);
+  }
+  if (group === "plungeDir8" || group === "planeDipDir8") {
+    return normalizeCompass8Direction(valueRaw);
   }
   return value(valueRaw);
 }

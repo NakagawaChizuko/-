@@ -461,6 +461,26 @@ main {
   margin-bottom: 8px;
 }
 
+.output-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 6px;
+}
+
+.output-filter-item {
+  width: min(100%, 260px);
+}
+
+.output-search-row {
+  width: min(100%, 340px);
+}
+
+.output-filter-summary {
+  margin: 0 0 8px;
+}
+
 .plan-map-legend {
   margin: 8px 0 10px;
   display: flex;
@@ -781,30 +801,17 @@ main {
   color: #94a3b8;
 }
 
-.image-corner-grid {
+.image-transform-grid {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 10px;
+  margin-bottom: 8px;
 }
 
-.image-corner-row {
-  display: grid;
-  grid-template-columns: 42px minmax(78px, auto) 1fr auto minmax(78px, auto) 1fr auto;
+.image-toggle-check {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
-  border: 1px solid #dbe3ee;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.image-corner-row strong {
-  color: #1e293b;
-  font-size: 0.8rem;
-}
-
-.image-corner-row span {
-  color: #475569;
-  font-size: 0.78rem;
   font-weight: 600;
 }
 
@@ -1211,7 +1218,7 @@ textarea {
 
 .large-shape-image-preview img {
   display: block;
-  width: 100%;
+  width: auto;
   max-width: 420px;
   max-height: 220px;
   object-fit: contain;
@@ -1224,95 +1231,43 @@ textarea {
   position: relative;
   width: fit-content;
   max-width: 100%;
-  padding: 12px;
-  margin: 14px 0 16px;
+  margin: 18px 0 20px;
 }
 
-.preview-corner-frame {
-  position: absolute;
-  inset: 12px;
-  border: 2px solid #0f172a;
-  border-radius: 0;
-  pointer-events: none;
-}
-
-.preview-corner-dot {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #0f172a;
-  pointer-events: none;
-  margin-left: -4.5px;
-  margin-top: -4.5px;
-}
-
-.preview-corner-dot.p1 {
-  top: 12px;
-  left: 12px;
-}
-
-.preview-corner-dot.p2 {
-  top: 12px;
-  right: 12px;
-  margin-left: 0;
-  margin-right: -4.5px;
-}
-
-.preview-corner-dot.p3 {
-  bottom: 12px;
-  right: 12px;
-  margin-left: 0;
-  margin-top: 0;
-  margin-right: -4.5px;
-  margin-bottom: -4.5px;
-}
-
-.preview-corner-dot.p4 {
-  bottom: 12px;
-  left: 12px;
-  margin-top: 0;
-  margin-bottom: -4.5px;
-}
-
-.preview-corner-badge {
+.preview-cardinal {
   position: absolute;
   z-index: 2;
-  min-width: 36px;
+  min-width: 22px;
   text-align: center;
-  padding: 2px 6px;
-  border-radius: 999px;
-  border: 1px solid #0f172a;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
-  font-size: 0.72rem;
+  color: #334155;
+  font-size: 0.82rem;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1;
   pointer-events: none;
 }
 
-.preview-corner-badge.p1 {
-  top: 12px;
-  left: 12px;
-  transform: translate(-40%, -100%);
+.preview-cardinal.north {
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.preview-corner-badge.p2 {
-  top: 12px;
-  right: 12px;
-  transform: translate(40%, -100%);
+.preview-cardinal.east {
+  right: -14px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.preview-corner-badge.p3 {
-  bottom: 12px;
-  right: 12px;
-  transform: translate(40%, 100%);
+.preview-cardinal.south {
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.preview-corner-badge.p4 {
-  bottom: 12px;
-  left: 12px;
-  transform: translate(-40%, 100%);
+.preview-cardinal.west {
+  left: -14px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .large-axis-direction-label {
@@ -1323,6 +1278,53 @@ textarea {
 
 .large-axis-direction-label input {
   text-transform: uppercase;
+}
+
+.large-axis-plunge-label {
+  display: grid;
+  gap: 4px;
+  max-width: 180px;
+}
+
+.large-dip-direction-row {
+  display: grid;
+  gap: 4px;
+}
+
+.inline-degree-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-degree-row input {
+  width: 88px;
+}
+
+.plane-attitude-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 14px;
+}
+
+.plane-attitude-field {
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.plane-attitude-field input {
+  text-transform: uppercase;
+}
+
+.plane-dip-dir-field {
+  min-width: 320px;
+}
+
+.eight-dir-tabs .dir-tab {
+  min-width: 50px;
+  text-align: center;
 }
 
 .large-shape-panel {
@@ -1880,11 +1882,6 @@ th.sortable-header.sort-desc::after {
     width: min(95vw, 700px);
     min-height: 300px;
     height: 60vh;
-  }
-
-  .image-corner-row {
-    grid-template-columns: 40px 1fr;
-    align-items: start;
   }
 
   .large-line-grid,
