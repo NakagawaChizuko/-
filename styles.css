@@ -890,6 +890,41 @@ main {
   color: #bae6fd;
 }
 
+.hover-edit-menu {
+  position: fixed;
+  z-index: 90;
+  min-width: 136px;
+  max-width: min(240px, calc(100vw - 16px));
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgb(2 6 23 / 24%);
+  padding: 8px 9px;
+}
+
+.hover-edit-menu-title {
+  margin: 0 0 6px;
+  font-size: 0.77rem;
+  color: #334155;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.hover-edit-menu-button {
+  width: 100%;
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.hover-edit-menu-button:hover {
+  background: #115e59;
+  border-color: #115e59;
+}
+
 .grid {
   display: grid;
   gap: 8px;
@@ -1546,6 +1581,7 @@ textarea {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #ffffff;
+  justify-items: center;
 }
 
 .large-shape-image-preview-title {
@@ -1553,6 +1589,8 @@ textarea {
   font-size: 0.8rem;
   color: #334155;
   font-weight: 700;
+  width: 100%;
+  text-align: center;
 }
 
 .large-shape-image-preview img {
@@ -1570,7 +1608,7 @@ textarea {
   position: relative;
   width: fit-content;
   max-width: 100%;
-  margin: 18px 0 20px;
+  margin: 18px auto 20px;
 }
 
 .preview-cardinal {
@@ -1949,6 +1987,11 @@ select.saved-carry-value {
 .muted {
   color: #6b7280;
   font-size: 0.84rem;
+}
+
+.hover-edit-note {
+  margin: 2px 0 8px;
+  line-height: 1.35;
 }
 
 .panel-actions {

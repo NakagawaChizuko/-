@@ -466,6 +466,9 @@ const positionPreviewModal = document.getElementById("position-preview-modal");
 const positionPreviewCloseBtn = document.getElementById("position-preview-close-btn");
 const positionPreviewMeta = document.getElementById("position-preview-meta");
 const positionPreviewMap = document.getElementById("position-preview-map");
+let hoverEditMenuEl = null;
+let hoverEditMenuRecordId = "";
+let hoverEditMenuKuwaku = "";
 
 const viewer3d = {
   initialized: false,
@@ -554,10 +557,31 @@ function bindEvents() {
     });
   }
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && positionPreviewModal && !positionPreviewModal.classList.contains("hidden")) {
+    if (event.key !== "Escape") {
+      return;
+    }
+    hideHoverEditMenu();
+    if (positionPreviewModal && !positionPreviewModal.classList.contains("hidden")) {
       closePositionPreviewModal();
     }
   });
+  document.addEventListener("pointerdown", (event) => {
+    if (!hoverEditMenuEl || hoverEditMenuEl.hidden) {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof Node && hoverEditMenuEl.contains(target)) {
+      return;
+    }
+    hideHoverEditMenu();
+  });
+  document.addEventListener(
+    "scroll",
+    () => {
+      hideHoverEditMenu();
+    },
+    true
+  );
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
@@ -1676,6 +1700,7 @@ async function addPhotosFromFiles(fileList) {
 
 function setActiveTab(tabId) {
   const previousTabId = getActiveTabId();
+  hideHoverEditMenu();
   if (previousTabId === "output-tab") {
     rememberOutputFilters();
   }
@@ -6469,6 +6494,7 @@ function ensureViewerInitialized() {
 
     viewerCanvasWrap.addEventListener("pointermove", handleViewerPointerMove);
     viewerCanvasWrap.addEventListener("pointerleave", hideViewerTooltip);
+    viewerCanvasWrap.addEventListener("contextmenu", handleViewerContextMenu);
     if (typeof ResizeObserver === "function") {
       viewer3d.resizeObserver = new ResizeObserver(() => {
         ensureViewerCanvasSize();
@@ -6703,6 +6729,7 @@ function renderViewerScene(shapes, metrics, options = {}) {
     );
     pickMesh.position.set(shape.x, shape.y, shape.z);
     pickMesh.userData = {
+      id: shape.id,
       label: shape.label,
       nameMemo: shape.nameMemo,
       unit: shape.unit,
@@ -7456,14 +7483,21 @@ function applyViewerPerspective() {
 }
 
 function handleViewerPointerMove(event) {
-  if (!viewer3d.initialized || !viewer3d.raycaster || !viewer3d.camera || !viewer3d.pickMeshes.length || !viewerCanvasWrap) {
+  const picked = pickViewerDataAtEvent(event);
+  if (!picked) {
     hideViewerTooltip();
     return;
   }
+  showViewerTooltip(event, picked);
+}
+
+function pickViewerDataAtEvent(event) {
+  if (!viewer3d.initialized || !viewer3d.raycaster || !viewer3d.camera || !viewer3d.pickMeshes.length || !viewerCanvasWrap) {
+    return null;
+  }
   const rect = viewerCanvasWrap.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) {
-    hideViewerTooltip();
-    return;
+    return null;
   }
   const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -7471,11 +7505,20 @@ function handleViewerPointerMove(event) {
   viewer3d.raycaster.setFromCamera(viewer3d.pointer, viewer3d.camera);
   const intersects = viewer3d.raycaster.intersectObjects(viewer3d.pickMeshes, false);
   if (!intersects.length) {
-    hideViewerTooltip();
+    return null;
+  }
+  return intersects[0].object?.userData || null;
+}
+
+function handleViewerContextMenu(event) {
+  const picked = pickViewerDataAtEvent(event);
+  if (!picked || !value(picked.id)) {
+    hideHoverEditMenu();
     return;
   }
-  const picked = intersects[0].object?.userData || {};
-  showViewerTooltip(event, picked);
+  event.preventDefault();
+  event.stopPropagation();
+  showHoverEditMenu(event.clientX, event.clientY, picked.id, picked.kuwaku, picked.label);
 }
 
 function showViewerTooltip(event, data) {
@@ -7639,6 +7682,8 @@ function buildPlanDrawableMeta(record) {
   const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
   const prefix = normalizeSpecimenPrefix(specimen.prefix);
   return {
+    id: value(record.id),
+    kuwaku: value(record.kuwaku) || getRecordKuwaku(record),
     color: getSpecimenPrefixColor(prefix),
     label: record.specimenNo || "",
     nameMemo: value(record.nameMemo),
@@ -8017,6 +8062,8 @@ function renderPlanDrawableSvg(drawable, index = 0) {
   return `
       <g
         class="plan-point-group"
+        data-id="${escapeHtml(value(drawable.id) || "")}"
+        data-kuwaku="${escapeHtml(value(drawable.kuwaku) || "")}"
         data-label="${escapeHtml(drawable.label || "")}"
         data-name-memo="${escapeHtml(drawable.nameMemo || "")}"
         data-unit="${escapeHtml(drawable.unit || "")}"
@@ -8451,6 +8498,17 @@ function attachPlanMapTooltips() {
       event.stopPropagation();
       show(pointEl, event);
     });
+    pointEl.addEventListener("contextmenu", (event) => {
+      const recordId = value(pointEl.dataset.id);
+      if (!recordId) {
+        hideHoverEditMenu();
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      show(pointEl, event);
+      showHoverEditMenu(event.clientX, event.clientY, recordId, value(pointEl.dataset.kuwaku), value(pointEl.dataset.label));
+    });
   });
 
   shell.addEventListener("click", (event) => {
@@ -8458,7 +8516,89 @@ function attachPlanMapTooltips() {
       return;
     }
     hide();
+    hideHoverEditMenu();
   });
+  shell.addEventListener("contextmenu", (event) => {
+    if (event.target.closest(".plan-point-group")) {
+      return;
+    }
+    hideHoverEditMenu();
+  });
+}
+
+function ensureHoverEditMenu() {
+  if (hoverEditMenuEl) {
+    return hoverEditMenuEl;
+  }
+  const menu = document.createElement("div");
+  menu.className = "hover-edit-menu";
+  menu.hidden = true;
+  menu.innerHTML = `
+    <div class="hover-edit-menu-title">このデータを編集</div>
+    <button type="button" class="hover-edit-menu-button">編集</button>
+  `;
+  const button = menu.querySelector(".hover-edit-menu-button");
+  if (button) {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const recordId = value(hoverEditMenuRecordId);
+      if (!recordId) {
+        hideHoverEditMenu();
+        return;
+      }
+      const preferredKuwaku = value(hoverEditMenuKuwaku);
+      hideHoverEditMenu();
+      openRecordForEdit(recordId, preferredKuwaku);
+    });
+  }
+  menu.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  document.body.appendChild(menu);
+  hoverEditMenuEl = menu;
+  return hoverEditMenuEl;
+}
+
+function showHoverEditMenu(clientXRaw, clientYRaw, recordIdRaw, kuwakuRaw = "", labelRaw = "") {
+  const recordId = value(recordIdRaw);
+  if (!recordId) {
+    hideHoverEditMenu();
+    return;
+  }
+  const menu = ensureHoverEditMenu();
+  hoverEditMenuRecordId = recordId;
+  hoverEditMenuKuwaku = value(kuwakuRaw);
+  const title = menu.querySelector(".hover-edit-menu-title");
+  const labelText = value(labelRaw);
+  if (title) {
+    title.textContent = labelText ? `${labelText} を編集` : "このデータを編集";
+  }
+  menu.hidden = false;
+  const clientX = Number(clientXRaw);
+  const clientY = Number(clientYRaw);
+  const fallbackX = Math.max(0, Math.floor(window.innerWidth / 2));
+  const fallbackY = Math.max(0, Math.floor(window.innerHeight / 2));
+  const anchorX = Number.isFinite(clientX) ? clientX : fallbackX;
+  const anchorY = Number.isFinite(clientY) ? clientY : fallbackY;
+  const margin = 8;
+  const offset = 12;
+  const rect = menu.getBoundingClientRect();
+  const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+  const left = clamp(anchorX + offset, margin, maxLeft);
+  const top = clamp(anchorY + offset, margin, maxTop);
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function hideHoverEditMenu() {
+  if (!hoverEditMenuEl) {
+    return;
+  }
+  hoverEditMenuEl.hidden = true;
+  hoverEditMenuRecordId = "";
+  hoverEditMenuKuwaku = "";
 }
 
 function positionTooltip(pointEl, mouseEvent, shell, svg, tooltip) {
