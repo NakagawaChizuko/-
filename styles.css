@@ -809,6 +809,18 @@ main {
   margin-bottom: 8px;
 }
 
+.custom-large-image-controls {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 240px));
+  margin-bottom: 8px;
+}
+
+.custom-large-image-controls .hint-text {
+  margin: 0;
+}
+
 .image-toggle-check {
   display: inline-flex;
   align-items: center;

@@ -345,6 +345,17 @@
 
                 <section class="large-shape-panel hidden" data-large-shape-panel="__IMAGE__">
                   <p class="hint-text">画像を回転・反転・変形して現地形状に合わせ、外枠サイズを入力します</p>
+                  <div id="custom-large-image-controls" class="custom-large-image-controls hidden">
+                    <label>画像名
+                      <input id="custom-large-image-name-input" name="customLargeImageName" type="text" placeholder="例：掌状角A" />
+                    </label>
+                    <label>画像ファイル
+                      <input id="custom-large-image-file-input" type="file" accept="image/*" />
+                    </label>
+                    <input id="custom-large-image-data-url-input" name="customLargeImageDataUrl" type="hidden" value="" />
+                    <button id="custom-large-image-clear-btn" type="button">画像をクリア</button>
+                    <p id="custom-large-image-status" class="hint-text">画像未選択</p>
+                  </div>
                   <div class="image-transform-grid">
                     <label>北から回転角
                       <div class="inline-degree-row">
@@ -868,6 +879,6 @@
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260308-3d44"></script>
+    <script src="./app.js?v=20260308-viewhold5"></script>
   </body>
 </html>

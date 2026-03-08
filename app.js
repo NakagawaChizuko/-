@@ -31,6 +31,7 @@ const ANALYSIS_TYPE_MAP = {
   H: "その他",
   MG: "はぎとり資料",
 };
+const CUSTOM_LARGE_SHAPE_TYPE = "カスタム画像";
 const REQUIRED_FIELD_LABELS = {
   kuwakuHeadA: "区画（グリッド）1番目",
   kuwakuHeadB: "区画（グリッド）2番目",
@@ -88,6 +89,8 @@ const REQUIRED_FIELD_LABELS = {
   imgFrameHeightCm: "画像外枠 辺2",
   imgSkewXDeg: "画像 横変形角",
   imgSkewYDeg: "画像 縦変形角",
+  customLargeImageName: "画像名",
+  customLargeImageDataUrl: "画像ファイル",
   layerName: "地層名",
   layerOther: "地層名（その他）",
   unit: "ユニット",
@@ -142,6 +145,7 @@ const SPECIMEN_POINT_COLORS = {
   h: "#6b7280",
 };
 const IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS = 5;
+const CUSTOM_IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS = 1;
 const PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH = 180000;
 const LARGE_SHAPE_DIR_PATH = "./shapes";
 const LARGE_SHAPE_FILE_LABEL_MAP = {
@@ -407,6 +411,12 @@ const largeShapeImageButtons = document.getElementById("large-shape-image-button
 const largeShapeImagePreview = document.getElementById("large-shape-image-preview");
 const largeShapeImagePreviewTitle = document.getElementById("large-shape-image-preview-title");
 const largeShapeImagePreviewImg = document.getElementById("large-shape-image-preview-img");
+const customLargeImageControls = document.getElementById("custom-large-image-controls");
+const customLargeImageNameInput = document.getElementById("custom-large-image-name-input");
+const customLargeImageFileInput = document.getElementById("custom-large-image-file-input");
+const customLargeImageDataUrlInput = document.getElementById("custom-large-image-data-url-input");
+const customLargeImageClearBtn = document.getElementById("custom-large-image-clear-btn");
+const customLargeImageStatus = document.getElementById("custom-large-image-status");
 const line1NsDirInput = document.getElementById("line1-ns-dir-input");
 const line1EwDirInput = document.getElementById("line1-ew-dir-input");
 const line2NsDirInput = document.getElementById("line2-ns-dir-input");
@@ -511,6 +521,27 @@ function bindEvents() {
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
+  if (customLargeImageFileInput) {
+    customLargeImageFileInput.addEventListener("change", async (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement)) {
+        return;
+      }
+      const file = Array.from(input.files || [])[0];
+      if (!file) {
+        return;
+      }
+      await setCustomLargeImageFromFile(file);
+      input.value = "";
+    });
+  }
+  if (customLargeImageClearBtn) {
+    customLargeImageClearBtn.addEventListener("click", () => {
+      clearCustomLargeImageFields();
+      syncLargeShapeImagePreviewForCurrentForm();
+      updateEditMissingRequiredHighlights();
+    });
+  }
   if (editTabPanel) {
     editTabPanel.addEventListener("input", () => {
       updateEditMissingRequiredHighlights();
@@ -765,8 +796,13 @@ function bindEvents() {
     const ellipseShortRadiusCm = value(formData.get("ellipseShortRadiusCm"));
     const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
     const isLargeImageShape = planSizeMode === "大きなもの" && isLargeShapeImageType(largeShapeType);
+    const isCustomLargeImageShape = isLargeImageShape && isCustomLargeShapeType(largeShapeType);
     const keepImageCornerFields = planSizeMode === "大きなもの";
     const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
+    const customLargeImageName = isCustomLargeImageShape
+      ? normalizeCustomLargeImageName(value(formData.get("customLargeImageName")))
+      : "";
+    const customLargeImageDataUrl = isCustomLargeImageShape ? normalizeCustomLargeImageDataUrl(value(formData.get("customLargeImageDataUrl"))) : "";
 
     const recordBase = {
       id: recordId,
@@ -843,6 +879,8 @@ function bindEvents() {
       imgSkewYDeg: isLargeImageShape ? imageTransformFields.imgSkewYDeg : "",
       imgFlipH: isLargeImageShape ? imageTransformFields.imgFlipH : "0",
       imgFlipV: isLargeImageShape ? imageTransformFields.imgFlipV : "0",
+      customLargeImageName,
+      customLargeImageDataUrl,
       importantFlag: normalizeHasFlag(value(formData.get("importantFlag"))),
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
@@ -1592,8 +1630,11 @@ function setActiveTab(tabId) {
     clearEditMissingRequiredHighlights();
   }
   if (tabId === "viewer-tab") {
-    renderViewerOutput();
+    renderViewerOutput({ preserveCamera: true });
     ensureViewerCanvasSize();
+  }
+  if (tabId === "plan-tab") {
+    renderPlanOutput();
   }
   if (tabId === "output-tab") {
     restoreOutputFilters();
@@ -1969,6 +2010,92 @@ function normalizeLargeShapeLabel(labelRaw) {
   return withoutExt;
 }
 
+function isCustomLargeShapeType(shapeTypeRaw) {
+  return normalizeLargeShapeType(shapeTypeRaw) === CUSTOM_LARGE_SHAPE_TYPE;
+}
+
+function getImageShapeDilateIterations(shapeTypeRaw) {
+  return isCustomLargeShapeType(shapeTypeRaw)
+    ? CUSTOM_IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS
+    : IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS;
+}
+
+function normalizeCustomLargeImageName(nameRaw) {
+  return value(nameRaw);
+}
+
+function normalizeCustomLargeImageDataUrl(dataUrlRaw) {
+  const dataUrl = value(dataUrlRaw);
+  return dataUrl.startsWith("data:image/") ? dataUrl : "";
+}
+
+function deriveCustomLargeImageNameFromFileName(fileNameRaw) {
+  const fileName = value(fileNameRaw);
+  if (!fileName) {
+    return "";
+  }
+  const base = fileName.split("/").pop() || fileName;
+  const normalized = typeof base.normalize === "function" ? base.normalize("NFC") : base;
+  return value(normalized.replace(/\.[^.]+$/, ""));
+}
+
+function syncCustomLargeImageStatus() {
+  if (!customLargeImageStatus) {
+    return;
+  }
+  const imageName = normalizeCustomLargeImageName(customLargeImageNameInput?.value);
+  const hasImage = Boolean(normalizeCustomLargeImageDataUrl(customLargeImageDataUrlInput?.value));
+  if (hasImage) {
+    customLargeImageStatus.textContent = imageName ? `画像設定済み: ${imageName}` : "画像設定済み";
+    return;
+  }
+  customLargeImageStatus.textContent = "画像未選択";
+}
+
+function clearCustomLargeImageFields() {
+  if (customLargeImageNameInput) {
+    customLargeImageNameInput.value = "";
+  }
+  if (customLargeImageDataUrlInput) {
+    customLargeImageDataUrlInput.value = "";
+  }
+  if (customLargeImageFileInput) {
+    customLargeImageFileInput.value = "";
+  }
+  syncCustomLargeImageStatus();
+}
+
+async function setCustomLargeImageFromFile(file) {
+  const sourceFile = file instanceof File ? file : null;
+  if (!sourceFile) {
+    return;
+  }
+  try {
+    const dataUrl = await resizeImage(sourceFile, 1400, 0.9, "image/png");
+    if (customLargeImageDataUrlInput) {
+      customLargeImageDataUrlInput.value = normalizeCustomLargeImageDataUrl(dataUrl);
+    }
+    if (customLargeImageNameInput && !value(customLargeImageNameInput.value)) {
+      customLargeImageNameInput.value = deriveCustomLargeImageNameFromFileName(sourceFile.name);
+    }
+    syncCustomLargeImageStatus();
+    syncLargeShapeImagePreviewForCurrentForm();
+  } catch (_error) {
+    showToast("画像アップロードに失敗しました");
+  }
+}
+
+function syncLargeShapeImagePreviewForCurrentForm() {
+  const shapeType = normalizeLargeShapeType(largeShapeTypeInput?.value);
+  if (!isLargeShapeImageType(shapeType)) {
+    syncLargeShapeImagePreview("");
+    return;
+  }
+  const customPath = isCustomLargeShapeType(shapeType) ? normalizeCustomLargeImageDataUrl(customLargeImageDataUrlInput?.value) : "";
+  const customName = isCustomLargeShapeType(shapeType) ? normalizeCustomLargeImageName(customLargeImageNameInput?.value) : "";
+  syncLargeShapeImagePreview(shapeType, customPath, customName);
+}
+
 function toSafeAssetUrl(pathRaw) {
   const path = pathRaw == null ? "" : String(pathRaw).trim();
   if (!path) {
@@ -2019,11 +2146,15 @@ function renderLargeShapeImageButtons() {
   if (!largeShapeImageButtons) {
     return;
   }
-  const labels = Array.from(largeShapeImagePathMap.keys()).filter((label) => value(label));
+  const labels = Array.from(new Set([...Array.from(largeShapeImagePathMap.keys()).filter((label) => value(label)), CUSTOM_LARGE_SHAPE_TYPE]));
   largeShapeImageButtons.innerHTML = labels
     .map(
-      (label) =>
-        `<button class="dir-tab" data-group="largeShapeType" data-value="${escapeHtml(label)}" type="button">${escapeHtml(label)}</button>`
+      (label) => {
+        const buttonLabel = label === CUSTOM_LARGE_SHAPE_TYPE ? "画像アップロード" : label;
+        return `<button class="dir-tab" data-group="largeShapeType" data-value="${escapeHtml(label)}" type="button">${escapeHtml(
+          buttonLabel
+        )}</button>`;
+      }
     )
     .join("");
 }
@@ -2081,12 +2212,13 @@ async function loadLargeShapeImageManifest() {
   }
 }
 
-function syncLargeShapeImagePreview(shapeTypeRaw) {
+function syncLargeShapeImagePreview(shapeTypeRaw, explicitImagePathRaw = "", explicitTitleRaw = "") {
   if (!largeShapeImagePreview || !largeShapeImagePreviewTitle || !largeShapeImagePreviewImg) {
     return;
   }
   const shapeType = normalizeLargeShapeType(shapeTypeRaw);
-  const candidates = getLargeShapeImagePathCandidates(shapeType);
+  const explicitImagePath = normalizeCustomLargeImageDataUrl(explicitImagePathRaw);
+  const candidates = getLargeShapeImagePathCandidates(shapeType, explicitImagePath);
   if (!candidates.length) {
     largeShapeImagePreview.classList.add("hidden");
     largeShapeImagePreviewTitle.textContent = "";
@@ -2101,7 +2233,8 @@ function syncLargeShapeImagePreview(shapeTypeRaw) {
     return;
   }
   largeShapeImagePreview.classList.remove("hidden");
-  largeShapeImagePreviewTitle.textContent = `${shapeType}`;
+  const previewTitle = value(explicitTitleRaw) || shapeType;
+  largeShapeImagePreviewTitle.textContent = previewTitle;
   largeShapeImagePreviewImg.alt = `${shapeType} 画像`;
   let candidateIndex = 0;
   largeShapeImagePreviewImg.onerror = () => {
@@ -2163,6 +2296,9 @@ function syncLargeShapeSectionFromForm() {
     if (planeAttitudeRow) {
       planeAttitudeRow.classList.add("hidden");
     }
+    if (customLargeImageControls) {
+      customLargeImageControls.classList.add("hidden");
+    }
     syncLargeShapeImagePreview("");
     return;
   }
@@ -2170,6 +2306,7 @@ function syncLargeShapeSectionFromForm() {
   const shapeTypeRaw = normalizeLargeShapeType(largeShapeTypeInput?.value);
   const shapeType = shapeTypeRaw || "直線状";
   const isImageShape = isLargeShapeImageType(shapeType);
+  const isCustomImageShape = isCustomLargeShapeType(shapeType);
   const isLineShape = shapeType === "直線状";
   if (largeShapeTypeInput) {
     largeShapeTypeInput.value = shapeType;
@@ -2204,12 +2341,20 @@ function syncLargeShapeSectionFromForm() {
   if (planeAttitudeRow) {
     planeAttitudeRow.classList.toggle("hidden", isLineShape);
   }
+  if (customLargeImageControls) {
+    customLargeImageControls.classList.toggle("hidden", !isCustomImageShape);
+  }
   largeShapePanels.forEach((panel) => {
     const panelType = value(panel.dataset.largeShapePanel);
     const shouldShow = panelType === shapeType || (panelType === "__IMAGE__" && isImageShape);
     panel.classList.toggle("hidden", !shouldShow);
   });
-  syncLargeShapeImagePreview(isImageShape ? shapeType : "");
+  syncCustomLargeImageStatus();
+  if (isImageShape) {
+    syncLargeShapeImagePreviewForCurrentForm();
+  } else {
+    syncLargeShapeImagePreview("");
+  }
 }
 
 function activateLayerTab(layerRaw) {
@@ -2505,6 +2650,10 @@ function handleRecordFormFieldEdit(event) {
     clearLayerSavedTabState();
   }
   if (target instanceof HTMLElement && target.closest("#large-shape-section")) {
+    syncCustomLargeImageStatus();
+    if (target === customLargeImageNameInput || target === customLargeImageDataUrlInput || target === customLargeImageFileInput) {
+      syncLargeShapeImagePreviewForCurrentForm();
+    }
     syncLargeShapeImagePreviewTransform();
   }
   updateEditMissingRequiredHighlights();
@@ -2700,6 +2849,15 @@ function resetRecordForm({ showMessage }) {
   if (recordForm.elements.largeShapeType) {
     recordForm.elements.largeShapeType.value = "";
   }
+  if (recordForm.elements.customLargeImageName) {
+    recordForm.elements.customLargeImageName.value = "";
+  }
+  if (recordForm.elements.customLargeImageDataUrl) {
+    recordForm.elements.customLargeImageDataUrl.value = "";
+  }
+  if (customLargeImageFileInput) {
+    customLargeImageFileInput.value = "";
+  }
   if (recordForm.elements.largeAxisDirection) {
     recordForm.elements.largeAxisDirection.value = "";
   }
@@ -2736,6 +2894,7 @@ function resetRecordForm({ showMessage }) {
   clearImageCornerCmFields();
   setDefaultImageCornerDirections();
   setLayerFromValue(PRESET_LAYER_NAMES[0]);
+  syncCustomLargeImageStatus();
 
   nsDirInput.value = "北から";
   ewDirInput.value = "東から";
@@ -2799,6 +2958,15 @@ function populateRecordForm(record) {
   }
   if (recordForm.elements.largeShapeType) {
     recordForm.elements.largeShapeType.value = normalizeLargeShapeType(record.largeShapeType);
+  }
+  if (recordForm.elements.customLargeImageName) {
+    recordForm.elements.customLargeImageName.value = normalizeCustomLargeImageName(record.customLargeImageName);
+  }
+  if (recordForm.elements.customLargeImageDataUrl) {
+    recordForm.elements.customLargeImageDataUrl.value = normalizeCustomLargeImageDataUrl(record.customLargeImageDataUrl);
+  }
+  if (customLargeImageFileInput) {
+    customLargeImageFileInput.value = "";
   }
   if (recordForm.elements.largeAxisDirection) {
     recordForm.elements.largeAxisDirection.value = normalizeLargeAxisDirection(record.largeAxisDirection);
@@ -2906,6 +3074,7 @@ function populateRecordForm(record) {
   renderSectionDiagramList();
   currentPhotos = clonePhotos(record.photos || []);
   renderPhotoList();
+  syncCustomLargeImageStatus();
   updateEditMissingRequiredHighlights();
 }
 
@@ -2972,6 +3141,7 @@ function buildCurrentEditDraftRecord() {
   const draftRawShapeType = value(formData.get("largeShapeType"));
   const draftShapeType = normalizeLargeShapeType(draftRawShapeType) || normalizeLargeShapeLabel(draftRawShapeType);
   const draftIsImageShape = isLargeShapeImageType(draftShapeType);
+  const draftIsCustomImageShape = draftIsImageShape && isCustomLargeShapeType(draftShapeType);
   const draftIsLineShape = draftShapeType === "直線状";
   const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
   const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
@@ -3054,6 +3224,8 @@ function buildCurrentEditDraftRecord() {
     imgSkewYDeg: draftIsImageShape ? imageTransformFields.imgSkewYDeg : "",
     imgFlipH: draftIsImageShape ? imageTransformFields.imgFlipH : "0",
     imgFlipV: draftIsImageShape ? imageTransformFields.imgFlipV : "0",
+    customLargeImageName: draftIsCustomImageShape ? normalizeCustomLargeImageName(value(formData.get("customLargeImageName"))) : "",
+    customLargeImageDataUrl: draftIsCustomImageShape ? normalizeCustomLargeImageDataUrl(value(formData.get("customLargeImageDataUrl"))) : "",
     layerName: getSelectedLayerName(),
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
@@ -3190,6 +3362,24 @@ function getRecordFormFieldByName(name) {
 }
 
 function markEditMissingFieldByName(name) {
+  if (name === "customLargeImageDataUrl") {
+    if (customLargeImageFileInput) {
+      customLargeImageFileInput.classList.add("edit-missing-field");
+    }
+    if (customLargeImageControls) {
+      customLargeImageControls.classList.add("edit-missing-group");
+    }
+    return;
+  }
+  if (name === "customLargeImageName") {
+    if (customLargeImageNameInput) {
+      customLargeImageNameInput.classList.add("edit-missing-field");
+    }
+    if (customLargeImageControls) {
+      customLargeImageControls.classList.add("edit-missing-group");
+    }
+    return;
+  }
   const field = getRecordFormFieldByName(name);
   if (field) {
     field.classList.add("edit-missing-field");
@@ -3326,6 +3516,8 @@ function updateEditMissingRequiredHighlights() {
     "imgRotateDeg",
     "imgFrameWidthCm",
     "imgFrameHeightCm",
+    "customLargeImageName",
+    "customLargeImageDataUrl",
     "imgP1NsCm",
     "imgP1EwCm",
     "imgP2NsCm",
@@ -3479,8 +3671,12 @@ function getInputRecordsForCurrentKuwaku() {
 function renderOutputs() {
   renderCardOutput();
   renderListOutput();
-  renderPlanOutput();
-  renderViewerOutput();
+  if (getActiveTabId() === "plan-tab") {
+    renderPlanOutput();
+  }
+  if (getActiveTabId() === "viewer-tab") {
+    renderViewerOutput({ preserveCamera: true });
+  }
   renderExportOutput();
 }
 
@@ -4328,6 +4524,8 @@ function renderListOutput() {
         "imgRotateDeg",
         "imgFrameWidthCm",
         "imgFrameHeightCm",
+        "customLargeImageName",
+        "customLargeImageDataUrl",
       ]);
       return `
       <tr class="${selectedClass}">
@@ -5032,7 +5230,8 @@ function applyViewerVerticalScale(zRaw, baseZRaw) {
   return baseZ + (z - baseZ) * viewerVerticalScale;
 }
 
-function renderViewerOutput() {
+function renderViewerOutput(options = {}) {
+  const preserveCamera = Boolean(options?.preserveCamera);
   if (
     !viewerKuwakuSelect ||
     !viewerUnitSelect ||
@@ -5189,7 +5388,7 @@ function renderViewerOutput() {
 
   const metrics = buildViewerGridMetrics(viewerCandidates);
   const shapes = viewerCandidates.map((candidate) => buildViewerShapeFromCandidate(candidate, metrics)).filter(Boolean);
-  renderViewerScene(shapes, metrics);
+  renderViewerScene(shapes, metrics, { preserveCamera });
 }
 
 function isViewerTabActive() {
@@ -5578,10 +5777,125 @@ function disposeViewerObject3D(object) {
   });
 }
 
-function renderViewerScene(shapes, metrics) {
+function captureViewerCameraState() {
+  if (!viewer3d.initialized || !viewer3d.camera || !viewer3d.bounds) {
+    return null;
+  }
+  const camera = viewer3d.camera;
+  const position = {
+    x: Number(camera.position?.x),
+    y: Number(camera.position?.y),
+    z: Number(camera.position?.z),
+  };
+  if (!Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
+    return null;
+  }
+  const up = {
+    x: Number(camera.up?.x),
+    y: Number(camera.up?.y),
+    z: Number(camera.up?.z),
+  };
+  const targetVec = viewer3d.controls?.target;
+  const target = {
+    x: Number(targetVec?.x),
+    y: Number(targetVec?.y),
+    z: Number(targetVec?.z),
+  };
+  if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
+    return null;
+  }
+  const dx = position.x - target.x;
+  const dy = position.y - target.y;
+  const dz = position.z - target.z;
+  const distance = Math.hypot(dx, dy, dz);
+  if (!Number.isFinite(distance) || distance < 0.5) {
+    return null;
+  }
+  return {
+    position,
+    up:
+      Number.isFinite(up.x) && Number.isFinite(up.y) && Number.isFinite(up.z)
+        ? up
+        : { x: 0, y: 0, z: 1 },
+    target,
+  };
+}
+
+function restoreViewerCameraState(viewState) {
+  if (!viewState || !viewer3d.initialized || !viewer3d.camera) {
+    return false;
+  }
+  const position = viewState.position || {};
+  const up = viewState.up || {};
+  const target = viewState.target || {};
+  if (
+    !Number.isFinite(position.x) ||
+    !Number.isFinite(position.y) ||
+    !Number.isFinite(position.z) ||
+    !Number.isFinite(target.x) ||
+    !Number.isFinite(target.y) ||
+    !Number.isFinite(target.z)
+  ) {
+    return false;
+  }
+  viewer3d.camera.position.set(position.x, position.y, position.z);
+  if (Number.isFinite(up.x) && Number.isFinite(up.y) && Number.isFinite(up.z)) {
+    viewer3d.camera.up.set(up.x, up.y, up.z);
+  }
+  if (viewer3d.controls) {
+    viewer3d.controls.target.set(target.x, target.y, target.z);
+    viewer3d.controls.update();
+  } else {
+    viewer3d.camera.lookAt(new THREE.Vector3(target.x, target.y, target.z));
+  }
+  return true;
+}
+
+function isViewerCameraStateCompatible(viewState, bounds) {
+  if (!viewState || !bounds) {
+    return false;
+  }
+  const target = viewState.target || {};
+  const position = viewState.position || {};
+  if (
+    !Number.isFinite(target.x) ||
+    !Number.isFinite(target.y) ||
+    !Number.isFinite(target.z) ||
+    !Number.isFinite(position.x) ||
+    !Number.isFinite(position.y) ||
+    !Number.isFinite(position.z)
+  ) {
+    return false;
+  }
+  const spanX = Math.max(1, Number(bounds.maxX) - Number(bounds.minX));
+  const spanY = Math.max(1, Number(bounds.maxY) - Number(bounds.minY));
+  const spanZ = Math.max(1, Number(bounds.maxZ) - Number(bounds.minZ));
+  const marginFactor = 3.5;
+  const within = (valueNum, minNum, maxNum, span) =>
+    valueNum >= minNum - span * marginFactor && valueNum <= maxNum + span * marginFactor;
+  if (
+    !within(target.x, bounds.minX, bounds.maxX, spanX) ||
+    !within(target.y, bounds.minY, bounds.maxY, spanY) ||
+    !within(target.z, bounds.minZ, bounds.maxZ, spanZ)
+  ) {
+    return false;
+  }
+  if (
+    !within(position.x, bounds.minX, bounds.maxX, spanX) ||
+    !within(position.y, bounds.minY, bounds.maxY, spanY) ||
+    !within(position.z, bounds.minZ, bounds.maxZ, spanZ)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function renderViewerScene(shapes, metrics, options = {}) {
   if (!viewer3d.initialized || !viewer3d.dataGroup || !viewer3d.labelGroup || !viewer3d.gridGroup) {
     return;
   }
+  const preserveCamera = Boolean(options?.preserveCamera);
+  const previousViewState = preserveCamera ? captureViewerCameraState() : null;
   clearViewerScene();
   renderViewerGrid(metrics);
   viewer3d.renderNonce += 1;
@@ -5630,7 +5944,11 @@ function renderViewerScene(shapes, metrics) {
   });
 
   viewer3d.bounds = computeViewerBounds(shapes, metrics);
-  applyViewerPerspective();
+  const shouldRestoreCamera =
+    preserveCamera && isViewerCameraStateCompatible(previousViewState, viewer3d.bounds) && restoreViewerCameraState(previousViewState);
+  if (!shouldRestoreCamera) {
+    applyViewerPerspective();
+  }
 }
 
 function renderViewerGrid(metrics) {
@@ -5821,19 +6139,21 @@ function renderViewerImageQuad(shape, renderNonce) {
     mesh.renderOrder = 6;
     targetGroup.add(mesh);
   };
+  const dilateIterations = getImageShapeDilateIterations(shape?.imageType);
   const loadFromImagePath = () =>
-    getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType)
-      .then((image) => {
-        const tintedCanvas = buildTintedCanvasFromImageSource(image, shape?.color);
-        if (tintedCanvas) {
-          const texture = new THREE.CanvasTexture(tintedCanvas);
-          addTexturedMesh(texture, "#ffffff");
-          return true;
-        }
-        const texture = new THREE.Texture(image);
-        addTexturedMesh(texture, parseHexColor(shape?.color).hex);
+    getOrLoadPlanLargeShapeTintedCanvas(imagePath, shape?.color, shape?.imageType, { dilateIterations })
+      .then((tintedCanvas) => {
+        const texture = new THREE.CanvasTexture(tintedCanvas);
+        addTexturedMesh(texture, "#ffffff");
         return true;
       })
+      .catch(() =>
+        getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType).then((image) => {
+          const texture = new THREE.Texture(image);
+          addTexturedMesh(texture, "#ffffff");
+          return true;
+        })
+      )
       .catch(() => false);
   // 3Dは常に着色済みCanvas経路を優先し、黒線化しやすいdataURL経路は使わない。
   void loadFromImagePath();
@@ -6088,13 +6408,17 @@ function dilateAlphaMask(alphaRaw, width, height, iterations = 1) {
   return src;
 }
 
-function getOrLoadPlanLargeShapeTintedCanvas(imagePathRaw, colorRaw, shapeTypeRaw = "") {
+function getOrLoadPlanLargeShapeTintedCanvas(imagePathRaw, colorRaw, shapeTypeRaw = "", options = {}) {
   const candidates = getLargeShapeImagePathCandidates(shapeTypeRaw, imagePathRaw);
   if (!candidates.length) {
     return Promise.reject(new Error("imagePath is empty"));
   }
   const tint = parseHexColor(colorRaw);
-  const key = `${candidates.join("|")}::${tint.hex}`;
+  const requestedIterations = Number(options?.dilateIterations);
+  const dilateIterations = Number.isFinite(requestedIterations)
+    ? clamp(Math.round(requestedIterations), 0, 8)
+    : getImageShapeDilateIterations(shapeTypeRaw);
+  const key = `${candidates.join("|")}::${tint.hex}::d${dilateIterations}`;
   const cached = planLargeShapeTintedCanvasCache.get(key);
   if (cached) {
     return cached;
@@ -6147,7 +6471,7 @@ function getOrLoadPlanLargeShapeTintedCanvas(imagePathRaw, colorRaw, shapeTypeRa
       }
     }
     const sourceMask = useLineMask ? lineMask : alphaMask;
-    const expandedAlpha = dilateAlphaMask(sourceMask, width, height, IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS);
+    const expandedAlpha = dilateAlphaMask(sourceMask, width, height, dilateIterations);
     for (let i = 0; i < data.length; i += 4) {
       const alpha = expandedAlpha[i / 4];
       if (alpha === 0) {
@@ -6171,13 +6495,17 @@ function getOrLoadPlanLargeShapeTintedCanvas(imagePathRaw, colorRaw, shapeTypeRa
   return promise;
 }
 
-function getPlanLargeShapeTintedDataUrl(imagePathRaw, colorRaw) {
-  const candidates = getLargeShapeImagePathCandidates("", imagePathRaw);
+function getPlanLargeShapeTintedDataUrl(imagePathRaw, colorRaw, shapeTypeRaw = "", options = {}) {
+  const candidates = getLargeShapeImagePathCandidates(shapeTypeRaw, imagePathRaw);
   if (!candidates.length) {
     return "";
   }
   const tint = parseHexColor(colorRaw);
-  const key = `${candidates.join("|")}::${tint.hex}`;
+  const requestedIterations = Number(options?.dilateIterations);
+  const dilateIterations = Number.isFinite(requestedIterations)
+    ? clamp(Math.round(requestedIterations), 0, 8)
+    : getImageShapeDilateIterations(shapeTypeRaw);
+  const key = `${candidates.join("|")}::${tint.hex}::d${dilateIterations}`;
   const cached = planLargeShapeTintedDataUrlCache.get(key);
   if (cached === "loading") {
     return "";
@@ -6187,7 +6515,7 @@ function getPlanLargeShapeTintedDataUrl(imagePathRaw, colorRaw) {
   }
   const preferredSource = candidates.find((candidate) => !String(candidate).startsWith("data:")) || candidates[0];
   planLargeShapeTintedDataUrlCache.set(key, "loading");
-  getOrLoadPlanLargeShapeTintedCanvas(preferredSource, tint.hex)
+  getOrLoadPlanLargeShapeTintedCanvas(preferredSource, tint.hex, shapeTypeRaw, { dilateIterations })
     .then((canvas) => {
       const dataUrl = canvas.toDataURL("image/png");
       if (dataUrl.length > PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH) {
@@ -6693,6 +7021,7 @@ function buildPlanDrawable(record) {
   const planSizeMode = normalizePlanSizeMode(record.planSizeMode);
   const shapeType = normalizeLargeShapeType(record.largeShapeType);
   const normalizedShapeLabel = normalizeLargeShapeLabel(record.largeShapeType);
+  const customImagePath = isCustomLargeShapeType(shapeType) ? normalizeCustomLargeImageDataUrl(record.customLargeImageDataUrl) : "";
   const isImageShape = isLargeShapeImageType(shapeType);
   const hasMappedImageType = largeShapeImagePathMap.has(normalizedShapeLabel);
   const rawImageCorners = collectImageCornerPoints(record);
@@ -6807,7 +7136,7 @@ function buildPlanDrawable(record) {
       type: "imageQuad",
       points,
       imageType: resolvedImageType,
-      imagePath: getLargeShapeImagePath(resolvedImageType),
+      imagePath: customImagePath || getLargeShapeImagePath(resolvedImageType),
       x: centroid.x,
       y: centroid.y,
       ...meta,
@@ -6902,7 +7231,10 @@ function buildPlanImageWarpSvg(drawable, index = 0) {
   const imageCandidates = getLargeShapeImagePathCandidates(drawable?.imageType, imagePath);
   const imageFallback =
     imageCandidates.find((candidate) => !String(candidate).startsWith("data:")) || imageCandidates[0] || imagePath;
-  const tintedDataUrlRaw = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color);
+  const dilateIterations = getImageShapeDilateIterations(drawable?.imageType);
+  const tintedDataUrlRaw = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color, drawable?.imageType, {
+    dilateIterations,
+  });
   const tintedDataUrl = value(tintedDataUrlRaw);
   const canUseTintedDataUrl =
     tintedDataUrl &&
@@ -7512,6 +7844,8 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     imgSkewYDeg: normalizeImageSkewDeg(value(item.imgSkewYDeg)),
     imgFlipH: normalizeToggleFlag(value(item.imgFlipH)),
     imgFlipV: normalizeToggleFlag(value(item.imgFlipV)),
+    customLargeImageName: normalizeCustomLargeImageName(value(item.customLargeImageName)),
+    customLargeImageDataUrl: normalizeCustomLargeImageDataUrl(value(item.customLargeImageDataUrl)),
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),
@@ -9831,6 +10165,14 @@ function getMissingRequiredKeys(record) {
           }
         });
       }
+      if (isCustomLargeShapeType(largeShapeType)) {
+        if (!normalizeCustomLargeImageName(record.customLargeImageName)) {
+          missing.add("customLargeImageName");
+        }
+        if (!normalizeCustomLargeImageDataUrl(record.customLargeImageDataUrl)) {
+          missing.add("customLargeImageDataUrl");
+        }
+      }
       const dipDeg = parseLargeAxisPlungeDeg(value(record.planeDipDeg));
       if (Number.isFinite(dipDeg) && dipDeg > 0 && !normalizeCompass8Direction(value(record.planeDipDir8))) {
         missing.add("planeDipDir8");
@@ -10047,14 +10389,21 @@ function normalizeLargeShapeType(valueRaw) {
   if (text === "ゾウ下顎臼歯" || text === "ゾウ上顎臼歯") {
     return "";
   }
-  if (text === "直線状" || text === "長方形" || text === "楕円" || largeShapeImagePathMap.has(text)) {
+  if (text === "画像アップロード") {
+    text = CUSTOM_LARGE_SHAPE_TYPE;
+  }
+  if (text === "直線状" || text === "長方形" || text === "楕円" || text === CUSTOM_LARGE_SHAPE_TYPE || largeShapeImagePathMap.has(text)) {
     return text;
   }
   return "";
 }
 
 function isLargeShapeImageType(shapeTypeRaw) {
-  return largeShapeImagePathMap.has(normalizeLargeShapeType(shapeTypeRaw));
+  const shapeType = normalizeLargeShapeType(shapeTypeRaw);
+  if (!shapeType) {
+    return false;
+  }
+  return shapeType === CUSTOM_LARGE_SHAPE_TYPE || largeShapeImagePathMap.has(shapeType);
 }
 
 function getLargeShapeImagePath(shapeTypeRaw) {
@@ -10444,7 +10793,7 @@ async function recompressPhotoArray(photosRaw, maxLength, quality) {
   return { photos: nextPhotos, changed };
 }
 
-function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72) {
+function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72, mimeType = "image/jpeg") {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
@@ -10464,18 +10813,18 @@ function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72) {
         return;
       }
       context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      resolve(canvas.toDataURL(mimeType, quality));
     };
     image.onerror = () => reject(new Error("Failed to load image"));
     image.src = dataUrl;
   });
 }
 
-function resizeImage(file, maxLength, quality = 0.72) {
+function resizeImage(file, maxLength, quality = 0.72, mimeType = "image/jpeg") {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      resizeDataUrlImage(String(reader.result || ""), maxLength, quality).then(resolve).catch(reject);
+      resizeDataUrlImage(String(reader.result || ""), maxLength, quality, mimeType).then(resolve).catch(reject);
     };
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);
