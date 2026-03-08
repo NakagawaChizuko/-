@@ -245,10 +245,12 @@ let outputFilterMemory = {
   searchText: "",
 };
 let selectedPlanKuwaku = "";
+let selectedPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
 let selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
 let selectedViewerKuwaku = ALL_GRIDS_VALUE;
+let selectedViewerCategory = EXPORT_CATEGORY_ALL_VALUE;
 let selectedViewerUnit = ALL_UNITS_VALUE;
 let selectedViewerDetail = ALL_DETAILS_VALUE;
 let selectedViewerDetailSub = ALL_DETAIL_SUBS_VALUE;
@@ -332,6 +334,7 @@ const outputStatusSelect = document.getElementById("output-status-select");
 const outputSearchInput = document.getElementById("output-search-input");
 const outputFilterSummary = document.getElementById("output-filter-summary");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
+const planCategorySelect = document.getElementById("plan-category-select");
 const planUnitSelect = document.getElementById("plan-unit-select");
 const planDetailSelect = document.getElementById("plan-detail-select");
 const planDetailSubSelect = document.getElementById("plan-detail-sub-select");
@@ -339,6 +342,7 @@ const planMapLegend = document.getElementById("plan-map-legend");
 const planMapWrap = document.getElementById("plan-map-wrap");
 const planKuwakuInfo = document.getElementById("plan-kuwaku-info");
 const viewerKuwakuSelect = document.getElementById("viewer-kuwaku-select");
+const viewerCategorySelect = document.getElementById("viewer-category-select");
 const viewerUnitSelect = document.getElementById("viewer-unit-select");
 const viewerDetailSelect = document.getElementById("viewer-detail-select");
 const viewerDetailSubSelect = document.getElementById("viewer-detail-sub-select");
@@ -1203,6 +1207,12 @@ function bindEvents() {
       renderPlanOutput();
     });
   }
+  if (planCategorySelect) {
+    planCategorySelect.addEventListener("change", () => {
+      selectedPlanCategory = value(planCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
+      renderPlanOutput();
+    });
+  }
 
   if (planUnitSelect) {
     planUnitSelect.addEventListener("change", () => {
@@ -1226,6 +1236,12 @@ function bindEvents() {
   if (viewerKuwakuSelect) {
     viewerKuwakuSelect.addEventListener("change", () => {
       selectedViewerKuwaku = value(viewerKuwakuSelect.value) || ALL_GRIDS_VALUE;
+      renderViewerOutput();
+    });
+  }
+  if (viewerCategorySelect) {
+    viewerCategorySelect.addEventListener("change", () => {
+      selectedViewerCategory = value(viewerCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
       renderViewerOutput();
     });
   }
@@ -4661,6 +4677,57 @@ function collectExportCategoryOptions(records) {
   return options;
 }
 
+function filterRecordsByCategory(recordsRaw, categoryValueRaw) {
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const categoryValue = value(categoryValueRaw) || EXPORT_CATEGORY_ALL_VALUE;
+  if (!categoryValue || categoryValue === EXPORT_CATEGORY_ALL_VALUE) {
+    return records;
+  }
+  return records.filter((record) => {
+    const specimen = parseSpecimenNo(record?.specimenNo, record?.specimenPrefix, record?.specimenSerial);
+    const prefix = normalizeSpecimenPrefix(specimen.prefix);
+    return prefix === categoryValue;
+  });
+}
+
+function syncPlanCategorySelect(recordsRaw) {
+  if (!planCategorySelect) {
+    return;
+  }
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const options = collectExportCategoryOptions(records);
+  if (!options.some((item) => item.value === selectedPlanCategory)) {
+    selectedPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
+  }
+  planCategorySelect.innerHTML = options
+    .map(
+      (item) =>
+        `<option value="${escapeHtml(item.value)}" ${item.value === selectedPlanCategory ? "selected" : ""}>${escapeHtml(
+          item.label
+        )}</option>`
+    )
+    .join("");
+}
+
+function syncViewerCategorySelect(recordsRaw) {
+  if (!viewerCategorySelect) {
+    return;
+  }
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const options = collectExportCategoryOptions(records);
+  if (!options.some((item) => item.value === selectedViewerCategory)) {
+    selectedViewerCategory = EXPORT_CATEGORY_ALL_VALUE;
+  }
+  viewerCategorySelect.innerHTML = options
+    .map(
+      (item) =>
+        `<option value="${escapeHtml(item.value)}" ${item.value === selectedViewerCategory ? "selected" : ""}>${escapeHtml(
+          item.label
+        )}</option>`
+    )
+    .join("");
+}
+
 function getListExportRecords() {
   return getRecordsByExportRangeFilters({
     kuwakuValue: exportListRangeKuwaku,
@@ -5290,10 +5357,14 @@ function renderPlanOutput() {
 
   if (!state.records.length) {
     selectedPlanKuwaku = "";
+    selectedPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
     selectedPlanUnit = "";
     selectedPlanDetail = ALL_DETAILS_VALUE;
     selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
     syncPlanKuwakuSelect([]);
+    if (planCategorySelect) {
+      planCategorySelect.innerHTML = "";
+    }
     planUnitSelect.innerHTML = "";
     planDetailSelect.innerHTML = "";
     planDetailSubSelect.innerHTML = "";
@@ -5305,11 +5376,13 @@ function renderPlanOutput() {
   }
 
   const kuwakuFilteredRecords = getFilteredPlanRecords();
+  syncPlanCategorySelect(kuwakuFilteredRecords);
+  const categoryRecords = filterRecordsByCategory(kuwakuFilteredRecords, selectedPlanCategory);
   if (planKuwakuInfo) {
     const kuwakuLabel = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
     planKuwakuInfo.textContent = `区画: ${kuwakuLabel}`;
   }
-  if (!kuwakuFilteredRecords.length) {
+  if (!categoryRecords.length) {
     selectedPlanUnit = "";
     selectedPlanDetail = ALL_DETAILS_VALUE;
     selectedPlanDetailSub = ALL_DETAIL_SUBS_VALUE;
@@ -5317,18 +5390,23 @@ function renderPlanOutput() {
     planDetailSelect.innerHTML = "";
     planDetailSubSelect.innerHTML = "";
     const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
+    const categoryLabelForMeta =
+      selectedPlanCategory === EXPORT_CATEGORY_ALL_VALUE
+        ? "全分類"
+        : `${selectedPlanCategory}: ${SPECIMEN_CATEGORY_MAP[selectedPlanCategory] || ""}`;
     planMapWrap.innerHTML = `
       <div class="plan-map-meta">
         <span>区画（グリッド）: ${escapeHtml(kuwakuLabelForMeta)}</span>
+        <span>分類: ${escapeHtml(categoryLabelForMeta)}</span>
         <span>出力階層: -</span>
         <span>表示件数: 0件</span>
       </div>
-      <p class="muted">この区画（グリッド）には表示対象データがありません。</p>
+      <p class="muted">この条件には表示対象データがありません。</p>
     `;
     return;
   }
 
-  const units = collectPlanUnits(kuwakuFilteredRecords);
+  const units = collectPlanUnits(categoryRecords);
   if (!units.some((unit) => unit.value === selectedPlanUnit)) {
     selectedPlanUnit = units[0].value;
   }
@@ -5343,8 +5421,8 @@ function renderPlanOutput() {
 
   const unitRecords =
     selectedPlanUnit === ALL_UNITS_VALUE
-      ? kuwakuFilteredRecords
-      : kuwakuFilteredRecords.filter((record) => unitValueForSelect(record.unit) === selectedPlanUnit);
+      ? categoryRecords
+      : categoryRecords.filter((record) => unitValueForSelect(record.unit) === selectedPlanUnit);
 
   const details = collectPlanDetails(unitRecords);
   if (!details.some((detail) => detail.value === selectedPlanDetail)) {
@@ -5383,6 +5461,10 @@ function renderPlanOutput() {
       : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedPlanDetailSub);
   const drawables = detailSubRecords.map((record) => buildPlanDrawable(record)).filter(Boolean);
   const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
+  const categoryLabelForMeta =
+    selectedPlanCategory === EXPORT_CATEGORY_ALL_VALUE
+      ? "全分類"
+      : `${selectedPlanCategory}: ${SPECIMEN_CATEGORY_MAP[selectedPlanCategory] || ""}`;
   const unitLabelForMeta = selectedPlanUnit === ALL_UNITS_VALUE ? "全ユニット" : unitLabelForSelect(selectedPlanUnit);
   const detailLabelForMeta =
     selectedPlanDetail === ALL_DETAILS_VALUE ? "全サブユニット" : detailLabelForSelect(selectedPlanDetail);
@@ -5392,6 +5474,7 @@ function renderPlanOutput() {
   const mapMetaHtml = `
     <div class="plan-map-meta">
       <span>区画（グリッド）: ${escapeHtml(kuwakuLabelForMeta)}</span>
+      <span>分類: ${escapeHtml(categoryLabelForMeta)}</span>
       <span>出力階層: ${escapeHtml(hierarchyLabelForMeta)}</span>
       <span>表示件数: ${detailSubRecords.length}件</span>
     </div>
@@ -5718,9 +5801,13 @@ function renderViewerOutput(options = {}) {
   syncViewerKuwakuSelect(sortedRecords);
 
   if (!sortedRecords.length) {
+    selectedViewerCategory = EXPORT_CATEGORY_ALL_VALUE;
     selectedViewerUnit = ALL_UNITS_VALUE;
     selectedViewerDetail = ALL_DETAILS_VALUE;
     selectedViewerDetailSub = ALL_DETAIL_SUBS_VALUE;
+    if (viewerCategorySelect) {
+      viewerCategorySelect.innerHTML = "";
+    }
     viewerUnitSelect.innerHTML = "";
     viewerDetailSelect.innerHTML = "";
     viewerDetailSubSelect.innerHTML = "";
@@ -5736,13 +5823,15 @@ function renderViewerOutput(options = {}) {
     selectedViewerKuwaku === ALL_GRIDS_VALUE
       ? sortedRecords
       : sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === selectedViewerKuwaku);
+  syncViewerCategorySelect(kuwakuRecords);
+  const categoryRecords = filterRecordsByCategory(kuwakuRecords, selectedViewerCategory);
 
   const kuwakuLabel = selectedViewerKuwaku === ALL_GRIDS_VALUE ? "全グリッド" : kuwakuLabelForSelect(selectedViewerKuwaku);
   if (viewerKuwakuInfo) {
     viewerKuwakuInfo.textContent = `区画: ${kuwakuLabel}`;
   }
 
-  if (!kuwakuRecords.length) {
+  if (!categoryRecords.length) {
     selectedViewerUnit = ALL_UNITS_VALUE;
     selectedViewerDetail = ALL_DETAILS_VALUE;
     selectedViewerDetailSub = ALL_DETAIL_SUBS_VALUE;
@@ -5754,7 +5843,7 @@ function renderViewerOutput(options = {}) {
     return;
   }
 
-  const units = collectPlanUnits(kuwakuRecords);
+  const units = collectPlanUnits(categoryRecords);
   if (!units.some((unit) => unit.value === selectedViewerUnit)) {
     selectedViewerUnit = units[0]?.value || ALL_UNITS_VALUE;
   }
@@ -5768,8 +5857,8 @@ function renderViewerOutput(options = {}) {
     .join("");
   const unitRecords =
     selectedViewerUnit === ALL_UNITS_VALUE
-      ? kuwakuRecords
-      : kuwakuRecords.filter((record) => unitValueForSelect(record.unit) === selectedViewerUnit);
+      ? categoryRecords
+      : categoryRecords.filter((record) => unitValueForSelect(record.unit) === selectedViewerUnit);
 
   const details = collectPlanDetails(unitRecords);
   if (!details.some((detail) => detail.value === selectedViewerDetail)) {
