@@ -7511,13 +7511,13 @@ function pickViewerDataAtEvent(event) {
 }
 
 function handleViewerContextMenu(event) {
+  event.preventDefault();
+  event.stopPropagation();
   const picked = pickViewerDataAtEvent(event);
   if (!picked || !value(picked.id)) {
     hideHoverEditMenu();
     return;
   }
-  event.preventDefault();
-  event.stopPropagation();
   showHoverEditMenu(event.clientX, event.clientY, picked.id, picked.kuwaku, picked.label);
 }
 
@@ -8499,13 +8499,13 @@ function attachPlanMapTooltips() {
       show(pointEl, event);
     });
     pointEl.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       const recordId = value(pointEl.dataset.id);
       if (!recordId) {
         hideHoverEditMenu();
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
       show(pointEl, event);
       showHoverEditMenu(event.clientX, event.clientY, recordId, value(pointEl.dataset.kuwaku), value(pointEl.dataset.label));
     });
