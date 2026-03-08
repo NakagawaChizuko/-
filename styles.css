@@ -2018,6 +2018,29 @@ select.saved-carry-value {
   border-color: #b45309;
 }
 
+#record-next-btn {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  margin-right: 14px;
+}
+
+#record-next-btn:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+#record-prev-btn {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+}
+
+#record-prev-btn:hover {
+  background: #115e59;
+  border-color: #115e59;
+}
+
 #record-reset-btn {
   background: #ffffff;
   border-color: #d97706;

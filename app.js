@@ -322,6 +322,8 @@ const editRecorderInput = document.getElementById("edit-recorder");
 const recordIdInput = document.getElementById("record-id-input");
 const recordSubmitBtn = document.getElementById("record-submit-btn");
 const recordCopyToInputBtn = document.getElementById("record-copy-to-input-btn");
+const recordPrevBtn = document.getElementById("record-prev-btn");
+const recordNextBtn = document.getElementById("record-next-btn");
 const recordResetBtn = document.getElementById("record-reset-btn");
 const recordTableBody = document.getElementById("record-table-body");
 const editRecordTableBody = document.getElementById("edit-record-table-body");
@@ -1036,6 +1038,16 @@ function bindEvents() {
   recordResetBtn.addEventListener("click", () => {
     resetRecordForm({ showMessage: true });
   });
+  if (recordPrevBtn) {
+    recordPrevBtn.addEventListener("click", () => {
+      moveToPreviousSpecimenWithoutSave();
+    });
+  }
+  if (recordNextBtn) {
+    recordNextBtn.addEventListener("click", () => {
+      moveToNextSpecimenWithoutSave();
+    });
+  }
   if (recordCopyToInputBtn) {
     recordCopyToInputBtn.addEventListener("click", () => {
       copyCurrentEditToInput();
@@ -1904,6 +1916,369 @@ function hideDuplicateSpecimenWarning() {
   specimenDuplicateWarning.classList.add("hidden");
   if (recordSubmitBtn) {
     recordSubmitBtn.disabled = false;
+  }
+}
+
+function moveToPreviousSpecimenWithoutSave() {
+  const activeTabId = getActiveTabId();
+  if (activeTabId !== "input-tab" && activeTabId !== "edit-tab") {
+    return;
+  }
+  const currentKuwaku = currentKuwakuForDuplicateWarning(activeTabId);
+  if (!currentKuwaku) {
+    showToast("区画（グリッド）を入力してください");
+    return;
+  }
+  const currentPrefix = normalizeSpecimenPrefix(specimenPrefixInput?.value);
+  const currentSerial = compactNoSpaceValue(specimenSerialInput?.value);
+  if (!state.records.length) {
+    let prevSerial = "1";
+    if (currentSerial && /^\d+$/.test(currentSerial)) {
+      prevSerial = String(Math.max(1, Number(currentSerial) - 1));
+    } else if (currentSerial) {
+      prevSerial = currentSerial;
+    }
+    applyNextNavigationTarget({
+      kuwaku: currentKuwaku,
+      prefix: currentPrefix,
+      serial: prevSerial,
+    });
+    showToast(`前へ: ${buildSpecimenNo(currentPrefix, prevSerial)}`);
+    return;
+  }
+
+  const prevRecord = findPreviousRecordByGridPrefixThenSerial(currentKuwaku, currentPrefix, currentSerial);
+  if (!prevRecord) {
+    showToast("前のデータが見つかりません");
+    return;
+  }
+  const prevKuwaku = getRecordKuwaku(prevRecord);
+  const prevSpecimen = parseSpecimenNo(prevRecord.specimenNo, prevRecord.specimenPrefix, prevRecord.specimenSerial);
+  if (activeTabId === "edit-tab") {
+    openRecordForEdit(prevRecord.id, prevKuwaku);
+    showToast(`前へ: ${prevKuwaku} / ${prevSpecimen.specimenNo}`);
+    return;
+  }
+  applyNextNavigationTarget({
+    kuwaku: prevKuwaku,
+    prefix: prevSpecimen.prefix,
+    serial: prevSpecimen.serial,
+  });
+  showToast(`前へ: ${prevKuwaku} / ${prevSpecimen.specimenNo}`);
+}
+
+function moveToNextSpecimenWithoutSave() {
+  const activeTabId = getActiveTabId();
+  if (activeTabId !== "input-tab" && activeTabId !== "edit-tab") {
+    return;
+  }
+  const currentKuwaku = currentKuwakuForDuplicateWarning(activeTabId);
+  if (!currentKuwaku) {
+    showToast("区画（グリッド）を入力してください");
+    return;
+  }
+  const currentPrefix = normalizeSpecimenPrefix(specimenPrefixInput?.value);
+  const currentSerial = compactNoSpaceValue(specimenSerialInput?.value);
+  if (!state.records.length) {
+    const nextSerial = currentSerial ? (/^\d+$/.test(currentSerial) ? String(Number(currentSerial) + 1) : `${currentSerial}1`) : "1";
+    applyNextNavigationTarget({
+      kuwaku: currentKuwaku,
+      prefix: currentPrefix,
+      serial: nextSerial,
+    });
+    showToast(`次へ: ${buildSpecimenNo(currentPrefix, nextSerial)}`);
+    return;
+  }
+
+  const nextRecord = findNextRecordByGridPrefixThenSerial(currentKuwaku, currentPrefix, currentSerial);
+  if (!nextRecord) {
+    showToast("次のデータが見つかりません");
+    return;
+  }
+
+  const nextKuwaku = getRecordKuwaku(nextRecord);
+  const nextSpecimen = parseSpecimenNo(nextRecord.specimenNo, nextRecord.specimenPrefix, nextRecord.specimenSerial);
+  if (activeTabId === "edit-tab") {
+    openRecordForEdit(nextRecord.id, nextKuwaku);
+    showToast(`次へ: ${nextKuwaku} / ${nextSpecimen.specimenNo}`);
+    return;
+  }
+  applyNextNavigationTarget({
+    kuwaku: nextKuwaku,
+    prefix: nextSpecimen.prefix,
+    serial: nextSpecimen.serial,
+  });
+  showToast(`次へ: ${nextKuwaku} / ${nextSpecimen.specimenNo}`);
+}
+
+function findPreviousRecordByGridPrefixThenSerial(currentKuwakuRaw, currentPrefixRaw, currentSerialRaw) {
+  const currentKuwakuValue = kuwakuValueForSelect(currentKuwakuRaw);
+  const currentPrefix = normalizeSpecimenPrefix(currentPrefixRaw);
+  const currentSerial = compactNoSpaceValue(currentSerialRaw);
+  const sorted = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  if (!sorted.length) {
+    return null;
+  }
+
+  const groupedByGrid = new Map();
+  const gridOrder = [];
+  sorted.forEach((record) => {
+    const gridValue = kuwakuValueForSelect(getRecordKuwaku(record));
+    if (!groupedByGrid.has(gridValue)) {
+      groupedByGrid.set(gridValue, []);
+      gridOrder.push(gridValue);
+    }
+    groupedByGrid.get(gridValue).push(record);
+  });
+
+  const currentGridRecords = groupedByGrid.get(currentKuwakuValue) || [];
+  const gridStartIndex = resolvePreviousGridStartIndex(gridOrder, currentKuwakuValue);
+  if (!currentGridRecords.length) {
+    for (let step = 0; step < gridOrder.length; step += 1) {
+      const gridValue = gridOrder[(gridStartIndex - step + gridOrder.length) % gridOrder.length];
+      const records = groupedByGrid.get(gridValue) || [];
+      if (records.length) {
+        return records[records.length - 1];
+      }
+    }
+    return sorted[sorted.length - 1];
+  }
+
+  const samePrefixRecords = currentGridRecords
+    .filter((record) => normalizeSpecimenPrefix(parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial).prefix) === currentPrefix)
+    .sort(compareRecordsBySpecimenNo);
+  if (samePrefixRecords.length) {
+    if (currentSerial) {
+      const exactIndex = samePrefixRecords.findIndex((record) => {
+        const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+        return compactNoSpaceValue(specimen.serial) === currentSerial;
+      });
+      if (exactIndex > 0) {
+        return samePrefixRecords[exactIndex - 1];
+      }
+      if (exactIndex < 0) {
+        for (let i = samePrefixRecords.length - 1; i >= 0; i -= 1) {
+          const specimen = parseSpecimenNo(
+            samePrefixRecords[i].specimenNo,
+            samePrefixRecords[i].specimenPrefix,
+            samePrefixRecords[i].specimenSerial
+          );
+          if (compareSpecimenSerialOnly(compactNoSpaceValue(specimen.serial), currentSerial) < 0) {
+            return samePrefixRecords[i];
+          }
+        }
+      }
+    } else {
+      return samePrefixRecords[samePrefixRecords.length - 1];
+    }
+  }
+
+  const sortedPrefixes = Array.from(
+    new Set(
+      currentGridRecords.map((record) =>
+        normalizeSpecimenPrefix(parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial).prefix)
+      )
+    )
+  ).sort((a, b) => a.localeCompare(b, "ja", { sensitivity: "base" }));
+  const prevPrefixes = sortedPrefixes
+    .filter((prefix) => prefix.localeCompare(currentPrefix, "ja", { sensitivity: "base" }) < 0)
+    .reverse();
+  for (const prefix of prevPrefixes) {
+    const prefixRecords = currentGridRecords
+      .filter((record) => {
+        const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+        return normalizeSpecimenPrefix(specimen.prefix) === prefix;
+      })
+      .sort(compareRecordsBySpecimenNo);
+    if (prefixRecords.length) {
+      return prefixRecords[prefixRecords.length - 1];
+    }
+  }
+
+  for (let step = 1; step <= gridOrder.length; step += 1) {
+    const gridValue = gridOrder[(gridStartIndex - step + gridOrder.length) % gridOrder.length];
+    const records = groupedByGrid.get(gridValue) || [];
+    if (records.length) {
+      return records[records.length - 1];
+    }
+  }
+  return sorted[sorted.length - 1];
+}
+
+function findNextRecordByGridPrefixThenSerial(currentKuwakuRaw, currentPrefixRaw, currentSerialRaw) {
+  const currentKuwakuValue = kuwakuValueForSelect(currentKuwakuRaw);
+  const currentPrefix = normalizeSpecimenPrefix(currentPrefixRaw);
+  const currentSerial = compactNoSpaceValue(currentSerialRaw);
+  const sorted = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  if (!sorted.length) {
+    return null;
+  }
+
+  const groupedByGrid = new Map();
+  const gridOrder = [];
+  sorted.forEach((record) => {
+    const gridValue = kuwakuValueForSelect(getRecordKuwaku(record));
+    if (!groupedByGrid.has(gridValue)) {
+      groupedByGrid.set(gridValue, []);
+      gridOrder.push(gridValue);
+    }
+    groupedByGrid.get(gridValue).push(record);
+  });
+
+  const currentGridRecords = groupedByGrid.get(currentKuwakuValue) || [];
+  const gridStartIndex = resolveNextGridStartIndex(gridOrder, currentKuwakuValue);
+  if (!currentGridRecords.length) {
+    for (let step = 0; step < gridOrder.length; step += 1) {
+      const gridValue = gridOrder[(gridStartIndex + step) % gridOrder.length];
+      const records = groupedByGrid.get(gridValue) || [];
+      if (records.length) {
+        return records[0];
+      }
+    }
+    return sorted[0];
+  }
+
+  const samePrefixRecords = currentGridRecords
+    .filter((record) => normalizeSpecimenPrefix(parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial).prefix) === currentPrefix)
+    .sort(compareRecordsBySpecimenNo);
+
+  if (samePrefixRecords.length) {
+    if (currentSerial) {
+      const exactIndex = samePrefixRecords.findIndex((record) => {
+        const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+        return compactNoSpaceValue(specimen.serial) === currentSerial;
+      });
+      if (exactIndex >= 0 && exactIndex + 1 < samePrefixRecords.length) {
+        return samePrefixRecords[exactIndex + 1];
+      }
+      if (exactIndex < 0) {
+        const nextBySerial = samePrefixRecords.find((record) => {
+          const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+          return compareSpecimenSerialOnly(compactNoSpaceValue(specimen.serial), currentSerial) > 0;
+        });
+        if (nextBySerial) {
+          return nextBySerial;
+        }
+      }
+    } else {
+      return samePrefixRecords[0];
+    }
+  }
+
+  const sortedPrefixes = Array.from(
+    new Set(
+      currentGridRecords.map((record) =>
+        normalizeSpecimenPrefix(parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial).prefix)
+      )
+    )
+  ).sort((a, b) => a.localeCompare(b, "ja", { sensitivity: "base" }));
+  const nextPrefixes = sortedPrefixes.filter(
+    (prefix) => prefix.localeCompare(currentPrefix, "ja", { sensitivity: "base" }) > 0
+  );
+  for (const prefix of nextPrefixes) {
+    const prefixRecords = currentGridRecords
+      .filter((record) => {
+        const specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+        return normalizeSpecimenPrefix(specimen.prefix) === prefix;
+      })
+      .sort(compareRecordsBySpecimenNo);
+    if (prefixRecords.length) {
+      return prefixRecords[0];
+    }
+  }
+
+  for (let step = 1; step <= gridOrder.length; step += 1) {
+    const gridValue = gridOrder[(gridStartIndex + step) % gridOrder.length];
+    const records = groupedByGrid.get(gridValue) || [];
+    if (records.length) {
+      return records[0];
+    }
+  }
+  return sorted[0];
+}
+
+function resolveNextGridStartIndex(gridOrder, currentGridValue) {
+  const exactIndex = gridOrder.indexOf(currentGridValue);
+  if (exactIndex >= 0) {
+    return exactIndex;
+  }
+  const currentLabel = kuwakuLabelForSelect(currentGridValue);
+  const insertedIndex = gridOrder.findIndex(
+    (value) =>
+      kuwakuLabelForSelect(value).localeCompare(currentLabel, "ja", {
+        numeric: true,
+        sensitivity: "base",
+      }) > 0
+  );
+  return insertedIndex >= 0 ? insertedIndex : 0;
+}
+
+function resolvePreviousGridStartIndex(gridOrder, currentGridValue) {
+  const exactIndex = gridOrder.indexOf(currentGridValue);
+  if (exactIndex >= 0) {
+    return exactIndex;
+  }
+  const currentLabel = kuwakuLabelForSelect(currentGridValue);
+  const insertedIndex = gridOrder.findIndex(
+    (value) =>
+      kuwakuLabelForSelect(value).localeCompare(currentLabel, "ja", {
+        numeric: true,
+        sensitivity: "base",
+      }) > 0
+  );
+  if (insertedIndex >= 0) {
+    return (insertedIndex - 1 + gridOrder.length) % gridOrder.length;
+  }
+  return Math.max(0, gridOrder.length - 1);
+}
+
+function compareSpecimenSerialOnly(aSerialRaw, bSerialRaw) {
+  const aSerial = compactNoSpaceValue(aSerialRaw);
+  const bSerial = compactNoSpaceValue(bSerialRaw);
+  const aIsNumber = /^\d+$/.test(aSerial);
+  const bIsNumber = /^\d+$/.test(bSerial);
+  if (aIsNumber && bIsNumber) {
+    return Number(aSerial) - Number(bSerial);
+  }
+  return aSerial.localeCompare(bSerial, "ja", { numeric: true, sensitivity: "base" });
+}
+
+function applyNextNavigationTarget({ kuwaku = "", prefix = DEFAULT_SPECIMEN_PREFIX, serial = "" } = {}) {
+  const activeTabId = getActiveTabId();
+  const kuwakuParts = parseKuwaku(kuwaku);
+  if (activeTabId === "edit-tab") {
+    if (editKuwakuHeadAInput) {
+      editKuwakuHeadAInput.value = kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
+    }
+    if (editKuwakuHeadBInput) {
+      editKuwakuHeadBInput.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
+    }
+    if (editKuwakuBlockInput) {
+      editKuwakuBlockInput.value = kuwakuParts.block || "";
+    }
+    if (editKuwakuNoInput) {
+      editKuwakuNoInput.value = kuwakuParts.no || "";
+    }
+  } else {
+    if (siteForm?.elements?.kuwakuHeadA) {
+      siteForm.elements.kuwakuHeadA.value = kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
+    }
+    if (siteForm?.elements?.kuwakuHeadB) {
+      siteForm.elements.kuwakuHeadB.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
+    }
+    if (siteForm?.elements?.kuwakuBlock) {
+      siteForm.elements.kuwakuBlock.value = kuwakuParts.block || "";
+    }
+    if (siteForm?.elements?.kuwakuNo) {
+      siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
+    }
+  }
+  activateSpecimenPrefix(prefix);
+  specimenSerialInput.value = compactNoSpaceValue(serial);
+  updateSpecimenNoFromParts();
+  if (getActiveTabId() === "edit-tab") {
+    renderRecordTable();
+    updateEditMissingRequiredHighlights();
   }
 }
 
