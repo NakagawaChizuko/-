@@ -457,7 +457,7 @@ main {
 }
 
 .output-grid-row {
-  max-width: 320px;
+  max-width: 240px;
   margin-bottom: 8px;
 }
 
@@ -470,11 +470,11 @@ main {
 }
 
 .output-filter-item {
-  width: min(100%, 260px);
+  width: min(100%, 180px);
 }
 
 .output-search-row {
-  width: min(100%, 340px);
+  width: min(100%, 250px);
 }
 
 .output-filter-summary {
@@ -803,8 +803,9 @@ main {
 
 .image-transform-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 220px));
+  justify-content: start;
+  gap: 8px 6px;
   margin-bottom: 8px;
 }
 
@@ -813,6 +814,13 @@ main {
   align-items: center;
   gap: 6px;
   font-weight: 600;
+}
+
+.image-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 label,

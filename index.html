@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>第24次野尻湖湖底発掘　化石・遺物 入力</title>
-    <link rel="stylesheet" href="./styles.css?v=20260308-3d22" />
+    <link rel="stylesheet" href="./styles.css?v=20260308-3d23" />
   </head>
   <body>
     <header class="app-header">
@@ -344,7 +344,7 @@
                 </section>
 
                 <section class="large-shape-panel hidden" data-large-shape-panel="__IMAGE__">
-                  <p class="hint-text">画像を回転・反転・変形して現地形状に合わせ、外枠サイズを入力します（4隅は自動計算）</p>
+                  <p class="hint-text">画像を回転・反転・変形して現地形状に合わせ、外枠サイズを入力します</p>
                   <div class="image-transform-grid">
                     <label>北から回転角
                       <div class="inline-degree-row">
@@ -376,8 +376,10 @@
                         <span>°</span>
                       </div>
                     </label>
-                    <label class="image-toggle-check"><input name="imgFlipH" type="checkbox" value="1" /> 左右反転</label>
-                    <label class="image-toggle-check"><input name="imgFlipV" type="checkbox" value="1" /> 上下反転</label>
+                    <div class="image-toggle-row">
+                      <label class="image-toggle-check"><input name="imgFlipH" type="checkbox" value="1" /> 左右反転</label>
+                      <label class="image-toggle-check"><input name="imgFlipV" type="checkbox" value="1" /> 上下反転</label>
+                    </div>
                   </div>
                 </section>
               </div>
@@ -866,6 +868,6 @@
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260308-3d33"></script>
+    <script src="./app.js?v=20260308-3d40"></script>
   </body>
 </html>

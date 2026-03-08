@@ -142,6 +142,7 @@ const SPECIMEN_POINT_COLORS = {
   h: "#6b7280",
 };
 const IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS = 5;
+const PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH = 180000;
 const LARGE_SHAPE_DIR_PATH = "./shapes";
 const LARGE_SHAPE_FILE_LABEL_MAP = {
   palmate_antler: "掌状角",
@@ -229,6 +230,12 @@ let selectedOutputKuwaku = ALL_GRIDS_VALUE;
 let selectedOutputCategory = EXPORT_CATEGORY_ALL_VALUE;
 let selectedOutputStatus = "all";
 let outputSearchText = "";
+let outputFilterMemory = {
+  kuwaku: ALL_GRIDS_VALUE,
+  category: EXPORT_CATEGORY_ALL_VALUE,
+  status: "all",
+  searchText: "",
+};
 let selectedPlanKuwaku = "";
 let selectedPlanUnit = "";
 let selectedPlanDetail = ALL_DETAILS_VALUE;
@@ -548,7 +555,6 @@ function bindEvents() {
       recorder: value(formData.get("recorder")),
       updatedAt: nowIso(),
     };
-    selectedOutputKuwaku = kuwakuValueForSelect(nextSiteKuwaku);
     selectedPlanKuwaku = kuwakuValueForSelect(nextSiteKuwaku);
     persist("区画（グリッド）情報を保存しました");
     renderRecordTable();
@@ -678,7 +684,6 @@ function bindEvents() {
         recorder: siteSnapshot.recorder,
         updatedAt: nowIso(),
       };
-      selectedOutputKuwaku = kuwakuValueForSelect(siteSnapshot.kuwaku);
       selectedPlanKuwaku = kuwakuValueForSelect(siteSnapshot.kuwaku);
     }
 
@@ -1038,6 +1043,7 @@ function bindEvents() {
     outputKuwakuSelect.addEventListener("change", () => {
       selectedOutputKuwaku = value(outputKuwakuSelect.value) || ALL_GRIDS_VALUE;
       selectedCardRecordId = "";
+      rememberOutputFilters();
       renderOutputs();
     });
   }
@@ -1045,6 +1051,7 @@ function bindEvents() {
     outputCategorySelect.addEventListener("change", () => {
       selectedOutputCategory = value(outputCategorySelect.value) || EXPORT_CATEGORY_ALL_VALUE;
       selectedCardRecordId = "";
+      rememberOutputFilters();
       renderOutputs();
     });
   }
@@ -1052,6 +1059,7 @@ function bindEvents() {
     outputStatusSelect.addEventListener("change", () => {
       selectedOutputStatus = value(outputStatusSelect.value) || "all";
       selectedCardRecordId = "";
+      rememberOutputFilters();
       renderOutputs();
     });
   }
@@ -1059,6 +1067,7 @@ function bindEvents() {
     outputSearchInput.addEventListener("input", () => {
       outputSearchText = value(outputSearchInput.value);
       selectedCardRecordId = "";
+      rememberOutputFilters();
       renderOutputs();
     });
   }
@@ -1564,6 +1573,10 @@ async function addPhotosFromFiles(fileList) {
 }
 
 function setActiveTab(tabId) {
+  const previousTabId = getActiveTabId();
+  if (previousTabId === "output-tab") {
+    rememberOutputFilters();
+  }
   tabButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === tabId);
   });
@@ -1581,6 +1594,11 @@ function setActiveTab(tabId) {
   if (tabId === "viewer-tab") {
     renderViewerOutput();
     ensureViewerCanvasSize();
+  }
+  if (tabId === "output-tab") {
+    restoreOutputFilters();
+    renderListOutput();
+    renderCardOutput();
   }
   if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab" || tabId === "viewer-tab" || tabId === "export-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
@@ -1624,6 +1642,24 @@ function syncRecordFormPlacement(tabId) {
 function getActiveTabId() {
   const activePanel = document.querySelector(".tab-panel.active");
   return activePanel?.id || "";
+}
+
+function rememberOutputFilters() {
+  outputFilterMemory = {
+    kuwaku: value(selectedOutputKuwaku) || ALL_GRIDS_VALUE,
+    category: value(selectedOutputCategory) || EXPORT_CATEGORY_ALL_VALUE,
+    status: ["all", "complete", "incomplete"].includes(value(selectedOutputStatus)) ? value(selectedOutputStatus) : "all",
+    searchText: value(outputSearchText),
+  };
+}
+
+function restoreOutputFilters() {
+  selectedOutputKuwaku = value(outputFilterMemory.kuwaku) || ALL_GRIDS_VALUE;
+  selectedOutputCategory = value(outputFilterMemory.category) || EXPORT_CATEGORY_ALL_VALUE;
+  selectedOutputStatus = ["all", "complete", "incomplete"].includes(value(outputFilterMemory.status))
+    ? value(outputFilterMemory.status)
+    : "all";
+  outputSearchText = value(outputFilterMemory.searchText);
 }
 
 function hydrateSiteForm() {
@@ -4881,7 +4917,7 @@ function renderPlanOutput() {
       <div class="plan-grid-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
       <div class="plan-grid-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
       <div class="plan-grid-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
-      <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="ユニット別平面図">
+      <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="ユニット別平面図" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <rect class="plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
@@ -6068,7 +6104,11 @@ function getOrLoadPlanLargeShapeTintedCanvas(imagePathRaw, colorRaw, shapeTypeRa
     try {
       imageData = ctx.getImageData(0, 0, width, height);
     } catch (_error) {
-      // ローカル環境等で getImageData が失敗する場合は、原画像のまま表示する。
+      // getImageData が失敗する環境でも、透過マスクに分類色を掛けて表示する。
+      ctx.globalCompositeOperation = "source-in";
+      ctx.fillStyle = tint.hex;
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = "source-over";
       return canvas;
     }
     const data = imageData.data;
@@ -6134,10 +6174,16 @@ function getPlanLargeShapeTintedDataUrl(imagePathRaw, colorRaw) {
   if (typeof cached === "string") {
     return cached;
   }
+  const preferredSource = candidates.find((candidate) => !String(candidate).startsWith("data:")) || candidates[0];
   planLargeShapeTintedDataUrlCache.set(key, "loading");
-  getOrLoadPlanLargeShapeTintedCanvas(candidates[0], tint.hex)
+  getOrLoadPlanLargeShapeTintedCanvas(preferredSource, tint.hex)
     .then((canvas) => {
       const dataUrl = canvas.toDataURL("image/png");
+      if (dataUrl.length > PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH) {
+        planLargeShapeTintedDataUrlCache.set(key, "");
+        renderOutputs();
+        return;
+      }
       planLargeShapeTintedDataUrlCache.set(key, dataUrl);
       renderOutputs();
     })
@@ -6843,13 +6889,37 @@ function buildPlanImageWarpSvg(drawable, index = 0) {
   const points = Array.isArray(drawable?.points) ? drawable.points : [];
   const imagePath = value(drawable?.imagePath);
   const imageCandidates = getLargeShapeImagePathCandidates(drawable?.imageType, imagePath);
-  const imageFallback = imageCandidates[0] || imagePath;
-  const tintedDataUrl = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color);
-  const imageRef = tintedDataUrl || imageFallback;
+  const imageFallback =
+    imageCandidates.find((candidate) => !String(candidate).startsWith("data:")) || imageCandidates[0] || imagePath;
+  const tintedDataUrlRaw = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color);
+  const tintedDataUrl = value(tintedDataUrlRaw);
+  const canUseTintedDataUrl =
+    tintedDataUrl &&
+    tintedDataUrl.startsWith("data:") &&
+    tintedDataUrl.length <= PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH;
+  const imageRef = canUseTintedDataUrl ? tintedDataUrl : imageFallback;
   if (points.length !== 4 || !imageRef) {
     return "";
   }
   const [p1, p2, p3, p4] = points;
+  const isParallelogram =
+    Number.isFinite(p1.x) &&
+    Number.isFinite(p1.y) &&
+    Number.isFinite(p2.x) &&
+    Number.isFinite(p2.y) &&
+    Number.isFinite(p3.x) &&
+    Number.isFinite(p3.y) &&
+    Number.isFinite(p4.x) &&
+    Number.isFinite(p4.y) &&
+    Math.abs((p1.x + p3.x) - (p2.x + p4.x)) <= 0.8 &&
+    Math.abs((p1.y + p3.y) - (p2.y + p4.y)) <= 0.8;
+  if (isParallelogram) {
+    const matrix = [p2.x - p1.x, p2.y - p1.y, p4.x - p1.x, p4.y - p1.y, p1.x, p1.y];
+    const matrixText = matrix.map((num) => (Number.isFinite(num) ? Number(num).toFixed(4) : "0")).join(" ");
+    return `<image href="${escapeHtml(imageRef)}" xlink:href="${escapeHtml(
+      imageRef
+    )}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixText})" />`;
+  }
   const labelKey = value(drawable.label || "x").replace(/[^a-zA-Z0-9_-]/g, "");
   const clipIdA = `plan-img-clip-a-${index}-${labelKey || "x"}`;
   const clipIdB = `plan-img-clip-b-${index}-${labelKey || "x"}`;
@@ -6868,8 +6938,12 @@ function buildPlanImageWarpSvg(drawable, index = 0) {
         <polygon points="${triB}" />
       </clipPath>
     </defs>
-    <image href="${escapeHtml(imageRef)}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixAText})" clip-path="url(#${clipIdA})" />
-    <image href="${escapeHtml(imageRef)}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixBText})" clip-path="url(#${clipIdB})" />
+    <image href="${escapeHtml(imageRef)}" xlink:href="${escapeHtml(
+      imageRef
+    )}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixAText})" clip-path="url(#${clipIdA})" />
+    <image href="${escapeHtml(imageRef)}" xlink:href="${escapeHtml(
+      imageRef
+    )}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" transform="matrix(${matrixBText})" clip-path="url(#${clipIdB})" />
   `;
 }
 
@@ -8870,7 +8944,7 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
       <div class="pdf-plan-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
       <div class="pdf-plan-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
       <div class="pdf-plan-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
-      <svg class="pdf-plan-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="層準別平面図">
+      <svg class="pdf-plan-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="層準別平面図" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <rect class="pdf-plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
@@ -10008,28 +10082,21 @@ function getLargeShapeImagePathCandidates(shapeTypeRaw, imagePathRaw = "") {
   const shapeType = normalizeLargeShapeType(shapeTypeRaw);
   const explicitPath = toSafeAssetUrl(imagePathRaw);
   const hasExplicitPath = Boolean(explicitPath);
-  if (hasExplicitPath) {
-    pushInlineCandidate(explicitPath);
-    pushCandidate(explicitPath);
-  }
   if (shapeType) {
     const fallbackList = LARGE_SHAPE_IMAGE_FALLBACK_PATHS[shapeType] || [];
     const mappedPath = largeShapeImagePathMap.get(shapeType) || "";
-    if (!hasExplicitPath) {
-      fallbackList.forEach((pathRaw) => {
-        pushInlineCandidate(pathRaw);
-        pushCandidate(pathRaw);
-      });
-      pushInlineCandidate(mappedPath);
-      pushCandidate(mappedPath);
-    } else {
-      pushInlineCandidate(mappedPath);
-      pushCandidate(mappedPath);
-      fallbackList.forEach((pathRaw) => {
-        pushInlineCandidate(pathRaw);
-        pushCandidate(pathRaw);
-      });
-    }
+    // 形状タイプに対応する正規画像を常に優先する（古い保存パス対策）。
+    pushInlineCandidate(mappedPath);
+    pushCandidate(mappedPath);
+    fallbackList.forEach((pathRaw) => {
+      pushInlineCandidate(pathRaw);
+      pushCandidate(pathRaw);
+    });
+  }
+  if (hasExplicitPath) {
+    // 明示パスは後方互換用の候補として最後に評価する。
+    pushInlineCandidate(explicitPath);
+    pushCandidate(explicitPath);
   }
   return candidates;
 }
