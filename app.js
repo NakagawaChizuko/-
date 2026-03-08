@@ -1959,11 +1959,7 @@ function moveToPreviousSpecimenWithoutSave() {
     showToast(`前へ: ${prevKuwaku} / ${prevSpecimen.specimenNo}`);
     return;
   }
-  applyNextNavigationTarget({
-    kuwaku: prevKuwaku,
-    prefix: prevSpecimen.prefix,
-    serial: prevSpecimen.serial,
-  });
+  loadRecordIntoInputForNavigation(prevRecord, prevKuwaku);
   showToast(`前へ: ${prevKuwaku} / ${prevSpecimen.specimenNo}`);
 }
 
@@ -2003,11 +1999,7 @@ function moveToNextSpecimenWithoutSave() {
     showToast(`次へ: ${nextKuwaku} / ${nextSpecimen.specimenNo}`);
     return;
   }
-  applyNextNavigationTarget({
-    kuwaku: nextKuwaku,
-    prefix: nextSpecimen.prefix,
-    serial: nextSpecimen.serial,
-  });
+  loadRecordIntoInputForNavigation(nextRecord, nextKuwaku);
   showToast(`次へ: ${nextKuwaku} / ${nextSpecimen.specimenNo}`);
 }
 
@@ -2272,6 +2264,7 @@ function applyNextNavigationTarget({ kuwaku = "", prefix = DEFAULT_SPECIMEN_PREF
     if (siteForm?.elements?.kuwakuNo) {
       siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
     }
+    syncInputSiteStateFromForm();
   }
   activateSpecimenPrefix(prefix);
   specimenSerialInput.value = compactNoSpaceValue(serial);
@@ -2279,7 +2272,74 @@ function applyNextNavigationTarget({ kuwaku = "", prefix = DEFAULT_SPECIMEN_PREF
   if (getActiveTabId() === "edit-tab") {
     renderRecordTable();
     updateEditMissingRequiredHighlights();
+  } else if (getActiveTabId() === "input-tab") {
+    renderRecordTable();
   }
+}
+
+function loadRecordIntoInputForNavigation(record, preferredKuwaku = "") {
+  if (!record) {
+    return;
+  }
+  const kuwakuSource = value(preferredKuwaku) || value(record.kuwaku) || getRecordKuwaku(record);
+  const kuwakuParts = parseKuwaku(kuwakuSource);
+  const teamState = normalizeTeamState(value(record.team), value(record.teamOther));
+  if (siteForm?.elements) {
+    siteForm.elements.kuwakuHeadA.value = kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A;
+    siteForm.elements.kuwakuHeadB.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
+    siteForm.elements.kuwakuBlock.value = kuwakuParts.block || "";
+    siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
+    siteForm.elements.levelHeight.value = value(record.levelHeight);
+    siteForm.elements.date.value = value(record.date);
+    siteForm.elements.team.value = teamState.team;
+    siteForm.elements.teamOther.value = teamState.teamOther;
+    siteForm.elements.teamLead.value = value(record.teamLead);
+    siteForm.elements.recorder.value = value(record.recorder);
+    syncTeamOtherInput(siteForm.elements.team.value);
+    syncInputSiteStateFromForm();
+  }
+  if (getActiveTabId() !== "input-tab") {
+    setActiveTab("input-tab");
+  }
+  populateRecordForm({
+    ...record,
+    id: "",
+  });
+  isOverwriteMode = false;
+  overwriteOriginalRecord = null;
+  clearOverwriteUpdatedState();
+  clearEditHistory();
+  editingRecordId = null;
+  if (recordIdInput) {
+    recordIdInput.value = "";
+  }
+  renderRecordTable();
+  updateDuplicateSpecimenWarning();
+}
+
+function syncInputSiteStateFromForm() {
+  if (!siteForm?.elements) {
+    return;
+  }
+  const kuwakuHeadA = normalizeKuwakuHeadA(siteForm.elements.kuwakuHeadA?.value);
+  const kuwakuHeadB = normalizeKuwakuHeadB(siteForm.elements.kuwakuHeadB?.value);
+  const kuwakuBlock = normalizeKuwakuBlock(siteForm.elements.kuwakuBlock?.value);
+  const kuwakuNo = normalizeKuwakuNo(siteForm.elements.kuwakuNo?.value);
+  const teamState = normalizeTeamState(value(siteForm.elements.team?.value), value(siteForm.elements.teamOther?.value));
+  state.site = {
+    ...state.site,
+    kuwaku: buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo),
+    kuwakuHeadA,
+    kuwakuHeadB,
+    kuwakuBlock,
+    kuwakuNo,
+    levelHeight: value(siteForm.elements.levelHeight?.value),
+    date: value(siteForm.elements.date?.value),
+    team: teamState.team,
+    teamOther: teamState.teamOther,
+    teamLead: value(siteForm.elements.teamLead?.value),
+    recorder: value(siteForm.elements.recorder?.value),
+  };
 }
 
 function syncAnalysisTypeInput(prefixRaw) {
