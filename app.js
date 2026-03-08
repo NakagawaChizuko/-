@@ -469,6 +469,15 @@ const positionPreviewMap = document.getElementById("position-preview-map");
 let hoverEditMenuEl = null;
 let hoverEditMenuRecordId = "";
 let hoverEditMenuKuwaku = "";
+const TOUCH_LONG_PRESS_MS = 520;
+const TOUCH_LONG_PRESS_MOVE_THRESHOLD_PX = 16;
+const viewerTouchLongPressState = {
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  timer: 0,
+  triggered: false,
+};
 
 const viewer3d = {
   initialized: false,
@@ -6493,7 +6502,10 @@ function ensureViewerInitialized() {
     viewer3d.initialized = true;
 
     viewerCanvasWrap.addEventListener("pointermove", handleViewerPointerMove);
-    viewerCanvasWrap.addEventListener("pointerleave", hideViewerTooltip);
+    viewerCanvasWrap.addEventListener("pointerdown", handleViewerPointerDown);
+    viewerCanvasWrap.addEventListener("pointerup", handleViewerPointerEnd);
+    viewerCanvasWrap.addEventListener("pointercancel", handleViewerPointerEnd);
+    viewerCanvasWrap.addEventListener("pointerleave", handleViewerPointerLeave);
     viewerCanvasWrap.addEventListener("contextmenu", handleViewerContextMenu);
     if (typeof ResizeObserver === "function") {
       viewer3d.resizeObserver = new ResizeObserver(() => {
@@ -7483,6 +7495,11 @@ function applyViewerPerspective() {
 }
 
 function handleViewerPointerMove(event) {
+  if (isTouchLikePointerEvent(event)) {
+    updateViewerTouchLongPressByMove(event);
+    hideViewerTooltip();
+    return;
+  }
   const picked = pickViewerDataAtEvent(event);
   if (!picked) {
     hideViewerTooltip();
@@ -7492,15 +7509,24 @@ function handleViewerPointerMove(event) {
 }
 
 function pickViewerDataAtEvent(event) {
+  return pickViewerDataAtClient(event?.clientX, event?.clientY);
+}
+
+function pickViewerDataAtClient(clientXRaw, clientYRaw) {
   if (!viewer3d.initialized || !viewer3d.raycaster || !viewer3d.camera || !viewer3d.pickMeshes.length || !viewerCanvasWrap) {
+    return null;
+  }
+  const clientX = Number(clientXRaw);
+  const clientY = Number(clientYRaw);
+  if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
     return null;
   }
   const rect = viewerCanvasWrap.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) {
     return null;
   }
-  const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((clientY - rect.top) / rect.height) * 2 + 1;
   viewer3d.pointer.set(x, y);
   viewer3d.raycaster.setFromCamera(viewer3d.pointer, viewer3d.camera);
   const intersects = viewer3d.raycaster.intersectObjects(viewer3d.pickMeshes, false);
@@ -7508,6 +7534,84 @@ function pickViewerDataAtEvent(event) {
     return null;
   }
   return intersects[0].object?.userData || null;
+}
+
+function handleViewerPointerDown(event) {
+  if (!isTouchLikePointerEvent(event)) {
+    return;
+  }
+  cancelViewerTouchLongPress();
+  viewerTouchLongPressState.pointerId = Number.isFinite(Number(event.pointerId)) ? event.pointerId : null;
+  viewerTouchLongPressState.startX = Number(event.clientX) || 0;
+  viewerTouchLongPressState.startY = Number(event.clientY) || 0;
+  viewerTouchLongPressState.triggered = false;
+  viewerTouchLongPressState.timer = window.setTimeout(() => {
+    if (viewerTouchLongPressState.pointerId == null) {
+      return;
+    }
+    viewerTouchLongPressState.timer = 0;
+    const picked = pickViewerDataAtClient(viewerTouchLongPressState.startX, viewerTouchLongPressState.startY);
+    if (!picked || !value(picked.id)) {
+      return;
+    }
+    hideViewerTooltip();
+    showHoverEditMenu(
+      viewerTouchLongPressState.startX,
+      viewerTouchLongPressState.startY,
+      picked.id,
+      picked.kuwaku,
+      picked.label
+    );
+    viewerTouchLongPressState.triggered = true;
+  }, TOUCH_LONG_PRESS_MS);
+}
+
+function updateViewerTouchLongPressByMove(event) {
+  if (!isTouchLikePointerEvent(event) || viewerTouchLongPressState.pointerId == null) {
+    return;
+  }
+  if (Number(event.pointerId) !== Number(viewerTouchLongPressState.pointerId)) {
+    return;
+  }
+  const moved = pointerMovedBeyondThreshold(
+    event.clientX,
+    event.clientY,
+    viewerTouchLongPressState.startX,
+    viewerTouchLongPressState.startY,
+    TOUCH_LONG_PRESS_MOVE_THRESHOLD_PX
+  );
+  if (moved) {
+    cancelViewerTouchLongPress();
+  }
+}
+
+function handleViewerPointerEnd(event) {
+  if (!isTouchLikePointerEvent(event)) {
+    return;
+  }
+  if (viewerTouchLongPressState.pointerId == null) {
+    return;
+  }
+  if (Number(event.pointerId) !== Number(viewerTouchLongPressState.pointerId)) {
+    return;
+  }
+  cancelViewerTouchLongPress();
+}
+
+function handleViewerPointerLeave(event) {
+  hideViewerTooltip();
+  if (isTouchLikePointerEvent(event)) {
+    cancelViewerTouchLongPress();
+  }
+}
+
+function cancelViewerTouchLongPress() {
+  if (viewerTouchLongPressState.timer) {
+    window.clearTimeout(viewerTouchLongPressState.timer);
+  }
+  viewerTouchLongPressState.timer = 0;
+  viewerTouchLongPressState.pointerId = null;
+  viewerTouchLongPressState.triggered = false;
 }
 
 function handleViewerContextMenu(event) {
@@ -8485,6 +8589,20 @@ function attachPlanMapTooltips() {
 
   const points = shell.querySelectorAll(".plan-point-group");
   points.forEach((pointEl) => {
+    const touchLongPressState = {
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      timer: 0,
+    };
+    const clearTouchLongPress = () => {
+      if (touchLongPressState.timer) {
+        window.clearTimeout(touchLongPressState.timer);
+      }
+      touchLongPressState.timer = 0;
+      touchLongPressState.pointerId = null;
+    };
+
     pointEl.addEventListener("mouseenter", (event) => show(pointEl, event));
     pointEl.addEventListener("mousemove", (event) => {
       if (!tooltip.hidden) {
@@ -8509,6 +8627,62 @@ function attachPlanMapTooltips() {
       show(pointEl, event);
       showHoverEditMenu(event.clientX, event.clientY, recordId, value(pointEl.dataset.kuwaku), value(pointEl.dataset.label));
     });
+    pointEl.addEventListener("pointerdown", (event) => {
+      if (!isTouchLikePointerEvent(event)) {
+        return;
+      }
+      const recordId = value(pointEl.dataset.id);
+      if (!recordId) {
+        return;
+      }
+      clearTouchLongPress();
+      touchLongPressState.pointerId = Number.isFinite(Number(event.pointerId)) ? event.pointerId : null;
+      touchLongPressState.startX = Number(event.clientX) || 0;
+      touchLongPressState.startY = Number(event.clientY) || 0;
+      touchLongPressState.timer = window.setTimeout(() => {
+        if (touchLongPressState.pointerId == null) {
+          return;
+        }
+        touchLongPressState.timer = 0;
+        show(pointEl, { clientX: touchLongPressState.startX, clientY: touchLongPressState.startY });
+        showHoverEditMenu(
+          touchLongPressState.startX,
+          touchLongPressState.startY,
+          recordId,
+          value(pointEl.dataset.kuwaku),
+          value(pointEl.dataset.label)
+        );
+      }, TOUCH_LONG_PRESS_MS);
+    });
+    pointEl.addEventListener("pointermove", (event) => {
+      if (!isTouchLikePointerEvent(event) || touchLongPressState.pointerId == null) {
+        return;
+      }
+      if (Number(event.pointerId) !== Number(touchLongPressState.pointerId)) {
+        return;
+      }
+      const moved = pointerMovedBeyondThreshold(
+        event.clientX,
+        event.clientY,
+        touchLongPressState.startX,
+        touchLongPressState.startY,
+        TOUCH_LONG_PRESS_MOVE_THRESHOLD_PX
+      );
+      if (moved) {
+        clearTouchLongPress();
+      }
+    });
+    pointEl.addEventListener("pointerup", (event) => {
+      if (!isTouchLikePointerEvent(event) || touchLongPressState.pointerId == null) {
+        return;
+      }
+      if (Number(event.pointerId) !== Number(touchLongPressState.pointerId)) {
+        return;
+      }
+      clearTouchLongPress();
+    });
+    pointEl.addEventListener("pointercancel", clearTouchLongPress);
+    pointEl.addEventListener("pointerleave", clearTouchLongPress);
   });
 
   shell.addEventListener("click", (event) => {
@@ -8599,6 +8773,23 @@ function hideHoverEditMenu() {
   hoverEditMenuEl.hidden = true;
   hoverEditMenuRecordId = "";
   hoverEditMenuKuwaku = "";
+}
+
+function isTouchLikePointerEvent(event) {
+  const pointerType = value(event?.pointerType).toLowerCase();
+  return pointerType === "touch" || pointerType === "pen";
+}
+
+function pointerMovedBeyondThreshold(clientXRaw, clientYRaw, startXRaw, startYRaw, thresholdRaw = 12) {
+  const clientX = Number(clientXRaw);
+  const clientY = Number(clientYRaw);
+  const startX = Number(startXRaw);
+  const startY = Number(startYRaw);
+  if (!Number.isFinite(clientX) || !Number.isFinite(clientY) || !Number.isFinite(startX) || !Number.isFinite(startY)) {
+    return false;
+  }
+  const threshold = Math.max(1, Number(thresholdRaw) || 1);
+  return Math.hypot(clientX - startX, clientY - startY) > threshold;
 }
 
 function positionTooltip(pointEl, mouseEvent, shell, svg, tooltip) {
