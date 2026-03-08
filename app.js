@@ -7409,9 +7409,10 @@ function parseImageQuadPlanPoints(record, center = null) {
     centerPointRaw && Number.isFinite(centerPointRaw.x) && Number.isFinite(centerPointRaw.y) ? centerPointRaw : null;
   const widthCm = parseDistanceToCm(record?.imgFrameWidthCm);
   const heightCm = parseDistanceToCm(record?.imgFrameHeightCm);
+  // 回転角が未入力でも、画像外枠サイズは反映する（未入力時は0°扱い）。
   const rotationText = normalizeImageRotationDeg(record?.imgRotateDeg);
-  if (centerPoint && widthCm != null && widthCm > 0 && heightCm != null && heightCm > 0 && rotationText !== "") {
-    const rotationDeg = Number(rotationText);
+  if (centerPoint && widthCm != null && widthCm > 0 && heightCm != null && heightCm > 0) {
+    const rotationDeg = Number(rotationText === "" ? "0" : rotationText);
     const skewXDeg = Number(normalizeImageSkewDeg(record?.imgSkewXDeg) || "0");
     const skewYDeg = Number(normalizeImageSkewDeg(record?.imgSkewYDeg) || "0");
     const flipH = normalizeToggleFlag(record?.imgFlipH) === "1";
@@ -8612,8 +8613,8 @@ function persist(successMessage) {
       showToast(successMessage);
     }
     scheduleCloudSave();
-  } catch (_error) {
-    void recoverFromQuotaError(successMessage);
+  } catch (error) {
+    void recoverFromQuotaError(successMessage, error);
   }
 }
 
@@ -11197,11 +11198,26 @@ function timestamp() {
   return `${yyyy}${mm}${dd}-${hh}${mi}`;
 }
 
-async function recoverFromQuotaError(successMessage) {
+function isLikelyQuotaExceededError(error) {
+  if (!error) {
+    return false;
+  }
+  const name = value(error.name).toLowerCase();
+  const message = value(error.message).toLowerCase();
+  return (
+    name.includes("quota") ||
+    name.includes("ns_error_dom_quota_reached") ||
+    message.includes("quota") ||
+    message.includes("storage")
+  );
+}
+
+async function recoverFromQuotaError(successMessage, causeError = null) {
   if (quotaRecoveryInProgress) {
     showToast("写真データを圧縮中です。数秒待ってから再試行してください");
     return;
   }
+  const quotaExceeded = isLikelyQuotaExceededError(causeError);
   quotaRecoveryInProgress = true;
   showToast("保存容量を超えたため写真を圧縮しています…");
   try {
@@ -11220,12 +11236,28 @@ async function recoverFromQuotaError(successMessage) {
         } else {
           showToast("写真を圧縮して保存しました");
         }
+        scheduleCloudSave();
         return;
       } catch (_error) {
         // 次の圧縮段階で再試行
       }
     }
-    showToast("保存に失敗しました。写真を一部削除して再試行してください");
+    if (cloudEndpoint) {
+      const pushed = await pushStateToCloud({ showToastOnSuccess: false, silentOnError: true });
+      if (pushed) {
+        if (successMessage) {
+          showToast(`${successMessage}（端末容量超過のためクラウド保存）`);
+        } else {
+          showToast("端末容量超過のためクラウド保存しました");
+        }
+        return;
+      }
+    }
+    if (quotaExceeded) {
+      showToast("端末保存の容量を超えました。画像を減らすか圧縮して再試行してください");
+    } else {
+      showToast("保存に失敗しました。写真を一部削除して再試行してください");
+    }
   } finally {
     quotaRecoveryInProgress = false;
   }
