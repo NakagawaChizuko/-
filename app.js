@@ -347,8 +347,11 @@ const viewerCanvasWrap = document.getElementById("viewer-canvas-wrap");
 const viewerTooltip = document.getElementById("viewer-tooltip");
 const viewerStatus = document.getElementById("viewer-status");
 const viewerViewTopBtn = document.getElementById("viewer-view-top-btn");
-const viewerViewIsoBtn = document.getElementById("viewer-view-iso-btn");
-const viewerResetBtn = document.getElementById("viewer-reset-btn");
+const viewerViewSeBtn = document.getElementById("viewer-view-se-btn");
+const viewerViewEastBtn = document.getElementById("viewer-view-east-btn");
+const viewerViewWestBtn = document.getElementById("viewer-view-west-btn");
+const viewerViewSouthBtn = document.getElementById("viewer-view-south-btn");
+const viewerViewNorthBtn = document.getElementById("viewer-view-north-btn");
 const viewerZScaleInput = document.getElementById("viewer-z-scale-input");
 const viewerZScaleValue = document.getElementById("viewer-z-scale-value");
 const largeAxisDirectionRow = document.getElementById("large-axis-direction-row");
@@ -799,6 +802,8 @@ function bindEvents() {
     const rectSide2Cm = value(formData.get("rectSide2Cm"));
     const ellipseLongRadiusCm = value(formData.get("ellipseLongRadiusCm"));
     const ellipseShortRadiusCm = value(formData.get("ellipseShortRadiusCm"));
+    const altitudeInputEnabled = normalizeToggleFlag(formData.get("altitudeInputEnabled"));
+    const altitudeDirectM = altitudeInputEnabled === "1" ? value(formData.get("altitudeDirectM")) : "";
     const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
     const isLargeImageShape = planSizeMode === "大きなもの" && isLargeShapeImageType(largeShapeType);
     const isCustomLargeImageShape = isLargeImageShape && isCustomLargeShapeType(largeShapeType);
@@ -829,6 +834,8 @@ function bindEvents() {
       identifier: value(formData.get("identifier")),
       levelUpperCm: value(formData.get("levelUpperCm")),
       levelLowerCm: value(formData.get("levelLowerCm")),
+      altitudeInputEnabled,
+      altitudeDirectM,
       occurrenceSection: normalizeNeedFlag(value(formData.get("occurrenceSection"))),
       occurrenceSketch: normalizeNeedFlag(value(formData.get("occurrenceSketch"))),
       sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
@@ -1248,16 +1255,39 @@ function bindEvents() {
       syncViewerViewButtons();
     });
   }
-  if (viewerViewIsoBtn) {
-    viewerViewIsoBtn.addEventListener("click", () => {
-      selectedViewerPerspective = "iso";
+  if (viewerViewSeBtn) {
+    viewerViewSeBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "se";
       applyViewerPerspective();
       syncViewerViewButtons();
     });
   }
-  if (viewerResetBtn) {
-    viewerResetBtn.addEventListener("click", () => {
-      renderViewerOutput();
+  if (viewerViewEastBtn) {
+    viewerViewEastBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "east";
+      applyViewerPerspective();
+      syncViewerViewButtons();
+    });
+  }
+  if (viewerViewWestBtn) {
+    viewerViewWestBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "west";
+      applyViewerPerspective();
+      syncViewerViewButtons();
+    });
+  }
+  if (viewerViewSouthBtn) {
+    viewerViewSouthBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "south";
+      applyViewerPerspective();
+      syncViewerViewButtons();
+    });
+  }
+  if (viewerViewNorthBtn) {
+    viewerViewNorthBtn.addEventListener("click", () => {
+      selectedViewerPerspective = "north";
+      applyViewerPerspective();
+      syncViewerViewButtons();
     });
   }
   if (viewerZScaleInput) {
@@ -1566,7 +1596,11 @@ async function addSectionDiagramsFromFiles(fileList) {
   let added = false;
   for (const file of files) {
     try {
-      const dataUrl = await resizeImage(file, 1280, 0.72);
+      const dataUrl = await loadImageFileDataUrlWithFallback(file, {
+        maxLength: 1280,
+        quality: 0.72,
+        mimeType: "image/jpeg",
+      });
       currentSectionDiagrams.push({
         id: newId("diagram"),
         name: file.name || "diagram.jpg",
@@ -1597,7 +1631,11 @@ async function addPhotosFromFiles(fileList) {
   let added = false;
   for (const file of files) {
     try {
-      const dataUrl = await resizeImage(file, 1280, 0.72);
+      const dataUrl = await loadImageFileDataUrlWithFallback(file, {
+        maxLength: 1280,
+        quality: 0.72,
+        mimeType: "image/jpeg",
+      });
       currentPhotos.push({
         id: newId("photo"),
         name: file.name || "photo.jpg",
@@ -2144,7 +2182,11 @@ async function setCustomLargeImageFromFile(file) {
     return;
   }
   try {
-    const dataUrl = await resizeImage(sourceFile, 1400, 0.9, "image/png");
+    const dataUrl = await loadImageFileDataUrlWithFallback(sourceFile, {
+      maxLength: 1200,
+      quality: 0.85,
+      mimeType: "",
+    });
     if (customLargeImageDataUrlInput) {
       customLargeImageDataUrlInput.value = normalizeCustomLargeImageDataUrl(dataUrl);
     }
@@ -2705,6 +2747,19 @@ function clearLayerSavedTabState() {
   });
 }
 
+function syncAltitudeDirectInputUi({ clearWhenDisabled = false } = {}) {
+  const altitudeToggleField = recordForm?.elements?.altitudeInputEnabled;
+  const altitudeInputField = recordForm?.elements?.altitudeDirectM;
+  if (!(altitudeInputField instanceof HTMLInputElement)) {
+    return;
+  }
+  const isEnabled = altitudeToggleField instanceof HTMLInputElement ? altitudeToggleField.checked : false;
+  altitudeInputField.disabled = !isEnabled;
+  if (!isEnabled && clearWhenDisabled) {
+    altitudeInputField.value = "";
+  }
+}
+
 function handleRecordFormFieldEdit(event) {
   const target = event.target;
   if (!(target instanceof Element)) {
@@ -2730,6 +2785,9 @@ function handleRecordFormFieldEdit(event) {
   if (target === layerOtherInput) {
     layerOtherInput.classList.remove("saved-carry-value");
     clearLayerSavedTabState();
+  }
+  if (target instanceof HTMLInputElement && target.name === "altitudeInputEnabled") {
+    syncAltitudeDirectInputUi({ clearWhenDisabled: true });
   }
   if (target instanceof HTMLElement && target.closest("#large-shape-section")) {
     const targetName =
@@ -2987,6 +3045,12 @@ function resetRecordForm({ showMessage }) {
   recordForm.elements.importantFlag.value = "無";
   recordForm.elements.simpleRecordFlag.value = "-";
   recordForm.elements.layerRelative.value = "";
+  if (recordForm.elements.altitudeInputEnabled instanceof HTMLInputElement) {
+    recordForm.elements.altitudeInputEnabled.checked = false;
+  }
+  if (recordForm.elements.altitudeDirectM instanceof HTMLInputElement) {
+    recordForm.elements.altitudeDirectM.value = "";
+  }
   if (recordForm.elements.planSizeMode) {
     recordForm.elements.planSizeMode.value = "通常";
   }
@@ -3052,6 +3116,7 @@ function resetRecordForm({ showMessage }) {
   nsDirInput.value = "北から";
   ewDirInput.value = "東から";
   syncDirectionTabsFromForm();
+  syncAltitudeDirectInputUi({ clearWhenDisabled: true });
 
   currentPhotos = [];
   currentSectionDiagrams = [];
@@ -3085,6 +3150,12 @@ function populateRecordForm(record) {
   recordForm.elements.identifier.value = record.identifier || "";
   recordForm.elements.levelUpperCm.value = record.levelUpperCm || "";
   recordForm.elements.levelLowerCm.value = record.levelLowerCm || "";
+  if (recordForm.elements.altitudeInputEnabled instanceof HTMLInputElement) {
+    recordForm.elements.altitudeInputEnabled.checked = normalizeToggleFlag(record.altitudeInputEnabled) === "1";
+  }
+  if (recordForm.elements.altitudeDirectM instanceof HTMLInputElement) {
+    recordForm.elements.altitudeDirectM.value = value(record.altitudeDirectM);
+  }
   recordForm.elements.occurrenceSection.value = normalizeNeedFlag(record.occurrenceSection);
   recordForm.elements.occurrenceSketch.value = normalizeNeedFlag(record.occurrenceSketch);
   if (recordForm.elements.sectionDiagramDistanceChecked) {
@@ -3178,6 +3249,7 @@ function populateRecordForm(record) {
   ewDirInput.value = normalizeEwDir(record.ewDir);
   recordForm.elements.ewCm.value = record.ewCm || "";
   syncDirectionTabsFromForm();
+  syncAltitudeDirectInputUi();
 
   setLayerFromValue(record.layerName);
   recordForm.elements.detail.value = record.detail || "";
@@ -3334,6 +3406,9 @@ function buildCurrentEditDraftRecord() {
     identifier: value(formData.get("identifier")),
     levelUpperCm: value(formData.get("levelUpperCm")),
     levelLowerCm: value(formData.get("levelLowerCm")),
+    altitudeInputEnabled: normalizeToggleFlag(formData.get("altitudeInputEnabled")),
+    altitudeDirectM:
+      normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1" ? value(formData.get("altitudeDirectM")) : "",
     occurrenceSection: value(formData.get("occurrenceSection")),
     occurrenceSketch: value(formData.get("occurrenceSketch")),
     sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
@@ -5730,6 +5805,8 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
     return baseZ + deltaM;
   };
   const altitudeZ = getViewerZForPlanPoint(centerPlanPoint);
+  const directBottomAltitudeEnabled = normalizeToggleFlag(candidate?.record?.altitudeInputEnabled) === "1";
+  const bottomTargetZ = applyViewerVerticalScale(altitudeM, metrics.minZ);
   const worldCenter = convertViewerPointCmToWorld(drawable.x, drawable.y, candidate.grid, metrics);
   const meta = {
     id: value(candidate.record.id),
@@ -5776,103 +5853,87 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
     const vx = axisUnit.x * horizFactor;
     const vy = axisUnit.y * horizFactor;
     const vz = -verticalFactor * viewerScale;
-    const p1 = {
-      x: worldCenter.x - vx * halfLengthM,
-      y: worldCenter.y - vy * halfLengthM,
-      z: altitudeZ - vz * halfLengthM,
-    };
-    const p2 = {
-      x: worldCenter.x + vx * halfLengthM,
-      y: worldCenter.y + vy * halfLengthM,
-      z: altitudeZ + vz * halfLengthM,
-    };
+    let linePoints = [
+      {
+        x: worldCenter.x - vx * halfLengthM,
+        y: worldCenter.y - vy * halfLengthM,
+        z: altitudeZ - vz * halfLengthM,
+      },
+      {
+        x: worldCenter.x + vx * halfLengthM,
+        y: worldCenter.y + vy * halfLengthM,
+        z: altitudeZ + vz * halfLengthM,
+      },
+    ];
+    let lineCenterZ = altitudeZ;
+    if (directBottomAltitudeEnabled) {
+      const anchored = anchorViewerPointsToBottomAltitude(linePoints, bottomTargetZ);
+      linePoints = anchored.points;
+      if (anchored.minZ != null && anchored.maxZ != null) {
+        lineCenterZ = (anchored.minZ + anchored.maxZ) / 2;
+      }
+    }
     return {
       type: "line",
-      points: [
-        { x: p1.x, y: p1.y, z: p1.z },
-        { x: p2.x, y: p2.y, z: p2.z },
-      ],
+      points: linePoints,
       x: worldCenter.x,
       y: worldCenter.y,
-      z: altitudeZ,
+      z: lineCenterZ,
       ...meta,
     };
   }
 
   if (drawable.type === "rect") {
-    const viewerScale = normalizeViewerVerticalScale(viewerVerticalScale);
-    const strikeAzimuth = normalizeAzimuth360(planeStrikeAzimuth ?? parseLargeAxisAzimuth(candidate?.record?.planeStrikeDirection));
-    const dipAzimuth = normalizeAzimuth360(planeDipAzimuth);
-    const dipDeg = Number.isFinite(planeDipDeg) ? clamp(planeDipDeg, 0, 90) : 0;
-    const strikeUnit = azimuthToViewerHorizontalUnit(Number.isFinite(strikeAzimuth) ? strikeAzimuth : 0);
-    const dipHorizUnit = azimuthToViewerHorizontalUnit(Number.isFinite(dipAzimuth) ? dipAzimuth : (strikeAzimuth + 90) % 360);
-    const dipRad = (dipDeg * Math.PI) / 180;
-    const dipHorizFactor = Math.cos(dipRad);
-    const dipVerticalFactor = Math.sin(dipRad);
-    const halfStrikeM = Math.max(0, drawable.width / 200);
-    const halfDipM = Math.max(0, drawable.height / 200);
-    const cornerFactors = [
-      { strike: -1, dip: -1 },
-      { strike: 1, dip: -1 },
-      { strike: 1, dip: 1 },
-      { strike: -1, dip: 1 },
-    ];
-    const points = cornerFactors.map((factor) => {
-      const strikeScale = factor.strike * halfStrikeM;
-      const dipScale = factor.dip * halfDipM;
-      const dx = strikeUnit.x * strikeScale + dipHorizUnit.x * dipHorizFactor * dipScale;
-      const dy = strikeUnit.y * strikeScale + dipHorizUnit.y * dipHorizFactor * dipScale;
-      const dz = -dipVerticalFactor * dipScale * viewerScale;
-      return {
-        x: worldCenter.x + dx,
-        y: worldCenter.y + dy,
-        z: altitudeZ + dz,
-      };
+    const halfW = drawable.width / 2;
+    const halfH = drawable.height / 2;
+    const localCorners = [
+      { x: drawable.x - halfW, y: drawable.y - halfH },
+      { x: drawable.x + halfW, y: drawable.y - halfH },
+      { x: drawable.x + halfW, y: drawable.y + halfH },
+      { x: drawable.x - halfW, y: drawable.y + halfH },
+    ].map((point) => rotatePlanPoint(point, { x: drawable.x, y: drawable.y }, drawable.rotationDeg));
+    let points = localCorners.map((point) => {
+      const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
+      return { x: world.x, y: world.y, z: getViewerZForPlanPoint(point) };
     });
+    if (directBottomAltitudeEnabled) {
+      const anchored = anchorViewerPointsToBottomAltitude(points, bottomTargetZ);
+      points = anchored.points;
+    }
     points.push(points[0]);
     return {
       type: "polyline",
       points,
       x: worldCenter.x,
       y: worldCenter.y,
-      z: altitudeZ,
+      z: directBottomAltitudeEnabled && points.length ? points.reduce((sum, p) => sum + p.z, 0) / points.length : altitudeZ,
       ...meta,
     };
   }
 
   if (drawable.type === "ellipse") {
-    const viewerScale = normalizeViewerVerticalScale(viewerVerticalScale);
-    const strikeAzimuth = normalizeAzimuth360(planeStrikeAzimuth ?? parseLargeAxisAzimuth(candidate?.record?.planeStrikeDirection));
-    const dipAzimuth = normalizeAzimuth360(planeDipAzimuth);
-    const dipDeg = Number.isFinite(planeDipDeg) ? clamp(planeDipDeg, 0, 90) : 0;
-    const strikeUnit = azimuthToViewerHorizontalUnit(Number.isFinite(strikeAzimuth) ? strikeAzimuth : 0);
-    const dipHorizUnit = azimuthToViewerHorizontalUnit(Number.isFinite(dipAzimuth) ? dipAzimuth : (strikeAzimuth + 90) % 360);
-    const dipRad = (dipDeg * Math.PI) / 180;
-    const dipHorizFactor = Math.cos(dipRad);
-    const dipVerticalFactor = Math.sin(dipRad);
-    const strikeRadiusM = Math.max(0, drawable.rx / 100);
-    const dipRadiusM = Math.max(0, drawable.ry / 100);
-    const points = [];
+    let points = [];
     const segmentCount = 48;
     for (let i = 0; i <= segmentCount; i += 1) {
       const theta = (i / segmentCount) * Math.PI * 2;
-      const strikeScale = Math.cos(theta) * strikeRadiusM;
-      const dipScale = Math.sin(theta) * dipRadiusM;
-      const dx = strikeUnit.x * strikeScale + dipHorizUnit.x * dipHorizFactor * dipScale;
-      const dy = strikeUnit.y * strikeScale + dipHorizUnit.y * dipHorizFactor * dipScale;
-      const dz = -dipVerticalFactor * dipScale * viewerScale;
-      points.push({
-        x: worldCenter.x + dx,
-        y: worldCenter.y + dy,
-        z: altitudeZ + dz,
-      });
+      const local = {
+        x: drawable.x + Math.cos(theta) * drawable.rx,
+        y: drawable.y + Math.sin(theta) * drawable.ry,
+      };
+      const rotated = rotatePlanPoint(local, { x: drawable.x, y: drawable.y }, drawable.rotationDeg);
+      const world = convertViewerPointCmToWorld(rotated.x, rotated.y, candidate.grid, metrics);
+      points.push({ x: world.x, y: world.y, z: getViewerZForPlanPoint(rotated) });
+    }
+    if (directBottomAltitudeEnabled) {
+      const anchored = anchorViewerPointsToBottomAltitude(points, bottomTargetZ);
+      points = anchored.points;
     }
     return {
       type: "polyline",
       points,
       x: worldCenter.x,
       y: worldCenter.y,
-      z: altitudeZ,
+      z: directBottomAltitudeEnabled && points.length ? points.reduce((sum, p) => sum + p.z, 0) / points.length : altitudeZ,
       ...meta,
     };
   }
@@ -5894,7 +5955,7 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
     const dipRad = (dipDeg * Math.PI) / 180;
     const dipHorizFactor = Math.cos(dipRad);
     const dipVerticalFactor = Math.sin(dipRad);
-    const points = (drawable.points || []).map((point) => {
+    let points = (drawable.points || []).map((point) => {
       const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
       if (!canUsePlaneProjection) {
         return { x: world.x, y: world.y, z: getViewerZForImagePlanPoint(point) };
@@ -5909,6 +5970,10 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
         z: altitudeZ - dipComp * dipVerticalFactor * viewerScale,
       };
     });
+    if (directBottomAltitudeEnabled) {
+      const anchored = anchorViewerPointsToBottomAltitude(points, bottomTargetZ);
+      points = anchored.points;
+    }
     return {
       type: "imageQuad",
       points,
@@ -5917,11 +5982,50 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
       useOriginalImageColor: Boolean(drawable.useOriginalImageColor),
       x: worldCenter.x,
       y: worldCenter.y,
-      z: altitudeZ,
+      z: directBottomAltitudeEnabled && points.length ? points.reduce((sum, p) => sum + p.z, 0) / points.length : altitudeZ,
       ...meta,
     };
   }
   return null;
+}
+
+function anchorViewerPointsToBottomAltitude(pointsRaw, targetBottomZRaw) {
+  const points = Array.isArray(pointsRaw) ? pointsRaw : [];
+  const targetBottomZ = Number(targetBottomZRaw);
+  if (!points.length || !Number.isFinite(targetBottomZ)) {
+    return { points, minZ: null, maxZ: null };
+  }
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  points.forEach((point) => {
+    const z = Number(point?.z);
+    if (!Number.isFinite(z)) {
+      return;
+    }
+    if (z < minZ) {
+      minZ = z;
+    }
+    if (z > maxZ) {
+      maxZ = z;
+    }
+  });
+  if (!Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+    return { points, minZ: null, maxZ: null };
+  }
+  const deltaZ = targetBottomZ - minZ;
+  if (Math.abs(deltaZ) < 1e-9) {
+    return { points, minZ, maxZ };
+  }
+  const shifted = points.map((point) => ({
+    x: point.x,
+    y: point.y,
+    z: Number.isFinite(Number(point?.z)) ? Number(point.z) + deltaZ : point.z,
+  }));
+  return {
+    points: shifted,
+    minZ: minZ + deltaZ,
+    maxZ: maxZ + deltaZ,
+  };
 }
 
 function rotatePlanPoint(point, center, rotationDegRaw) {
@@ -5977,8 +6081,20 @@ function syncViewerViewButtons() {
   if (viewerViewTopBtn) {
     viewerViewTopBtn.classList.toggle("active", selectedViewerPerspective === "top");
   }
-  if (viewerViewIsoBtn) {
-    viewerViewIsoBtn.classList.toggle("active", selectedViewerPerspective === "iso");
+  if (viewerViewSeBtn) {
+    viewerViewSeBtn.classList.toggle("active", selectedViewerPerspective === "se" || selectedViewerPerspective === "iso");
+  }
+  if (viewerViewEastBtn) {
+    viewerViewEastBtn.classList.toggle("active", selectedViewerPerspective === "east");
+  }
+  if (viewerViewWestBtn) {
+    viewerViewWestBtn.classList.toggle("active", selectedViewerPerspective === "west");
+  }
+  if (viewerViewSouthBtn) {
+    viewerViewSouthBtn.classList.toggle("active", selectedViewerPerspective === "south");
+  }
+  if (viewerViewNorthBtn) {
+    viewerViewNorthBtn.classList.toggle("active", selectedViewerPerspective === "north");
   }
 }
 
@@ -6356,7 +6472,7 @@ function renderViewerGrid(metrics) {
         scaleX: 1.57,
         scaleY: 0.39,
       });
-      label.position.set(corner.x + corner.dirX * 0.62, corner.y + corner.dirY * 0.62, z);
+      label.position.set(corner.x + corner.dirX * 0.95, corner.y + corner.dirY * 0.95, z + 0.12);
       viewer3d.gridGroup.add(label);
     }
     const axisLabel = createViewerTextSprite("標高(m)", "#1e293b", {
@@ -6364,7 +6480,7 @@ function renderViewerGrid(metrics) {
       scaleX: 1.57,
       scaleY: 0.39,
     });
-    axisLabel.position.set(corner.x + corner.dirX * 0.68, corner.y + corner.dirY * 0.68, zEnd + 0.08);
+    axisLabel.position.set(corner.x + corner.dirX * 1.05, corner.y + corner.dirY * 1.05, zEnd + 0.26);
     viewer3d.gridGroup.add(axisLabel);
   });
 }
@@ -6963,21 +7079,34 @@ function applyViewerPerspective() {
   const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
   const scale = normalizeViewerVerticalScale(viewerVerticalScale);
   const unscaledSpanZ = Math.max(1, spanZ / scale);
-  const baseDist = Math.max(spanX, spanY) * 1.1 + Math.max(8, unscaledSpanZ * 5);
+  const focus = new THREE.Vector3(center.x, center.y, bounds.minZ + spanZ * 0.18);
+  const baseDist = Math.max(spanX, spanY) * 0.92 + Math.max(4, unscaledSpanZ * 2.8);
   const zoomInFactor = Math.pow(scale, -0.7);
-  const dist = baseDist * zoomInFactor;
-  if (selectedViewerPerspective === "top") {
+  const dist = baseDist * zoomInFactor * 0.88;
+  const perspective = selectedViewerPerspective === "iso" ? "se" : selectedViewerPerspective;
+  if (perspective === "top") {
     viewer3d.camera.up.set(0, 1, 0);
-    viewer3d.camera.position.set(center.x, center.y, center.z + dist);
+    viewer3d.camera.position.set(focus.x, focus.y, focus.z + dist);
   } else {
     viewer3d.camera.up.set(0, 0, 1);
-    viewer3d.camera.position.set(center.x + dist * 0.75, center.y - dist * 0.75, center.z + dist * 0.6);
+    const sideElev = dist * 0.22;
+    if (perspective === "east") {
+      viewer3d.camera.position.set(focus.x + dist, focus.y, focus.z + sideElev);
+    } else if (perspective === "west") {
+      viewer3d.camera.position.set(focus.x - dist, focus.y, focus.z + sideElev);
+    } else if (perspective === "south") {
+      viewer3d.camera.position.set(focus.x, focus.y - dist, focus.z + sideElev);
+    } else if (perspective === "north") {
+      viewer3d.camera.position.set(focus.x, focus.y + dist, focus.z + sideElev);
+    } else {
+      viewer3d.camera.position.set(focus.x + dist * 0.75, focus.y - dist * 0.75, focus.z + dist * 0.46);
+    }
   }
   if (viewer3d.controls) {
-    viewer3d.controls.target.copy(center);
+    viewer3d.controls.target.copy(focus);
     viewer3d.controls.update();
   } else {
-    viewer3d.camera.lookAt(center);
+    viewer3d.camera.lookAt(focus);
   }
 }
 
@@ -8145,6 +8274,8 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     identifier: value(item.identifier),
     levelUpperCm: value(item.levelUpperCm) || value(item.levelRead) || value(item.levelError),
     levelLowerCm: value(item.levelLowerCm),
+    altitudeInputEnabled: normalizeToggleFlag(value(item.altitudeInputEnabled) || (value(item.altitudeDirectM) ? "1" : "")),
+    altitudeDirectM: value(item.altitudeDirectM) || value(item.altitudeInputM),
     occurrenceSection: normalizeNeedFlag(value(item.occurrenceSection) || value(item.sectionSketch)),
     occurrenceSketch: normalizeNeedFlag(value(item.occurrenceSketch) || value(item.sectionSketch)),
     sectionDiagramDistanceChecked: normalizeChecklistChecked(value(item.sectionDiagramDistanceChecked)),
@@ -10932,6 +11063,11 @@ function formatLevelRead(record) {
 }
 
 function getRecordAltitudeMValue(record) {
+  const useDirectAltitude = normalizeToggleFlag(record?.altitudeInputEnabled) === "1";
+  if (useDirectAltitude) {
+    const directAltitudeM = parseDistanceToCm(record?.altitudeDirectM);
+    return directAltitudeM != null ? directAltitudeM : null;
+  }
   const levelHeightM = parseDistanceToCm(getRecordLevelHeight(record));
   const lowerCm = parseDistanceToCm(record?.levelLowerCm);
   if (levelHeightM == null || lowerCm == null) {
@@ -11108,6 +11244,13 @@ async function recompressAllPhotos(maxLength, quality) {
       record.photos = photoResult.photos;
       changed = true;
     }
+    if (isCustomLargeShapeType(record.largeShapeType)) {
+      const imageResult = await recompressImageDataUrl(record.customLargeImageDataUrl, maxLength, quality);
+      if (imageResult.changed) {
+        record.customLargeImageDataUrl = imageResult.dataUrl;
+        changed = true;
+      }
+    }
   }
   const currentSectionResult = await recompressPhotoArray(currentSectionDiagrams, maxLength, quality);
   if (currentSectionResult.changed) {
@@ -11118,6 +11261,15 @@ async function recompressAllPhotos(maxLength, quality) {
   if (currentPhotoResult.changed) {
     currentPhotos = currentPhotoResult.photos;
     changed = true;
+  }
+  if (customLargeImageDataUrlInput) {
+    const currentCustomImageResult = await recompressImageDataUrl(customLargeImageDataUrlInput.value, maxLength, quality);
+    if (currentCustomImageResult.changed) {
+      customLargeImageDataUrlInput.value = currentCustomImageResult.dataUrl;
+      await updateCustomLargeImageAspectFromDataUrl(currentCustomImageResult.dataUrl);
+      syncLargeShapeImagePreviewForCurrentForm();
+      changed = true;
+    }
   }
   return changed;
 }
@@ -11154,6 +11306,83 @@ async function recompressPhotoArray(photosRaw, maxLength, quality) {
   return { photos: nextPhotos, changed };
 }
 
+async function recompressImageDataUrl(dataUrlRaw, maxLength, quality) {
+  const dataUrl = normalizeCustomLargeImageDataUrl(dataUrlRaw);
+  if (!dataUrl) {
+    return { dataUrl, changed: false };
+  }
+  const matchedMimeType = dataUrl.match(/^data:([^;,]+)/i);
+  const sourceMimeType = normalizeImageMimeType(matchedMimeType?.[1]);
+  const outputMimeType = sourceMimeType === "image/png" ? "image/png" : "image/jpeg";
+  try {
+    const recompressed = await resizeDataUrlImage(dataUrl, maxLength, quality, outputMimeType);
+    if (recompressed && recompressed.length < dataUrl.length) {
+      return { dataUrl: recompressed, changed: true };
+    }
+  } catch (_error) {
+    // 元画像を維持
+  }
+  return { dataUrl, changed: false };
+}
+
+const SUPPORTED_UPLOAD_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
+
+function normalizeImageMimeType(mimeTypeRaw) {
+  const mimeType = value(mimeTypeRaw).toLowerCase();
+  if (!mimeType) {
+    return "";
+  }
+  if (mimeType === "image/jpg") {
+    return "image/jpeg";
+  }
+  return mimeType;
+}
+
+function inferImageMimeTypeFromFileName(fileNameRaw) {
+  const fileName = value(fileNameRaw).toLowerCase();
+  if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  if (fileName.endsWith(".png")) {
+    return "image/png";
+  }
+  return "";
+}
+
+function resolveImageMimeType(file, preferredMimeTypeRaw = "") {
+  const preferredMimeType = normalizeImageMimeType(preferredMimeTypeRaw);
+  if (SUPPORTED_UPLOAD_IMAGE_MIME_TYPES.has(preferredMimeType)) {
+    return preferredMimeType;
+  }
+  const fileMimeType = normalizeImageMimeType(file?.type);
+  if (SUPPORTED_UPLOAD_IMAGE_MIME_TYPES.has(fileMimeType)) {
+    return fileMimeType;
+  }
+  const fromName = inferImageMimeTypeFromFileName(file?.name);
+  if (SUPPORTED_UPLOAD_IMAGE_MIME_TYPES.has(fromName)) {
+    return fromName;
+  }
+  return "";
+}
+
+function normalizeImageDataUrlForUpload(dataUrlRaw, file, preferredMimeTypeRaw = "") {
+  const dataUrl = value(dataUrlRaw);
+  if (!dataUrl || !dataUrl.startsWith("data:")) {
+    return "";
+  }
+  if (dataUrl.startsWith("data:image/")) {
+    return dataUrl;
+  }
+  const resolvedMimeType = resolveImageMimeType(file, preferredMimeTypeRaw);
+  if (!resolvedMimeType) {
+    return "";
+  }
+  if (/^data:;base64,/i.test(dataUrl)) {
+    return dataUrl.replace(/^data:;base64,/i, `data:${resolvedMimeType};base64,`);
+  }
+  return dataUrl.replace(/^data:[^;,]+/i, `data:${resolvedMimeType}`);
+}
+
 function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72, mimeType = "image/jpeg") {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -11183,11 +11412,56 @@ function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72, mimeType = "imag
 
 function resizeImage(file, maxLength, quality = 0.72, mimeType = "image/jpeg") {
   return new Promise((resolve, reject) => {
+    const outputMimeType = resolveImageMimeType(file, mimeType) || "image/jpeg";
     const reader = new FileReader();
     reader.onload = () => {
-      resizeDataUrlImage(String(reader.result || ""), maxLength, quality, mimeType).then(resolve).catch(reject);
+      const normalizedDataUrl = normalizeImageDataUrlForUpload(reader.result, file, outputMimeType);
+      if (!normalizedDataUrl) {
+        reject(new Error("Unsupported image type"));
+        return;
+      }
+      resizeDataUrlImage(normalizedDataUrl, maxLength, quality, outputMimeType).then(resolve).catch(reject);
     };
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const sourceFile = file instanceof File ? file : null;
+    if (!sourceFile) {
+      reject(new Error("Invalid file"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(String(reader.result || ""));
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(sourceFile);
+  });
+}
+
+async function loadImageFileDataUrlWithFallback(
+  file,
+  { maxLength = 1280, quality = 0.72, mimeType = "image/jpeg", allowOriginalFallback = true } = {}
+) {
+  const sourceFile = file instanceof File ? file : null;
+  if (!sourceFile) {
+    throw new Error("Invalid file");
+  }
+  const outputMimeType = resolveImageMimeType(sourceFile, mimeType) || normalizeImageMimeType(mimeType) || "image/jpeg";
+  try {
+    return await resizeImage(sourceFile, maxLength, quality, outputMimeType);
+  } catch (resizeError) {
+    if (!allowOriginalFallback) {
+      throw resizeError;
+    }
+    const originalDataUrl = normalizeImageDataUrlForUpload(await readFileAsDataUrl(sourceFile), sourceFile, outputMimeType);
+    if (!originalDataUrl) {
+      throw resizeError;
+    }
+    return originalDataUrl;
+  }
 }
