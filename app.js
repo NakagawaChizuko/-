@@ -5626,24 +5626,93 @@ function buildViewerGridMetrics(candidates) {
   };
 }
 
+function normalizeAzimuth360(valueRaw) {
+  const valueNum = Number(valueRaw);
+  if (!Number.isFinite(valueNum)) {
+    return null;
+  }
+  return ((valueNum % 360) + 360) % 360;
+}
+
+function angularDistanceDeg(aRaw, bRaw) {
+  const a = normalizeAzimuth360(aRaw);
+  const b = normalizeAzimuth360(bRaw);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    return Infinity;
+  }
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function azimuthToViewerHorizontalUnit(azimuthRaw) {
+  const azimuth = Number(azimuthRaw);
+  if (!Number.isFinite(azimuth)) {
+    return { x: 0, y: 1 };
+  }
+  const rad = (azimuth * Math.PI) / 180;
+  return {
+    x: Math.sin(rad),
+    y: Math.cos(rad),
+  };
+}
+
+function resolvePlaneTiltParameters(record) {
+  const strikeAzimuth = parseLargeAxisAzimuth(record?.planeStrikeDirection);
+  const dipDeg = parseLargeAxisPlungeDeg(record?.planeDipDeg);
+  const dipDirRaw = parseCompass8Azimuth(record?.planeDipDir8);
+  if (!Number.isFinite(dipDeg) || dipDeg <= 0) {
+    return {
+      strikeAzimuth: Number.isFinite(strikeAzimuth) ? strikeAzimuth : null,
+      dipAzimuth: null,
+      dipDeg: null,
+    };
+  }
+  if (Number.isFinite(strikeAzimuth)) {
+    const rightDip = (strikeAzimuth + 90) % 360;
+    const leftDip = (strikeAzimuth + 270) % 360;
+    if (!Number.isFinite(dipDirRaw)) {
+      return { strikeAzimuth, dipAzimuth: rightDip, dipDeg };
+    }
+    const rightDist = angularDistanceDeg(dipDirRaw, rightDip);
+    const leftDist = angularDistanceDeg(dipDirRaw, leftDip);
+    return {
+      strikeAzimuth,
+      dipAzimuth: rightDist <= leftDist ? rightDip : leftDip,
+      dipDeg,
+    };
+  }
+  return {
+    strikeAzimuth: null,
+    dipAzimuth: Number.isFinite(dipDirRaw) ? dipDirRaw : null,
+    dipDeg,
+  };
+}
+
 function buildViewerShapeFromCandidate(candidate, metrics) {
   const drawable = candidate.drawable;
   const altitudeM = candidate.altitudeM;
   const centerPlanPoint = { x: drawable.x, y: drawable.y };
   let tiltAzimuth = null;
   let tiltDeg = null;
+  let lineDirectionAzimuth = null;
+  let linePlungeDeg = null;
+  let lineDownwardAzimuth = null;
+  let planeStrikeAzimuth = null;
+  let planeDipAzimuth = null;
+  let planeDipDeg = null;
   if (drawable.type === "line") {
-    tiltAzimuth =
-      parseCompass8Azimuth(candidate?.record?.largeAxisPlungeDir8) ??
-      parseLargeAxisAzimuth(candidate?.record?.largeAxisDirection);
-    tiltDeg = parseLargeAxisPlungeDeg(candidate?.record?.largeAxisPlungeDeg);
+    lineDirectionAzimuth = parseLargeAxisAzimuth(candidate?.record?.largeAxisDirection);
+    linePlungeDeg = parseLargeAxisPlungeDeg(candidate?.record?.largeAxisPlungeDeg);
+    lineDownwardAzimuth = parseCompass8Azimuth(candidate?.record?.largeAxisPlungeDir8);
+    tiltAzimuth = lineDownwardAzimuth ?? lineDirectionAzimuth;
+    tiltDeg = linePlungeDeg;
   } else if (drawable.type === "rect" || drawable.type === "ellipse" || drawable.type === "imageQuad") {
-    const strikeAzimuth = parseLargeAxisAzimuth(candidate?.record?.planeStrikeDirection);
-    const dipDeg = parseLargeAxisPlungeDeg(candidate?.record?.planeDipDeg);
-    tiltAzimuth =
-      parseCompass8Azimuth(candidate?.record?.planeDipDir8) ??
-      (Number.isFinite(strikeAzimuth) ? (strikeAzimuth + 90) % 360 : null);
-    tiltDeg = Number.isFinite(dipDeg) ? dipDeg : null;
+    const planeTilt = resolvePlaneTiltParameters(candidate?.record);
+    planeStrikeAzimuth = planeTilt.strikeAzimuth;
+    planeDipAzimuth = planeTilt.dipAzimuth;
+    planeDipDeg = planeTilt.dipDeg;
+    tiltAzimuth = planeDipAzimuth;
+    tiltDeg = planeDipDeg;
   }
   const getViewerZForPlanPoint = (planPointRaw) => {
     const planPoint = planPointRaw || centerPlanPoint;
@@ -5653,7 +5722,7 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   const getViewerZForImagePlanPoint = (planPointRaw) => {
     const planPoint = planPointRaw || centerPlanPoint;
     const rawDeltaM = computeViewerPlungeDeltaM(planPoint, centerPlanPoint, tiltAzimuth, tiltDeg);
-    // 画像形状は見かけの縦伸びを抑えるため、傾斜によるZ差を弱めて上限も設定する。
+    // 画像形状のフォールバック計算。極端値は抑制して表示破綻を防ぐ。
     const deltaM = Number.isFinite(rawDeltaM)
       ? clamp(rawDeltaM * IMAGE_QUAD_TILT_Z_SCALE, -IMAGE_QUAD_TILT_Z_LIMIT_M, IMAGE_QUAD_TILT_Z_LIMIT_M)
       : 0;
@@ -5684,15 +5753,44 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   }
 
   if (drawable.type === "line") {
-    const p1 = convertViewerPointCmToWorld(drawable.x1, drawable.y1, candidate.grid, metrics);
-    const p2 = convertViewerPointCmToWorld(drawable.x2, drawable.y2, candidate.grid, metrics);
-    const z1 = getViewerZForPlanPoint({ x: drawable.x1, y: drawable.y1 });
-    const z2 = getViewerZForPlanPoint({ x: drawable.x2, y: drawable.y2 });
+    const viewerScale = normalizeViewerVerticalScale(viewerVerticalScale);
+    const lineLengthCm =
+      parseDistanceToCm(candidate?.record?.lineLengthCm) ?? Math.hypot(drawable.x2 - drawable.x1, drawable.y2 - drawable.y1);
+    const halfLengthM = Math.max(0, lineLengthCm / 200);
+    let axisAzimuth = normalizeAzimuth360(lineDirectionAzimuth ?? tiltAzimuth);
+    if (!Number.isFinite(axisAzimuth)) {
+      axisAzimuth = 0;
+    }
+    const downwardAzimuth = normalizeAzimuth360(lineDownwardAzimuth);
+    if (Number.isFinite(downwardAzimuth)) {
+      const forwardDist = angularDistanceDeg(downwardAzimuth, axisAzimuth);
+      if (forwardDist > 90) {
+        axisAzimuth = (axisAzimuth + 180) % 360;
+      }
+    }
+    const plunge = Number.isFinite(linePlungeDeg) ? clamp(linePlungeDeg, 0, 90) : 0;
+    const plungeRad = (plunge * Math.PI) / 180;
+    const horizFactor = Math.cos(plungeRad);
+    const verticalFactor = Math.sin(plungeRad);
+    const axisUnit = azimuthToViewerHorizontalUnit(axisAzimuth);
+    const vx = axisUnit.x * horizFactor;
+    const vy = axisUnit.y * horizFactor;
+    const vz = -verticalFactor * viewerScale;
+    const p1 = {
+      x: worldCenter.x - vx * halfLengthM,
+      y: worldCenter.y - vy * halfLengthM,
+      z: altitudeZ - vz * halfLengthM,
+    };
+    const p2 = {
+      x: worldCenter.x + vx * halfLengthM,
+      y: worldCenter.y + vy * halfLengthM,
+      z: altitudeZ + vz * halfLengthM,
+    };
     return {
       type: "line",
       points: [
-        { x: p1.x, y: p1.y, z: z1 },
-        { x: p2.x, y: p2.y, z: z2 },
+        { x: p1.x, y: p1.y, z: p1.z },
+        { x: p2.x, y: p2.y, z: p2.z },
       ],
       x: worldCenter.x,
       y: worldCenter.y,
@@ -5702,17 +5800,34 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   }
 
   if (drawable.type === "rect") {
-    const halfW = drawable.width / 2;
-    const halfH = drawable.height / 2;
-    const localCorners = [
-      { x: drawable.x - halfW, y: drawable.y - halfH },
-      { x: drawable.x + halfW, y: drawable.y - halfH },
-      { x: drawable.x + halfW, y: drawable.y + halfH },
-      { x: drawable.x - halfW, y: drawable.y + halfH },
-    ].map((point) => rotatePlanPoint(point, { x: drawable.x, y: drawable.y }, drawable.rotationDeg));
-    const points = localCorners.map((point) => {
-      const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
-      return { x: world.x, y: world.y, z: getViewerZForPlanPoint(point) };
+    const viewerScale = normalizeViewerVerticalScale(viewerVerticalScale);
+    const strikeAzimuth = normalizeAzimuth360(planeStrikeAzimuth ?? parseLargeAxisAzimuth(candidate?.record?.planeStrikeDirection));
+    const dipAzimuth = normalizeAzimuth360(planeDipAzimuth);
+    const dipDeg = Number.isFinite(planeDipDeg) ? clamp(planeDipDeg, 0, 90) : 0;
+    const strikeUnit = azimuthToViewerHorizontalUnit(Number.isFinite(strikeAzimuth) ? strikeAzimuth : 0);
+    const dipHorizUnit = azimuthToViewerHorizontalUnit(Number.isFinite(dipAzimuth) ? dipAzimuth : (strikeAzimuth + 90) % 360);
+    const dipRad = (dipDeg * Math.PI) / 180;
+    const dipHorizFactor = Math.cos(dipRad);
+    const dipVerticalFactor = Math.sin(dipRad);
+    const halfStrikeM = Math.max(0, drawable.width / 200);
+    const halfDipM = Math.max(0, drawable.height / 200);
+    const cornerFactors = [
+      { strike: -1, dip: -1 },
+      { strike: 1, dip: -1 },
+      { strike: 1, dip: 1 },
+      { strike: -1, dip: 1 },
+    ];
+    const points = cornerFactors.map((factor) => {
+      const strikeScale = factor.strike * halfStrikeM;
+      const dipScale = factor.dip * halfDipM;
+      const dx = strikeUnit.x * strikeScale + dipHorizUnit.x * dipHorizFactor * dipScale;
+      const dy = strikeUnit.y * strikeScale + dipHorizUnit.y * dipHorizFactor * dipScale;
+      const dz = -dipVerticalFactor * dipScale * viewerScale;
+      return {
+        x: worldCenter.x + dx,
+        y: worldCenter.y + dy,
+        z: altitudeZ + dz,
+      };
     });
     points.push(points[0]);
     return {
@@ -5726,17 +5841,31 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   }
 
   if (drawable.type === "ellipse") {
+    const viewerScale = normalizeViewerVerticalScale(viewerVerticalScale);
+    const strikeAzimuth = normalizeAzimuth360(planeStrikeAzimuth ?? parseLargeAxisAzimuth(candidate?.record?.planeStrikeDirection));
+    const dipAzimuth = normalizeAzimuth360(planeDipAzimuth);
+    const dipDeg = Number.isFinite(planeDipDeg) ? clamp(planeDipDeg, 0, 90) : 0;
+    const strikeUnit = azimuthToViewerHorizontalUnit(Number.isFinite(strikeAzimuth) ? strikeAzimuth : 0);
+    const dipHorizUnit = azimuthToViewerHorizontalUnit(Number.isFinite(dipAzimuth) ? dipAzimuth : (strikeAzimuth + 90) % 360);
+    const dipRad = (dipDeg * Math.PI) / 180;
+    const dipHorizFactor = Math.cos(dipRad);
+    const dipVerticalFactor = Math.sin(dipRad);
+    const strikeRadiusM = Math.max(0, drawable.rx / 100);
+    const dipRadiusM = Math.max(0, drawable.ry / 100);
     const points = [];
     const segmentCount = 48;
     for (let i = 0; i <= segmentCount; i += 1) {
       const theta = (i / segmentCount) * Math.PI * 2;
-      const local = {
-        x: drawable.x + Math.cos(theta) * drawable.rx,
-        y: drawable.y + Math.sin(theta) * drawable.ry,
-      };
-      const rotated = rotatePlanPoint(local, { x: drawable.x, y: drawable.y }, drawable.rotationDeg);
-      const world = convertViewerPointCmToWorld(rotated.x, rotated.y, candidate.grid, metrics);
-      points.push({ x: world.x, y: world.y, z: getViewerZForPlanPoint(rotated) });
+      const strikeScale = Math.cos(theta) * strikeRadiusM;
+      const dipScale = Math.sin(theta) * dipRadiusM;
+      const dx = strikeUnit.x * strikeScale + dipHorizUnit.x * dipHorizFactor * dipScale;
+      const dy = strikeUnit.y * strikeScale + dipHorizUnit.y * dipHorizFactor * dipScale;
+      const dz = -dipVerticalFactor * dipScale * viewerScale;
+      points.push({
+        x: worldCenter.x + dx,
+        y: worldCenter.y + dy,
+        z: altitudeZ + dz,
+      });
     }
     return {
       type: "polyline",
@@ -5749,9 +5878,36 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   }
 
   if (drawable.type === "imageQuad") {
+    const viewerScale = normalizeViewerVerticalScale(viewerVerticalScale);
+    const dipDeg = Number.isFinite(planeDipDeg) ? clamp(planeDipDeg, 0, 90) : 0;
+    const dipAzimuth = normalizeAzimuth360(
+      planeDipAzimuth ??
+        (Number.isFinite(planeStrikeAzimuth) ? (planeStrikeAzimuth + 90) % 360 : null)
+    );
+    const strikeAzimuth = normalizeAzimuth360(
+      planeStrikeAzimuth ??
+        (Number.isFinite(dipAzimuth) ? (dipAzimuth + 270) % 360 : null)
+    );
+    const canUsePlaneProjection = Number.isFinite(dipAzimuth) && Number.isFinite(strikeAzimuth) && dipDeg > 0;
+    const strikeUnit = azimuthToViewerHorizontalUnit(strikeAzimuth);
+    const dipUnit = azimuthToViewerHorizontalUnit(dipAzimuth);
+    const dipRad = (dipDeg * Math.PI) / 180;
+    const dipHorizFactor = Math.cos(dipRad);
+    const dipVerticalFactor = Math.sin(dipRad);
     const points = (drawable.points || []).map((point) => {
       const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
-      return { x: world.x, y: world.y, z: getViewerZForImagePlanPoint(point) };
+      if (!canUsePlaneProjection) {
+        return { x: world.x, y: world.y, z: getViewerZForImagePlanPoint(point) };
+      }
+      const relX = world.x - worldCenter.x;
+      const relY = world.y - worldCenter.y;
+      const strikeComp = relX * strikeUnit.x + relY * strikeUnit.y;
+      const dipComp = relX * dipUnit.x + relY * dipUnit.y;
+      return {
+        x: worldCenter.x + strikeUnit.x * strikeComp + dipUnit.x * dipComp * dipHorizFactor,
+        y: worldCenter.y + strikeUnit.y * strikeComp + dipUnit.y * dipComp * dipHorizFactor,
+        z: altitudeZ - dipComp * dipVerticalFactor * viewerScale,
+      };
     });
     return {
       type: "imageQuad",
@@ -5761,7 +5917,7 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
       useOriginalImageColor: Boolean(drawable.useOriginalImageColor),
       x: worldCenter.x,
       y: worldCenter.y,
-      z: getViewerZForImagePlanPoint(centerPlanPoint),
+      z: altitudeZ,
       ...meta,
     };
   }
