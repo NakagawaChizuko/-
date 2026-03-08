@@ -89,8 +89,10 @@ const REQUIRED_FIELD_LABELS = {
   imgFrameHeightCm: "画像外枠 辺2",
   imgSkewXDeg: "画像 横変形角",
   imgSkewYDeg: "画像 縦変形角",
+  imgLockAspectRatio: "画像 縦横比固定",
   customLargeImageName: "画像名",
   customLargeImageDataUrl: "画像ファイル",
+  customLargeImageAspect: "画像 縦横比",
   layerName: "地層名",
   layerOther: "地層名（その他）",
   unit: "ユニット",
@@ -146,6 +148,8 @@ const SPECIMEN_POINT_COLORS = {
 };
 const IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS = 5;
 const CUSTOM_IMAGE_SHAPE_CANVAS_DILATE_ITERATIONS = 1;
+const IMAGE_QUAD_TILT_Z_SCALE = 0.38;
+const IMAGE_QUAD_TILT_Z_LIMIT_M = 1.2;
 const PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH = 180000;
 const LARGE_SHAPE_DIR_PATH = "./shapes";
 const LARGE_SHAPE_FILE_LABEL_MAP = {
@@ -415,6 +419,7 @@ const customLargeImageControls = document.getElementById("custom-large-image-con
 const customLargeImageNameInput = document.getElementById("custom-large-image-name-input");
 const customLargeImageFileInput = document.getElementById("custom-large-image-file-input");
 const customLargeImageDataUrlInput = document.getElementById("custom-large-image-data-url-input");
+const customLargeImageAspectInput = document.getElementById("custom-large-image-aspect-input");
 const customLargeImageClearBtn = document.getElementById("custom-large-image-clear-btn");
 const customLargeImageStatus = document.getElementById("custom-large-image-status");
 const line1NsDirInput = document.getElementById("line1-ns-dir-input");
@@ -879,8 +884,11 @@ function bindEvents() {
       imgSkewYDeg: isLargeImageShape ? imageTransformFields.imgSkewYDeg : "",
       imgFlipH: isLargeImageShape ? imageTransformFields.imgFlipH : "0",
       imgFlipV: isLargeImageShape ? imageTransformFields.imgFlipV : "0",
+      imgLockAspectRatio: isLargeImageShape ? imageTransformFields.imgLockAspectRatio : "0",
+      imgUseOriginalColor: isLargeImageShape ? imageTransformFields.imgUseOriginalColor : "0",
       customLargeImageName,
       customLargeImageDataUrl,
+      customLargeImageAspect: isCustomLargeImageShape ? imageTransformFields.customLargeImageAspect : "",
       importantFlag: normalizeHasFlag(value(formData.get("importantFlag"))),
       simpleRecordFlag: normalizeCircleDashFlag(value(formData.get("simpleRecordFlag"))),
       layerName: getSelectedLayerName(),
@@ -2029,6 +2037,68 @@ function normalizeCustomLargeImageDataUrl(dataUrlRaw) {
   return dataUrl.startsWith("data:image/") ? dataUrl : "";
 }
 
+function normalizeCustomLargeImageAspect(aspectRaw) {
+  const text = value(aspectRaw).replace(",", ".");
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/\d+(?:\.\d+)?/);
+  if (!matched) {
+    return "";
+  }
+  const ratio = Number(matched[0]);
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return "";
+  }
+  return String(Number(ratio.toFixed(8)));
+}
+
+function formatLengthInputValue(lengthRaw) {
+  const length = Number(lengthRaw);
+  if (!Number.isFinite(length)) {
+    return "";
+  }
+  if (Math.abs(length) < 0.0005) {
+    return "0";
+  }
+  return String(Number(length.toFixed(3)));
+}
+
+function readImageAspectRatio(dataUrlRaw) {
+  const dataUrl = normalizeCustomLargeImageDataUrl(dataUrlRaw);
+  if (!dataUrl) {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const width = Math.max(1, Number(image.naturalWidth || image.width) || 0);
+      const height = Math.max(1, Number(image.naturalHeight || image.height) || 0);
+      if (!width || !height) {
+        resolve(null);
+        return;
+      }
+      resolve(width / height);
+    };
+    image.onerror = () => resolve(null);
+    image.src = dataUrl;
+  });
+}
+
+async function updateCustomLargeImageAspectFromDataUrl(dataUrlRaw = customLargeImageDataUrlInput?.value) {
+  const dataUrl = normalizeCustomLargeImageDataUrl(dataUrlRaw);
+  if (!customLargeImageAspectInput) {
+    return null;
+  }
+  if (!dataUrl) {
+    customLargeImageAspectInput.value = "";
+    return null;
+  }
+  const ratio = await readImageAspectRatio(dataUrl);
+  customLargeImageAspectInput.value = normalizeCustomLargeImageAspect(ratio);
+  return ratio && ratio > 0 ? ratio : null;
+}
+
 function deriveCustomLargeImageNameFromFileName(fileNameRaw) {
   const fileName = value(fileNameRaw);
   if (!fileName) {
@@ -2059,6 +2129,9 @@ function clearCustomLargeImageFields() {
   if (customLargeImageDataUrlInput) {
     customLargeImageDataUrlInput.value = "";
   }
+  if (customLargeImageAspectInput) {
+    customLargeImageAspectInput.value = "";
+  }
   if (customLargeImageFileInput) {
     customLargeImageFileInput.value = "";
   }
@@ -2075,9 +2148,13 @@ async function setCustomLargeImageFromFile(file) {
     if (customLargeImageDataUrlInput) {
       customLargeImageDataUrlInput.value = normalizeCustomLargeImageDataUrl(dataUrl);
     }
+    await updateCustomLargeImageAspectFromDataUrl(dataUrl);
     if (customLargeImageNameInput && !value(customLargeImageNameInput.value)) {
       customLargeImageNameInput.value = deriveCustomLargeImageNameFromFileName(sourceFile.name);
     }
+    void syncImageFrameSizeFromAspectLock("customLargeImageDataUrl").then(() => {
+      syncLargeShapeImagePreviewTransform();
+    });
     syncCustomLargeImageStatus();
     syncLargeShapeImagePreviewForCurrentForm();
   } catch (_error) {
@@ -2352,6 +2429,9 @@ function syncLargeShapeSectionFromForm() {
   syncCustomLargeImageStatus();
   if (isImageShape) {
     syncLargeShapeImagePreviewForCurrentForm();
+    void syncImageFrameSizeFromAspectLock("largeShapeType").then(() => {
+      syncLargeShapeImagePreviewTransform();
+    });
   } else {
     syncLargeShapeImagePreview("");
   }
@@ -2519,6 +2599,8 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
     "imgSkewYDeg",
     "imgFlipH",
     "imgFlipV",
+    "imgLockAspectRatio",
+    "customLargeImageAspect",
     "detail",
     "detailSub",
     "layerRef",
@@ -2650,11 +2732,21 @@ function handleRecordFormFieldEdit(event) {
     clearLayerSavedTabState();
   }
   if (target instanceof HTMLElement && target.closest("#large-shape-section")) {
+    const targetName =
+      target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement
+        ? target.name
+        : "";
     syncCustomLargeImageStatus();
     if (target === customLargeImageNameInput || target === customLargeImageDataUrlInput || target === customLargeImageFileInput) {
+      if (target === customLargeImageDataUrlInput) {
+        void updateCustomLargeImageAspectFromDataUrl(customLargeImageDataUrlInput?.value);
+      }
       syncLargeShapeImagePreviewForCurrentForm();
     }
-    syncLargeShapeImagePreviewTransform();
+    void syncImageFrameSizeFromAspectLock(targetName).then(() => {
+      syncLargeShapeImagePreviewTransform();
+      updateEditMissingRequiredHighlights();
+    });
   }
   updateEditMissingRequiredHighlights();
 }
@@ -2762,6 +2854,9 @@ function extractImageTransformFieldsFromFormData(formData) {
     imgSkewYDeg: normalizeImageSkewDeg(formData.get("imgSkewYDeg")),
     imgFlipH: normalizeToggleFlag(formData.get("imgFlipH")),
     imgFlipV: normalizeToggleFlag(formData.get("imgFlipV")),
+    imgLockAspectRatio: normalizeToggleFlag(formData.get("imgLockAspectRatio")),
+    imgUseOriginalColor: normalizeToggleFlag(formData.get("imgUseOriginalColor")),
+    customLargeImageAspect: normalizeCustomLargeImageAspect(formData.get("customLargeImageAspect")),
   };
 }
 
@@ -2821,6 +2916,55 @@ function syncLargeShapeImagePreviewTransform() {
   largeShapeImagePreviewImg.style.transform = `rotate(${rotate}deg) scale(${scaleX}, ${scaleY}) skew(${skewX}deg, ${skewY}deg)`;
 }
 
+async function syncImageFrameSizeFromAspectLock(triggerFieldName = "") {
+  if (!recordForm?.elements) {
+    return;
+  }
+  const planSizeMode = normalizePlanSizeMode(recordForm.elements.planSizeMode?.value);
+  const shapeType = normalizeLargeShapeType(recordForm.elements.largeShapeType?.value);
+  if (planSizeMode !== "大きなもの" || !isCustomLargeShapeType(shapeType)) {
+    return;
+  }
+  const lockInput = recordForm.elements.imgLockAspectRatio;
+  if (!(lockInput instanceof HTMLInputElement) || !lockInput.checked) {
+    return;
+  }
+  const widthInput = recordForm.elements.imgFrameWidthCm;
+  const heightInput = recordForm.elements.imgFrameHeightCm;
+  if (!(widthInput instanceof HTMLInputElement) || !(heightInput instanceof HTMLInputElement)) {
+    return;
+  }
+
+  let aspectRatio = Number(normalizeCustomLargeImageAspect(customLargeImageAspectInput?.value));
+  if (!(aspectRatio > 0)) {
+    const loadedAspect = await updateCustomLargeImageAspectFromDataUrl(customLargeImageDataUrlInput?.value);
+    aspectRatio = Number(loadedAspect);
+  }
+  if (!(aspectRatio > 0)) {
+    return;
+  }
+
+  const widthCm = parseDistanceToCm(widthInput.value);
+  const heightCm = parseDistanceToCm(heightInput.value);
+  const hasWidth = Number.isFinite(widthCm) && widthCm > 0;
+  const hasHeight = Number.isFinite(heightCm) && heightCm > 0;
+  if (triggerFieldName === "imgFrameWidthCm" && hasWidth) {
+    heightInput.value = formatLengthInputValue(widthCm / aspectRatio);
+    return;
+  }
+  if (triggerFieldName === "imgFrameHeightCm" && hasHeight) {
+    widthInput.value = formatLengthInputValue(heightCm * aspectRatio);
+    return;
+  }
+  if (hasWidth && !hasHeight) {
+    heightInput.value = formatLengthInputValue(widthCm / aspectRatio);
+    return;
+  }
+  if (!hasWidth && hasHeight) {
+    widthInput.value = formatLengthInputValue(heightCm * aspectRatio);
+  }
+}
+
 function resetRecordForm({ showMessage }) {
   recordForm.reset();
   isOverwriteMode = false;
@@ -2854,6 +2998,9 @@ function resetRecordForm({ showMessage }) {
   }
   if (recordForm.elements.customLargeImageDataUrl) {
     recordForm.elements.customLargeImageDataUrl.value = "";
+  }
+  if (recordForm.elements.customLargeImageAspect) {
+    recordForm.elements.customLargeImageAspect.value = "";
   }
   if (customLargeImageFileInput) {
     customLargeImageFileInput.value = "";
@@ -2890,6 +3037,12 @@ function resetRecordForm({ showMessage }) {
   }
   if (recordForm.elements.imgFlipV instanceof HTMLInputElement) {
     recordForm.elements.imgFlipV.checked = false;
+  }
+  if (recordForm.elements.imgLockAspectRatio instanceof HTMLInputElement) {
+    recordForm.elements.imgLockAspectRatio.checked = false;
+  }
+  if (recordForm.elements.imgUseOriginalColor instanceof HTMLInputElement) {
+    recordForm.elements.imgUseOriginalColor.checked = false;
   }
   clearImageCornerCmFields();
   setDefaultImageCornerDirections();
@@ -2965,6 +3118,9 @@ function populateRecordForm(record) {
   if (recordForm.elements.customLargeImageDataUrl) {
     recordForm.elements.customLargeImageDataUrl.value = normalizeCustomLargeImageDataUrl(record.customLargeImageDataUrl);
   }
+  if (recordForm.elements.customLargeImageAspect) {
+    recordForm.elements.customLargeImageAspect.value = normalizeCustomLargeImageAspect(record.customLargeImageAspect);
+  }
   if (customLargeImageFileInput) {
     customLargeImageFileInput.value = "";
   }
@@ -3009,6 +3165,12 @@ function populateRecordForm(record) {
   }
   if (recordForm.elements.imgFlipV instanceof HTMLInputElement) {
     recordForm.elements.imgFlipV.checked = normalizeToggleFlag(record.imgFlipV) === "1";
+  }
+  if (recordForm.elements.imgLockAspectRatio instanceof HTMLInputElement) {
+    recordForm.elements.imgLockAspectRatio.checked = normalizeToggleFlag(record.imgLockAspectRatio) === "1";
+  }
+  if (recordForm.elements.imgUseOriginalColor instanceof HTMLInputElement) {
+    recordForm.elements.imgUseOriginalColor.checked = normalizeToggleFlag(record.imgUseOriginalColor) === "1";
   }
 
   nsDirInput.value = normalizeNsDir(record.nsDir);
@@ -3075,6 +3237,9 @@ function populateRecordForm(record) {
   currentPhotos = clonePhotos(record.photos || []);
   renderPhotoList();
   syncCustomLargeImageStatus();
+  void syncImageFrameSizeFromAspectLock("populate").then(() => {
+    syncLargeShapeImagePreviewTransform();
+  });
   updateEditMissingRequiredHighlights();
 }
 
@@ -3224,8 +3389,11 @@ function buildCurrentEditDraftRecord() {
     imgSkewYDeg: draftIsImageShape ? imageTransformFields.imgSkewYDeg : "",
     imgFlipH: draftIsImageShape ? imageTransformFields.imgFlipH : "0",
     imgFlipV: draftIsImageShape ? imageTransformFields.imgFlipV : "0",
+    imgLockAspectRatio: draftIsImageShape ? imageTransformFields.imgLockAspectRatio : "0",
+    imgUseOriginalColor: draftIsImageShape ? imageTransformFields.imgUseOriginalColor : "0",
     customLargeImageName: draftIsCustomImageShape ? normalizeCustomLargeImageName(value(formData.get("customLargeImageName"))) : "",
     customLargeImageDataUrl: draftIsCustomImageShape ? normalizeCustomLargeImageDataUrl(value(formData.get("customLargeImageDataUrl"))) : "",
+    customLargeImageAspect: draftIsCustomImageShape ? imageTransformFields.customLargeImageAspect : "",
     layerName: getSelectedLayerName(),
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
@@ -5482,6 +5650,16 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
     const deltaM = computeViewerPlungeDeltaM(planPoint, centerPlanPoint, tiltAzimuth, tiltDeg);
     return applyViewerVerticalScale(altitudeM + deltaM, metrics.minZ);
   };
+  const getViewerZForImagePlanPoint = (planPointRaw) => {
+    const planPoint = planPointRaw || centerPlanPoint;
+    const rawDeltaM = computeViewerPlungeDeltaM(planPoint, centerPlanPoint, tiltAzimuth, tiltDeg);
+    // 画像形状は見かけの縦伸びを抑えるため、傾斜によるZ差を弱めて上限も設定する。
+    const deltaM = Number.isFinite(rawDeltaM)
+      ? clamp(rawDeltaM * IMAGE_QUAD_TILT_Z_SCALE, -IMAGE_QUAD_TILT_Z_LIMIT_M, IMAGE_QUAD_TILT_Z_LIMIT_M)
+      : 0;
+    const baseZ = applyViewerVerticalScale(altitudeM, metrics.minZ);
+    return baseZ + deltaM;
+  };
   const altitudeZ = getViewerZForPlanPoint(centerPlanPoint);
   const worldCenter = convertViewerPointCmToWorld(drawable.x, drawable.y, candidate.grid, metrics);
   const meta = {
@@ -5573,16 +5751,17 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
   if (drawable.type === "imageQuad") {
     const points = (drawable.points || []).map((point) => {
       const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
-      return { x: world.x, y: world.y, z: getViewerZForPlanPoint(point) };
+      return { x: world.x, y: world.y, z: getViewerZForImagePlanPoint(point) };
     });
     return {
       type: "imageQuad",
       points,
       imageType: value(drawable.imageType),
       imagePath: value(drawable.imagePath),
+      useOriginalImageColor: Boolean(drawable.useOriginalImageColor),
       x: worldCenter.x,
       y: worldCenter.y,
-      z: altitudeZ,
+      z: getViewerZForImagePlanPoint(centerPlanPoint),
       ...meta,
     };
   }
@@ -6062,14 +6241,17 @@ function renderViewerImageQuad(shape, renderNonce) {
   const targetGroup = viewer3d.dataGroup;
   const points = Array.isArray(shape?.points) ? shape.points : [];
   const imagePath = value(shape?.imagePath) || getLargeShapeImagePath(shape?.imageType);
+  const useOriginalImageColor = Boolean(shape?.useOriginalImageColor);
   if (points.length !== 4) {
     return;
   }
-  // 画像が読めない場合でも位置が分かるように、外形線は先に描画する。
-  for (let i = 0; i < points.length; i += 1) {
-    const start = points[i];
-    const end = points[(i + 1) % points.length];
-    renderViewerSegment(start, end, new THREE.Color(shape?.color || "#6b7280"), 0.012);
+  if (!useOriginalImageColor) {
+    // 画像が読めない場合でも位置が分かるように、外形線は先に描画する。
+    for (let i = 0; i < points.length; i += 1) {
+      const start = points[i];
+      const end = points[(i + 1) % points.length];
+      renderViewerSegment(start, end, new THREE.Color(shape?.color || "#6b7280"), 0.012);
+    }
   }
   if (!imagePath) {
     return;
@@ -6140,8 +6322,17 @@ function renderViewerImageQuad(shape, renderNonce) {
     targetGroup.add(mesh);
   };
   const dilateIterations = getImageShapeDilateIterations(shape?.imageType);
-  const loadFromImagePath = () =>
-    getOrLoadPlanLargeShapeTintedCanvas(imagePath, shape?.color, shape?.imageType, { dilateIterations })
+  const loadFromImagePath = () => {
+    if (useOriginalImageColor) {
+      return getOrLoadPlanLargeShapeImage(imagePath, shape?.imageType)
+        .then((image) => {
+          const texture = new THREE.Texture(image);
+          addTexturedMesh(texture, "#ffffff");
+          return true;
+        })
+        .catch(() => false);
+    }
+    return getOrLoadPlanLargeShapeTintedCanvas(imagePath, shape?.color, shape?.imageType, { dilateIterations })
       .then((tintedCanvas) => {
         const texture = new THREE.CanvasTexture(tintedCanvas);
         addTexturedMesh(texture, "#ffffff");
@@ -6155,6 +6346,7 @@ function renderViewerImageQuad(shape, renderNonce) {
         })
       )
       .catch(() => false);
+  };
   // 3Dは常に着色済みCanvas経路を優先し、黒線化しやすいdataURL経路は使わない。
   void loadFromImagePath();
 }
@@ -7128,6 +7320,7 @@ function buildPlanDrawable(record) {
     if (!points) {
       return null;
     }
+    const useOriginalImageColor = normalizeToggleFlag(record?.imgUseOriginalColor) === "1";
     const centroid = points.reduce(
       (acc, point) => ({ x: acc.x + point.x / points.length, y: acc.y + point.y / points.length }),
       { x: 0, y: 0 }
@@ -7137,6 +7330,7 @@ function buildPlanDrawable(record) {
       points,
       imageType: resolvedImageType,
       imagePath: customImagePath || getLargeShapeImagePath(resolvedImageType),
+      useOriginalImageColor,
       x: centroid.x,
       y: centroid.y,
       ...meta,
@@ -7171,9 +7365,13 @@ function renderPlanDrawableSvg(drawable, index = 0) {
     shapeSvg = `<ellipse class="plan-shape-ellipse" cx="${drawable.x}" cy="${drawable.y}" rx="${drawable.rx}" ry="${drawable.ry}" stroke="${drawable.color}"${transform} />`;
   } else if (drawable.type === "imageQuad") {
     const imageSvg = buildPlanImageWarpSvg(drawable, index);
-    const polygonPoints = (drawable.points || []).map((point) => `${point.x},${point.y}`).join(" ");
-    const outlineSvg = `<polygon class="plan-shape-image-outline" points="${polygonPoints}" fill="none" stroke="${drawable.color}" />`;
-    shapeSvg = imageSvg ? `${imageSvg}${outlineSvg}` : outlineSvg;
+    if (drawable.useOriginalImageColor) {
+      shapeSvg = imageSvg;
+    } else {
+      const polygonPoints = (drawable.points || []).map((point) => `${point.x},${point.y}`).join(" ");
+      const outlineSvg = `<polygon class="plan-shape-image-outline" points="${polygonPoints}" fill="none" stroke="${drawable.color}" />`;
+      shapeSvg = imageSvg ? `${imageSvg}${outlineSvg}` : outlineSvg;
+    }
   } else {
     shapeSvg = `<circle class="plan-point-hit" cx="${drawable.x}" cy="${drawable.y}" r="5" fill="${drawable.color}" />`;
   }
@@ -7228,19 +7426,23 @@ function parseHexColor(colorRaw, fallback = "#6b7280") {
 function buildPlanImageWarpSvg(drawable, index = 0) {
   const points = Array.isArray(drawable?.points) ? drawable.points : [];
   const imagePath = value(drawable?.imagePath);
+  const useOriginalImageColor = Boolean(drawable?.useOriginalImageColor);
   const imageCandidates = getLargeShapeImagePathCandidates(drawable?.imageType, imagePath);
   const imageFallback =
     imageCandidates.find((candidate) => !String(candidate).startsWith("data:")) || imageCandidates[0] || imagePath;
-  const dilateIterations = getImageShapeDilateIterations(drawable?.imageType);
-  const tintedDataUrlRaw = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color, drawable?.imageType, {
-    dilateIterations,
-  });
-  const tintedDataUrl = value(tintedDataUrlRaw);
-  const canUseTintedDataUrl =
-    tintedDataUrl &&
-    tintedDataUrl.startsWith("data:") &&
-    tintedDataUrl.length <= PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH;
-  const imageRef = canUseTintedDataUrl ? tintedDataUrl : imageFallback;
+  let imageRef = imageFallback;
+  if (!useOriginalImageColor) {
+    const dilateIterations = getImageShapeDilateIterations(drawable?.imageType);
+    const tintedDataUrlRaw = getPlanLargeShapeTintedDataUrl(imageFallback, drawable?.color, drawable?.imageType, {
+      dilateIterations,
+    });
+    const tintedDataUrl = value(tintedDataUrlRaw);
+    const canUseTintedDataUrl =
+      tintedDataUrl &&
+      tintedDataUrl.startsWith("data:") &&
+      tintedDataUrl.length <= PLAN_IMAGE_TINTED_DATA_URL_MAX_LENGTH;
+    imageRef = canUseTintedDataUrl ? tintedDataUrl : imageFallback;
+  }
   if (points.length !== 4 || !imageRef) {
     return "";
   }
@@ -7844,8 +8046,11 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     imgSkewYDeg: normalizeImageSkewDeg(value(item.imgSkewYDeg)),
     imgFlipH: normalizeToggleFlag(value(item.imgFlipH)),
     imgFlipV: normalizeToggleFlag(value(item.imgFlipV)),
+    imgLockAspectRatio: normalizeToggleFlag(value(item.imgLockAspectRatio)),
+    imgUseOriginalColor: normalizeToggleFlag(value(item.imgUseOriginalColor) || value(item.useOriginalImageColor)),
     customLargeImageName: normalizeCustomLargeImageName(value(item.customLargeImageName)),
     customLargeImageDataUrl: normalizeCustomLargeImageDataUrl(value(item.customLargeImageDataUrl)),
+    customLargeImageAspect: normalizeCustomLargeImageAspect(value(item.customLargeImageAspect)),
     importantFlag: normalizeHasFlag(value(item.importantFlag) || value(item.isImportant)),
     simpleRecordFlag: normalizeCircleDashFlag(value(item.simpleRecordFlag)),
     layerName: normalizeLayerName(value(item.layerName)),

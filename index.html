@@ -6,13 +6,15 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>第24次野尻湖湖底発掘　化石・遺物 入力</title>
-    <link rel="stylesheet" href="./styles.css?v=20260308-3d23" />
+    <title>第24次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
+    <link rel="stylesheet" href="./styles.css?v=20260308-headnote7" />
   </head>
   <body>
     <header class="app-header">
       <div>
-        <h1>第24次野尻湖湖底発掘　化石・遺物 入力</h1>
+        <h1>第24次野尻湖湖底発掘　化石・遺物 入力フォーム</h1>
+        <p class="header-update-note">3D表現が可能になりました(2026.03.07)</p>
+        <p class="header-update-note">描画画像のアップが可能になりました(2026.03.08)</p>
       </div>
       <div class="header-actions">
         <div class="cloud-controls">
@@ -353,6 +355,7 @@
                       <input id="custom-large-image-file-input" type="file" accept="image/*" />
                     </label>
                     <input id="custom-large-image-data-url-input" name="customLargeImageDataUrl" type="hidden" value="" />
+                    <input id="custom-large-image-aspect-input" name="customLargeImageAspect" type="hidden" value="" />
                     <button id="custom-large-image-clear-btn" type="button">画像をクリア</button>
                     <p id="custom-large-image-status" class="hint-text">画像未選択</p>
                   </div>
@@ -390,6 +393,10 @@
                     <div class="image-toggle-row">
                       <label class="image-toggle-check"><input name="imgFlipH" type="checkbox" value="1" /> 左右反転</label>
                       <label class="image-toggle-check"><input name="imgFlipV" type="checkbox" value="1" /> 上下反転</label>
+                    </div>
+                    <div class="image-toggle-row">
+                      <label class="image-toggle-check"><input name="imgLockAspectRatio" type="checkbox" value="1" /> 元の縦横比を固定</label>
+                      <label class="image-toggle-check"><input name="imgUseOriginalColor" type="checkbox" value="1" /> 原図の色を利用</label>
                     </div>
                   </div>
                 </section>
@@ -879,6 +886,6 @@
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260308-viewhold5"></script>
+    <script src="./app.js?v=20260308-aspect1"></script>
   </body>
 </html>
