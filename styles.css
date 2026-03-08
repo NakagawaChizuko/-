@@ -533,13 +533,14 @@ main {
 }
 
 .plan-map-shell {
+  --plan-map-pad: 30px;
   position: relative;
   width: min(96vw, 560px);
   aspect-ratio: 1 / 1;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  padding: 30px;
+  padding: var(--plan-map-pad);
 }
 
 .position-preview-row {
@@ -613,8 +614,9 @@ main {
 }
 
 .position-preview-shell {
+  --plan-map-pad: 22px;
   width: min(78vw, 320px);
-  padding: 22px;
+  padding: var(--plan-map-pad);
   margin: 0 auto;
 }
 
@@ -657,6 +659,15 @@ main {
   font-size: 11px;
   font-weight: 700;
   pointer-events: none;
+}
+
+.plan-map-svg .plan-grid-corner-svg text {
+  fill: #0f172a;
+  font-size: 10.5px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 2.2px;
 }
 
 .plan-point-hotspot {
@@ -759,23 +770,27 @@ main {
 }
 
 .plan-grid-corner.top-left {
-  top: 8px;
-  left: 8px;
+  top: var(--plan-map-pad);
+  left: var(--plan-map-pad);
+  transform: translate(-42%, -42%);
 }
 
 .plan-grid-corner.top-right {
-  top: 8px;
-  right: 8px;
+  top: var(--plan-map-pad);
+  right: var(--plan-map-pad);
+  transform: translate(42%, -42%);
 }
 
 .plan-grid-corner.bottom-left {
-  bottom: 8px;
-  left: 8px;
+  bottom: var(--plan-map-pad);
+  left: var(--plan-map-pad);
+  transform: translate(-42%, 42%);
 }
 
 .plan-grid-corner.bottom-right {
-  bottom: 8px;
-  right: 8px;
+  bottom: var(--plan-map-pad);
+  right: var(--plan-map-pad);
+  transform: translate(42%, 42%);
 }
 
 .viewer-toolbar {

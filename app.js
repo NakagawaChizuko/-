@@ -5506,6 +5506,8 @@ function renderPlanOutput() {
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
   const cornerLabels = buildPlanCornerLabels(selectedPlanKuwaku);
+  const cornerLabelsSvg = buildPlanCornerLabelsSvg(cornerLabels);
+  const viewBox = computePlanSvgViewBox(drawables);
 
   planMapWrap.innerHTML = `
     ${mapMetaHtml}
@@ -5514,14 +5516,11 @@ function renderPlanOutput() {
       <div class="plan-axis east">東</div>
       <div class="plan-axis south">南</div>
       <div class="plan-axis west">西</div>
-      <div class="plan-grid-corner top-left">${escapeHtml(cornerLabels.topLeft)}</div>
-      <div class="plan-grid-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
-      <div class="plan-grid-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
-      <div class="plan-grid-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
-      <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="ユニット別平面図" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <svg class="plan-map-svg" viewBox="${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}" aria-label="ユニット別平面図" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <rect class="plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
+        ${cornerLabelsSvg}
         ${pointsSvg}
       </svg>
       <div class="plan-map-tooltip" hidden></div>
@@ -5644,6 +5643,8 @@ function renderPositionPreviewModalContent() {
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
   const cornerLabels = buildPlanCornerLabels(kuwakuValue);
+  const cornerLabelsSvg = buildPlanCornerLabelsSvg(cornerLabels);
+  const viewBox = computePlanSvgViewBox(drawables);
   const kuwakuLabel = kuwakuValue === EMPTY_KUWAKU_VALUE ? "（未設定）" : kuwakuLabelForSelect(kuwakuValue);
   positionPreviewMeta.innerHTML = `
     <span>区画（グリッド）: ${escapeHtml(kuwakuLabel)}</span>
@@ -5655,14 +5656,11 @@ function renderPositionPreviewModalContent() {
       <div class="plan-axis east">東</div>
       <div class="plan-axis south">南</div>
       <div class="plan-axis west">西</div>
-      <div class="plan-grid-corner top-left">${escapeHtml(cornerLabels.topLeft)}</div>
-      <div class="plan-grid-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
-      <div class="plan-grid-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
-      <div class="plan-grid-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
-      <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="平面位置確認" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <svg class="plan-map-svg" viewBox="${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}" aria-label="平面位置確認" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <rect class="plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
+        ${cornerLabelsSvg}
         ${pointsSvg}
       </svg>
     </div>
@@ -6752,17 +6750,40 @@ function renderViewerGrid(metrics) {
     viewer3d.gridGroup.add(new THREE.Line(geometry, gridMat));
   }
 
+  const cardinalOffset = 0.9;
+  const cardinalZ = zBase + 0.06;
+  const cardinalLabels = [
+    { text: "北", x: width / 2, y: height + cardinalOffset },
+    { text: "南", x: width / 2, y: -cardinalOffset },
+    { text: "東", x: width + cardinalOffset, y: height / 2 },
+    { text: "西", x: -cardinalOffset, y: height / 2 },
+  ];
+  cardinalLabels.forEach((item) => {
+    const sprite = createViewerTextSprite(item.text, "#0f172a", {
+      fontPx: 120,
+      scaleX: 1.8,
+      scaleY: 0.45,
+    });
+    sprite.position.set(item.x, item.y, cardinalZ);
+    viewer3d.gridGroup.add(sprite);
+  });
+
   for (let xIndex = metrics.minXIndex; xIndex <= metrics.maxXIndex; xIndex += 1) {
     const headBlock = viewerXIndexToHeadBlock(xIndex);
     for (let no = metrics.minNo; no <= metrics.maxNo; no += 1) {
       const label = `${headBlock.head}-${headBlock.block}-${no}`;
-      const x = (xIndex - metrics.minXIndex) * 4 + 0.45;
-      const y = (metrics.maxNo - no) * 4 + 3.55;
+      const cellX0 = (xIndex - metrics.minXIndex) * 4;
+      const cellY0 = (metrics.maxNo - no) * 4;
+      // グリッドの北西隅（角）に寄せて配置
+      const x = cellX0 + 0.08;
+      const y = cellY0 + 3.94;
       const sprite = createViewerTextSprite(label, "#334155", {
         fontPx: 124,
-        scaleX: 2.24,
-        scaleY: 0.56,
+        scaleX: 1.88,
+        scaleY: 0.46,
       });
+      // Spriteの基準点を左上へ寄せ、角配置を明確化
+      sprite.center.set(0, 1);
       sprite.position.set(x, y, zBase + 0.01);
       viewer3d.gridGroup.add(sprite);
     }
@@ -6804,7 +6825,7 @@ function renderViewerGrid(metrics) {
       scaleX: 1.57,
       scaleY: 0.39,
     });
-    axisLabel.position.set(corner.x + corner.dirX * 1.05, corner.y + corner.dirY * 1.05, zEnd + 0.26);
+    axisLabel.position.set(corner.x + corner.dirX * 1.5, corner.y + corner.dirY * 1.5, zEnd + 0.85);
     viewer3d.gridGroup.add(axisLabel);
   });
 }
@@ -8102,6 +8123,108 @@ function buildPlanImageWarpSvg(drawable, index = 0) {
   `;
 }
 
+function getPlanDrawableExtent(drawable) {
+  if (!drawable || typeof drawable !== "object") {
+    return null;
+  }
+  if (drawable.type === "line") {
+    return {
+      minX: Math.min(Number(drawable.x1), Number(drawable.x2)),
+      maxX: Math.max(Number(drawable.x1), Number(drawable.x2)),
+      minY: Math.min(Number(drawable.y1), Number(drawable.y2)),
+      maxY: Math.max(Number(drawable.y1), Number(drawable.y2)),
+    };
+  }
+  if (drawable.type === "rect") {
+    const cx = Number(drawable.x);
+    const cy = Number(drawable.y);
+    const w = Number(drawable.width);
+    const h = Number(drawable.height);
+    const halfDiag = Math.hypot(w / 2, h / 2);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(halfDiag)) {
+      return null;
+    }
+    return {
+      minX: cx - halfDiag,
+      maxX: cx + halfDiag,
+      minY: cy - halfDiag,
+      maxY: cy + halfDiag,
+    };
+  }
+  if (drawable.type === "ellipse") {
+    const cx = Number(drawable.x);
+    const cy = Number(drawable.y);
+    const radius = Math.max(Number(drawable.rx), Number(drawable.ry));
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(radius)) {
+      return null;
+    }
+    return {
+      minX: cx - radius,
+      maxX: cx + radius,
+      minY: cy - radius,
+      maxY: cy + radius,
+    };
+  }
+  if (drawable.type === "imageQuad" && Array.isArray(drawable.points) && drawable.points.length) {
+    const xs = drawable.points.map((point) => Number(point?.x)).filter((num) => Number.isFinite(num));
+    const ys = drawable.points.map((point) => Number(point?.y)).filter((num) => Number.isFinite(num));
+    if (!xs.length || !ys.length) {
+      return null;
+    }
+    return {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+    };
+  }
+  const cx = Number(drawable.x);
+  const cy = Number(drawable.y);
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
+    return null;
+  }
+  return {
+    minX: cx,
+    maxX: cx,
+    minY: cy,
+    maxY: cy,
+  };
+}
+
+function computePlanSvgViewBox(drawables = []) {
+  const base = {
+    minX: 0,
+    maxX: PLAN_SIZE_CM,
+    minY: 0,
+    maxY: PLAN_SIZE_CM,
+  };
+  const extents = (Array.isArray(drawables) ? drawables : [])
+    .map((drawable) => getPlanDrawableExtent(drawable))
+    .filter(Boolean);
+  if (extents.length) {
+    extents.forEach((extent) => {
+      base.minX = Math.min(base.minX, extent.minX);
+      base.maxX = Math.max(base.maxX, extent.maxX);
+      base.minY = Math.min(base.minY, extent.minY);
+      base.maxY = Math.max(base.maxY, extent.maxY);
+    });
+  }
+  const leftPad = 40;
+  const rightPad = 24;
+  const topPad = 24;
+  const bottomPad = 24;
+  const minX = Math.floor(base.minX - leftPad);
+  const minY = Math.floor(base.minY - topPad);
+  const width = Math.ceil(base.maxX + rightPad - minX);
+  const height = Math.ceil(base.maxY + bottomPad - minY);
+  return {
+    minX,
+    minY,
+    width: Math.max(PLAN_SIZE_CM, width),
+    height: Math.max(PLAN_SIZE_CM, height),
+  };
+}
+
 function parseDistanceToCm(distanceRaw) {
   const text = value(distanceRaw).replace(",", ".");
   if (!text) {
@@ -8135,6 +8258,22 @@ function buildPlanCornerLabels(kuwakuRaw) {
     bottomLeft: `${block}-${lowerNo}`,
     bottomRight: `${rightBlock}-${lowerNo}`,
   };
+}
+
+function buildPlanCornerLabelsSvg(cornerLabels) {
+  const labels = cornerLabels || {};
+  const tl = escapeHtml(value(labels.topLeft) || "-");
+  const tr = escapeHtml(value(labels.topRight) || "-");
+  const bl = escapeHtml(value(labels.bottomLeft) || "-");
+  const br = escapeHtml(value(labels.bottomRight) || "-");
+  return `
+    <g class="plan-grid-corner-svg">
+      <text x="4" y="4" text-anchor="start" dominant-baseline="hanging">${tl}</text>
+      <text x="${PLAN_SIZE_CM - 4}" y="4" text-anchor="end" dominant-baseline="hanging">${tr}</text>
+      <text x="4" y="${PLAN_SIZE_CM - 4}" text-anchor="start" dominant-baseline="ideographic">${bl}</text>
+      <text x="${PLAN_SIZE_CM - 4}" y="${PLAN_SIZE_CM - 4}" text-anchor="end" dominant-baseline="ideographic">${br}</text>
+    </g>
+  `;
 }
 
 function incrementGridBlock(blockRaw, step) {
@@ -8324,7 +8463,6 @@ function attachPlanMapTooltips() {
 
 function positionTooltip(pointEl, mouseEvent, shell, svg, tooltip) {
   const shellRect = shell.getBoundingClientRect();
-  const svgRect = svg.getBoundingClientRect();
 
   let xLocal = 0;
   let yLocal = 0;
@@ -8332,10 +8470,9 @@ function positionTooltip(pointEl, mouseEvent, shell, svg, tooltip) {
     xLocal = mouseEvent.clientX - shellRect.left;
     yLocal = mouseEvent.clientY - shellRect.top;
   } else {
-    const x = Number(pointEl.dataset.x);
-    const y = Number(pointEl.dataset.y);
-    xLocal = svgRect.left - shellRect.left + (x / PLAN_SIZE_CM) * svgRect.width;
-    yLocal = svgRect.top - shellRect.top + (y / PLAN_SIZE_CM) * svgRect.height;
+    const pointRect = pointEl.getBoundingClientRect();
+    xLocal = pointRect.left - shellRect.left + pointRect.width / 2;
+    yLocal = pointRect.top - shellRect.top + pointRect.height / 2;
   }
 
   const offset = 14;
