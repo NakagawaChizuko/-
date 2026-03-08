@@ -411,6 +411,9 @@
                 </section>
               </div>
             </fieldset>
+            <div class="position-preview-row span-3">
+              <button id="position-preview-btn" type="button">平面位置確認</button>
+            </div>
 
             <fieldset class="inline-fieldset span-3">
               <legend>地層名<span class="required">*</span></legend>
@@ -883,6 +886,26 @@
           <h2>入力履歴</h2>
           <div id="edit-history-list"></div>
         </section>
+        <section class="panel">
+          <h2>同一グリッドの入力済みデータ</h2>
+          <div class="table-wrap">
+            <table id="edit-record-table">
+              <thead>
+                <tr>
+                  <th>区画</th>
+                  <th>発掘班</th>
+                  <th>標本番号</th>
+                  <th>分類</th>
+                  <th>名称</th>
+                  <th>発見者</th>
+                  <th>レベル読値(上面/下底)</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="edit-record-table-body"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
     <nav class="tabs tabs-bottom" aria-label="入力セクション（下部）">
@@ -894,10 +917,21 @@
     </nav>
 
     <div id="toast" role="status" aria-live="polite"></div>
+    <div id="position-preview-modal" class="position-preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="position-preview-title">
+      <div class="position-preview-dialog">
+        <div class="position-preview-header">
+          <h3 id="position-preview-title">平面位置確認</h3>
+          <button id="position-preview-close-btn" type="button" aria-label="閉じる">×</button>
+        </div>
+        <div id="position-preview-meta" class="plan-map-meta"></div>
+        <div id="position-preview-map"></div>
+        <p class="position-preview-note">赤色: 現在入力中 / 通常色: 保存済みデータ</p>
+      </div>
+    </div>
 
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260308-imagesizefix1"></script>
+    <script src="./app.js?v=20260308-positionpreview2"></script>
   </body>
 </html>

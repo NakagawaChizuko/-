@@ -34,20 +34,28 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 8px 12px;
   background: #12303a;
   color: #fff;
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: clamp(0.72rem, 2.4vw, 1rem);
+  white-space: nowrap;
 }
 
 .app-header p {
   margin: 2px 0 0;
   font-size: 0.9rem;
   opacity: 0.86;
+}
+
+.header-update-note {
+  margin: 1px 0 0;
+  font-size: 0.3rem;
+  line-height: 1.15;
+  opacity: 0.92;
 }
 
 .header-actions {
@@ -534,6 +542,94 @@ main {
   padding: 30px;
 }
 
+.position-preview-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: -2px;
+}
+
+#position-preview-btn {
+  background: #f8fafc;
+  border-color: #9cb2c7;
+  color: #1f3348;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+}
+
+#position-preview-btn:hover {
+  background: #eef5fb;
+}
+
+.position-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgb(15 23 42 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.position-preview-dialog {
+  width: min(92vw, 430px);
+  max-height: 88vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgb(2 6 23 / 28%);
+  padding: 10px 12px 12px;
+}
+
+.position-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.position-preview-header h3 {
+  margin: 0;
+  font-size: 0.96rem;
+  color: #0f172a;
+}
+
+#position-preview-close-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 999px;
+  padding: 0;
+  line-height: 1;
+  font-size: 1.05rem;
+  background: #f8fafc;
+  border-color: #c9d4e0;
+  color: #1f3348;
+}
+
+.position-preview-shell {
+  width: min(78vw, 320px);
+  padding: 22px;
+  margin: 0 auto;
+}
+
+.position-preview-shell .plan-axis {
+  font-size: 0.78rem;
+}
+
+.position-preview-shell .plan-grid-corner {
+  font-size: 0.68rem;
+  padding: 1px 5px;
+}
+
+.position-preview-note {
+  margin: 8px 2px 0;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
 .plan-map-svg {
   width: 100%;
   height: 100%;
@@ -767,6 +863,53 @@ main {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+#site-form,
+#record-form,
+#edit-tab > .panel,
+#edit-history-panel {
+  max-width: 1160px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#site-form .grid.cols-3,
+#record-form .grid.cols-3,
+#edit-tab > .panel .grid.cols-3 {
+  gap: 10px 12px;
+  align-items: start;
+}
+
+#record-form .inline-fieldset,
+#edit-record-form-host .inline-fieldset {
+  background: #f9fbfd;
+  border-color: #ccd5e1;
+}
+
+#record-form .inline-fieldset legend,
+#edit-record-form-host .inline-fieldset legend {
+  font-weight: 700;
+  color: #334155;
+}
+
+#site-form .panel-actions,
+#record-form .panel-actions,
+#edit-tab > .panel .panel-actions {
+  justify-content: center;
+  padding-top: 10px;
+  border-top: 1px solid #dbe3ec;
+}
+
+#record-form .two-inline-labels,
+#edit-record-form-host .two-inline-labels {
+  gap: 10px;
+  align-items: start;
+}
+
+#record-form .compact-position-fieldset .inline-cm-row,
+#edit-record-form-host .compact-position-fieldset .inline-cm-row {
+  justify-content: start;
+}
+
 .span-2 {
   grid-column: span 2;
 }
@@ -871,9 +1014,25 @@ textarea {
 
 .kuwaku-input {
   display: grid;
-  grid-template-columns: minmax(62px, 0.9fr) auto minmax(62px, 0.9fr) auto minmax(88px, 1fr) auto minmax(88px, 1fr);
+  grid-template-columns: 56px 8px 56px 8px 64px 8px 64px;
   align-items: center;
-  gap: 6px;
+  column-gap: 0;
+  row-gap: 2px;
+  justify-content: start;
+  width: fit-content;
+}
+
+.kuwaku-input .sep {
+  width: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  line-height: 1;
+}
+
+.kuwaku-input input {
+  width: 100%;
 }
 
 .fixed-chip {
@@ -1158,13 +1317,34 @@ textarea {
 
 .level-read-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, max-content);
+  justify-content: start;
+  gap: 6px 10px;
+  align-items: end;
 }
 
 .level-read-item {
   display: grid;
   gap: 4px;
+}
+
+.level-altitude-item {
+  align-content: end;
+}
+
+.level-altitude-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #314155;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.level-altitude-toggle input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
 }
 
 .inline-cm-row {
@@ -1174,9 +1354,73 @@ textarea {
   gap: 6px;
 }
 
+.compact-cm-row {
+  grid-template-columns: minmax(62px, 96px) auto;
+  width: fit-content;
+}
+
 .inline-cm-row span {
   color: #5b6777;
   font-size: 0.84rem;
+}
+
+.altitude-direct-row input:disabled {
+  background: #eef2f7;
+  color: #7a8696;
+}
+
+.altitude-direct-hint {
+  font-size: 0.76rem;
+}
+
+.numeric-compact-input,
+#input-tab input[name="kuwakuHeadA"],
+#input-tab input[name="kuwakuHeadB"],
+#input-tab input[name="kuwakuBlock"],
+#input-tab input[name="kuwakuNo"],
+#edit-tab #edit-kuwaku-head-a,
+#edit-tab #edit-kuwaku-head-b,
+#edit-tab #edit-kuwaku-block,
+#edit-tab #edit-kuwaku-no {
+  max-width: 72px;
+}
+
+#input-tab input[name="date"],
+#edit-tab #edit-date {
+  max-width: 170px;
+}
+
+#input-tab input[name="levelHeight"],
+#edit-tab #edit-level-height,
+#record-form input[name="levelUpperCm"],
+#record-form input[name="levelLowerCm"],
+#record-form input[name="nsCm"],
+#record-form input[name="ewCm"],
+#record-form input[name="altitudeDirectM"],
+#record-form input[name="lineLengthCm"],
+#record-form input[name="rectSide1Cm"],
+#record-form input[name="rectSide2Cm"],
+#record-form input[name="ellipseLongRadiusCm"],
+#record-form input[name="ellipseShortRadiusCm"],
+#record-form input[name="imgFrameWidthCm"],
+#record-form input[name="imgFrameHeightCm"] {
+  max-width: 96px;
+}
+
+#record-form input[name="largeAxisPlungeDeg"],
+#record-form input[name="planeDipDeg"],
+#record-form input[name="imgRotateDeg"],
+#record-form input[name="imgSkewXDeg"],
+#record-form input[name="imgSkewYDeg"] {
+  max-width: 80px;
+}
+
+.compact-position-fieldset {
+  align-content: start;
+}
+
+.compact-position-fieldset .dir-tabs {
+  gap: 5px;
 }
 
 .layer-position-row {
@@ -1214,10 +1458,7 @@ textarea {
 }
 
 .image-shape-tabs {
-  padding: 6px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  background: #f8fafc;
+  display: contents;
 }
 
 .large-shape-image-preview {
@@ -1318,7 +1559,7 @@ textarea {
 }
 
 .inline-degree-row input {
-  width: 88px;
+  width: 72px;
 }
 
 .plane-attitude-row {
@@ -1890,12 +2131,21 @@ th.sortable-header.sort-desc::after {
   }
 
   .kuwaku-input {
-    grid-template-columns: minmax(52px, 0.8fr) auto minmax(52px, 0.8fr) auto 1fr auto 1fr;
+    grid-template-columns: 50px 8px 50px 8px 58px 8px 58px;
+  }
+
+  .level-read-grid {
+    grid-template-columns: 1fr;
   }
 
   .plan-map-shell {
     width: min(95vw, 520px);
     padding: 24px;
+  }
+
+  .position-preview-shell {
+    width: min(86vw, 300px);
+    padding: 20px;
   }
 
   .viewer-canvas-wrap {

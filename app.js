@@ -322,6 +322,7 @@ const recordSubmitBtn = document.getElementById("record-submit-btn");
 const recordCopyToInputBtn = document.getElementById("record-copy-to-input-btn");
 const recordResetBtn = document.getElementById("record-reset-btn");
 const recordTableBody = document.getElementById("record-table-body");
+const editRecordTableBody = document.getElementById("edit-record-table-body");
 const outputListBody = document.getElementById("output-list-body");
 const outputListTable = document.getElementById("output-list-table");
 const cardOutputList = document.getElementById("card-output-list");
@@ -456,6 +457,11 @@ const cloudSyncBtn = document.getElementById("cloud-sync-btn");
 const cloudDisableBtn = document.getElementById("cloud-disable-btn");
 const cloudStatusEl = document.getElementById("cloud-status");
 const toastEl = document.getElementById("toast");
+const positionPreviewBtn = document.getElementById("position-preview-btn");
+const positionPreviewModal = document.getElementById("position-preview-modal");
+const positionPreviewCloseBtn = document.getElementById("position-preview-close-btn");
+const positionPreviewMeta = document.getElementById("position-preview-meta");
+const positionPreviewMap = document.getElementById("position-preview-map");
 
 const viewer3d = {
   initialized: false,
@@ -526,6 +532,28 @@ function bindEvents() {
       }
     });
   }
+  if (positionPreviewBtn) {
+    positionPreviewBtn.addEventListener("click", () => {
+      openPositionPreviewModal();
+    });
+  }
+  if (positionPreviewCloseBtn) {
+    positionPreviewCloseBtn.addEventListener("click", () => {
+      closePositionPreviewModal();
+    });
+  }
+  if (positionPreviewModal) {
+    positionPreviewModal.addEventListener("click", (event) => {
+      if (event.target === positionPreviewModal) {
+        closePositionPreviewModal();
+      }
+    });
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && positionPreviewModal && !positionPreviewModal.classList.contains("hidden")) {
+      closePositionPreviewModal();
+    }
+  });
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
@@ -553,9 +581,11 @@ function bindEvents() {
   if (editTabPanel) {
     editTabPanel.addEventListener("input", () => {
       updateEditMissingRequiredHighlights();
+      renderRecordTable();
     });
     editTabPanel.addEventListener("change", () => {
       updateEditMissingRequiredHighlights();
+      renderRecordTable();
     });
     editTabPanel.addEventListener("click", (event) => {
       const target = event.target;
@@ -566,6 +596,7 @@ function bindEvents() {
         return;
       }
       updateEditMissingRequiredHighlights();
+      renderRecordTable();
     });
   }
 
@@ -971,44 +1002,12 @@ function bindEvents() {
     });
   }
 
-  recordTableBody.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-action]");
-    if (!button) {
-      return;
-    }
-    const recordId = button.dataset.id;
-    const action = button.dataset.action;
-    const record = findRecord(recordId);
-    if (!record) {
-      showToast("対象データが見つかりません");
-      return;
-    }
-
-    if (action === "edit") {
-      const rowKuwaku = value(button.dataset.kuwaku);
-      openRecordForEdit(record.id, rowKuwaku);
-      return;
-    }
-    if (action === "copy-to-input") {
-      const rowKuwaku = value(button.dataset.kuwaku);
-      copySavedRecordToInput(recordId, rowKuwaku);
-      return;
-    }
-
-    if (action === "delete") {
-      const answer = window.confirm(`標本番号 ${record.specimenNo} を削除しますか？`);
-      if (!answer) {
-        return;
-      }
-      state.records = state.records.filter((item) => item.id !== recordId);
-      if (editingRecordId === recordId) {
-        resetRecordForm({ showMessage: false });
-      }
-      persist("記録を削除しました");
-      renderRecordTable();
-      renderOutputs();
-    }
-  });
+  if (recordTableBody) {
+    recordTableBody.addEventListener("click", handleRecordTableActionClick);
+  }
+  if (editRecordTableBody) {
+    editRecordTableBody.addEventListener("click", handleRecordTableActionClick);
+  }
 
   outputListBody.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
@@ -3364,6 +3363,7 @@ function openRecordForEdit(recordId, preferredKuwaku = "") {
   populateRecordForm(record);
   renderEditHistory(record);
   setActiveTab("edit-tab");
+  renderRecordTable();
   updateEditMissingRequiredHighlights();
 }
 
@@ -3862,20 +3862,61 @@ function renderEditHistory(record) {
 }
 
 function renderRecordTable() {
+  if (!recordTableBody && !editRecordTableBody) {
+    return;
+  }
   if (!state.records.length) {
-    recordTableBody.innerHTML = "<tr><td colspan=\"8\">まだ入力データがありません。</td></tr>";
+    renderRecordTableBodyRows(recordTableBody, [], "まだ入力データがありません。");
+    renderRecordTableBodyRows(editRecordTableBody, [], "まだ入力データがありません。");
     return;
   }
+  const inputRecords = getInputRecordsForCurrentKuwaku();
+  const editRecords = getEditRecordsForCurrentKuwaku();
+  renderRecordTableBodyRows(
+    recordTableBody,
+    inputRecords,
+    inputRecords.length ? "" : "現在の区画（グリッド）の入力データがありません。"
+  );
+  renderRecordTableBodyRows(
+    editRecordTableBody,
+    editRecords,
+    editRecords.length ? "" : "編集中の区画（グリッド）の入力データがありません。"
+  );
+}
 
-  const recordsForCurrentKuwaku = getInputRecordsForCurrentKuwaku();
-  if (!recordsForCurrentKuwaku.length) {
-    recordTableBody.innerHTML = "<tr><td colspan=\"8\">現在の区画（グリッド）の入力データがありません。</td></tr>";
+function getInputRecordsForCurrentKuwaku() {
+  const currentKuwaku = value(state.site?.kuwaku);
+  const sortedRecords = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  if (!currentKuwaku || isDefaultKuwaku(currentKuwaku)) {
+    return sortedRecords;
+  }
+  const currentValue = kuwakuValueForSelect(currentKuwaku);
+  return sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === currentValue);
+}
+
+function getEditRecordsForCurrentKuwaku() {
+  const editKuwaku = currentKuwakuForDuplicateWarning("edit-tab");
+  const sortedRecords = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
+  if (!editKuwaku) {
+    return [];
+  }
+  const currentValue = kuwakuValueForSelect(editKuwaku);
+  return sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === currentValue);
+}
+
+function renderRecordTableBodyRows(targetBody, records, emptyMessage) {
+  if (!targetBody) {
     return;
   }
+  if (!records.length) {
+    targetBody.innerHTML = `<tr><td colspan="8">${escapeHtml(emptyMessage || "表示対象データがありません。")}</td></tr>`;
+    return;
+  }
+  targetBody.innerHTML = records.map((record) => buildRecordTableRowHtml(record)).join("");
+}
 
-  recordTableBody.innerHTML = recordsForCurrentKuwaku
-    .map((record) => {
-      return `
+function buildRecordTableRowHtml(record) {
+  return `
       <tr>
         <td>${escapeHtml(getRecordKuwaku(record))}</td>
         <td>${escapeHtml(getRecordTeamValue(record))}</td>
@@ -3897,18 +3938,44 @@ function renderRecordTable() {
         </td>
       </tr>
       `;
-    })
-    .join("");
 }
 
-function getInputRecordsForCurrentKuwaku() {
-  const currentKuwaku = value(state.site?.kuwaku);
-  const sortedRecords = [...state.records].sort(compareRecordsByKuwakuThenSpecimen);
-  if (!currentKuwaku || isDefaultKuwaku(currentKuwaku)) {
-    return sortedRecords;
+function handleRecordTableActionClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) {
+    return;
   }
-  const currentValue = kuwakuValueForSelect(currentKuwaku);
-  return sortedRecords.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === currentValue);
+  const recordId = button.dataset.id;
+  const action = button.dataset.action;
+  const record = findRecord(recordId);
+  if (!record) {
+    showToast("対象データが見つかりません");
+    return;
+  }
+
+  if (action === "edit") {
+    const rowKuwaku = value(button.dataset.kuwaku);
+    openRecordForEdit(record.id, rowKuwaku);
+    return;
+  }
+  if (action === "copy-to-input") {
+    const rowKuwaku = value(button.dataset.kuwaku);
+    copySavedRecordToInput(recordId, rowKuwaku);
+    return;
+  }
+  if (action === "delete") {
+    const answer = window.confirm(`標本番号 ${record.specimenNo} を削除しますか？`);
+    if (!answer) {
+      return;
+    }
+    state.records = state.records.filter((item) => item.id !== recordId);
+    if (editingRecordId === recordId) {
+      resetRecordForm({ showMessage: false });
+    }
+    persist("記録を削除しました");
+    renderRecordTable();
+    renderOutputs();
+  }
 }
 
 function renderOutputs() {
@@ -5368,6 +5435,164 @@ function renderPlanOutput() {
     </div>
   `;
   attachPlanMapTooltips();
+}
+
+function buildCurrentRecordDraftForPositionPreview() {
+  if (!recordForm) {
+    return null;
+  }
+  const formData = new FormData(recordForm);
+  const isEditTab = getActiveTabId() === "edit-tab";
+  const kuwaku = isEditTab
+    ? buildKuwaku(
+        normalizeKuwakuHeadA(editKuwakuHeadAInput?.value),
+        normalizeKuwakuHeadB(editKuwakuHeadBInput?.value),
+        normalizeKuwakuBlock(editKuwakuBlockInput?.value),
+        normalizeKuwakuNo(editKuwakuNoInput?.value)
+      )
+    : buildKuwaku(
+        normalizeKuwakuHeadA(siteForm?.elements?.kuwakuHeadA?.value),
+        normalizeKuwakuHeadB(siteForm?.elements?.kuwakuHeadB?.value),
+        normalizeKuwakuBlock(siteForm?.elements?.kuwakuBlock?.value),
+        normalizeKuwakuNo(siteForm?.elements?.kuwakuNo?.value)
+      );
+  const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
+  const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
+  const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+  const rawLargeShapeType = value(formData.get("largeShapeType"));
+  const largeShapeType =
+    planSizeMode === "大きなもの" ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType) : "";
+  const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
+  const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
+  const isImageShape = isLargeShapeImageType(largeShapeType);
+  const isCustomImageShape = isImageShape && isCustomLargeShapeType(largeShapeType);
+  return {
+    id: value(editingRecordId || recordIdInput?.value),
+    kuwaku,
+    specimenPrefix,
+    specimenSerial,
+    specimenNo: buildSpecimenNo(specimenPrefix, specimenSerial),
+    nameMemo: value(formData.get("nameMemo")),
+    unit: compactNoSpaceValue(formData.get("unit")),
+    detail: compactNoSpaceValue(formData.get("detail")),
+    detailSub: value(formData.get("detailSub")),
+    nsDir: normalizeNsDir(value(formData.get("nsDir"))),
+    nsCm: value(formData.get("nsCm")),
+    ewDir: normalizeEwDir(value(formData.get("ewDir"))),
+    ewCm: value(formData.get("ewCm")),
+    planSizeMode,
+    largeShapeType,
+    largeAxisDirection: normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
+    planeStrikeDirection: normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection"))),
+    planeDipDeg: normalizePlaneDipDeg(value(formData.get("planeDipDeg"))),
+    planeDipDir8: normalizeCompass8Direction(value(formData.get("planeDipDir8"))),
+    lineLengthCm: value(formData.get("lineLengthCm")),
+    rectSide1Cm: value(formData.get("rectSide1Cm")),
+    rectSide2Cm: value(formData.get("rectSide2Cm")),
+    ellipseLongRadiusCm: value(formData.get("ellipseLongRadiusCm")),
+    ellipseShortRadiusCm: value(formData.get("ellipseShortRadiusCm")),
+    imgP1NsDir: imageCornerFields.imgP1NsDir,
+    imgP1NsCm: imageCornerFields.imgP1NsCm,
+    imgP1EwDir: imageCornerFields.imgP1EwDir,
+    imgP1EwCm: imageCornerFields.imgP1EwCm,
+    imgP2NsDir: imageCornerFields.imgP2NsDir,
+    imgP2NsCm: imageCornerFields.imgP2NsCm,
+    imgP2EwDir: imageCornerFields.imgP2EwDir,
+    imgP2EwCm: imageCornerFields.imgP2EwCm,
+    imgP3NsDir: imageCornerFields.imgP3NsDir,
+    imgP3NsCm: imageCornerFields.imgP3NsCm,
+    imgP3EwDir: imageCornerFields.imgP3EwDir,
+    imgP3EwCm: imageCornerFields.imgP3EwCm,
+    imgP4NsDir: imageCornerFields.imgP4NsDir,
+    imgP4NsCm: imageCornerFields.imgP4NsCm,
+    imgP4EwDir: imageCornerFields.imgP4EwDir,
+    imgP4EwCm: imageCornerFields.imgP4EwCm,
+    imgRotateDeg: isImageShape ? imageTransformFields.imgRotateDeg : "",
+    imgFrameWidthCm: isImageShape ? imageTransformFields.imgFrameWidthCm : "",
+    imgFrameHeightCm: isImageShape ? imageTransformFields.imgFrameHeightCm : "",
+    imgSkewXDeg: isImageShape ? imageTransformFields.imgSkewXDeg : "",
+    imgSkewYDeg: isImageShape ? imageTransformFields.imgSkewYDeg : "",
+    imgFlipH: isImageShape ? imageTransformFields.imgFlipH : "0",
+    imgFlipV: isImageShape ? imageTransformFields.imgFlipV : "0",
+    imgUseOriginalColor: isImageShape ? imageTransformFields.imgUseOriginalColor : "0",
+    customLargeImageDataUrl: isCustomImageShape ? normalizeCustomLargeImageDataUrl(value(formData.get("customLargeImageDataUrl"))) : "",
+  };
+}
+
+function renderPositionPreviewModalContent() {
+  if (!positionPreviewMeta || !positionPreviewMap) {
+    return false;
+  }
+  const draftRecord = buildCurrentRecordDraftForPositionPreview();
+  if (!draftRecord) {
+    return false;
+  }
+  const currentDrawableRaw = buildPlanDrawable(draftRecord);
+  if (!currentDrawableRaw) {
+    showToast("平面位置の入力値を確認してください");
+    return false;
+  }
+  const kuwakuValue = kuwakuValueForSelect(getRecordKuwaku(draftRecord));
+  const savedDrawables = state.records
+    .filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue && value(record.id) !== value(draftRecord.id))
+    .map((record) => buildPlanDrawable(record))
+    .filter(Boolean);
+  const currentDrawable = {
+    ...currentDrawableRaw,
+    color: "#dc2626",
+    label: value(draftRecord.specimenNo) || "入力中",
+  };
+  const drawables = [...savedDrawables, currentDrawable];
+  const verticalGrid = [100, 200, 300]
+    .map((x) => `<line class="plan-grid-line" x1="${x}" y1="0" x2="${x}" y2="${PLAN_SIZE_CM}" />`)
+    .join("");
+  const horizontalGrid = [100, 200, 300]
+    .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
+    .join("");
+  const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
+  const cornerLabels = buildPlanCornerLabels(kuwakuValue);
+  const kuwakuLabel = kuwakuValue === EMPTY_KUWAKU_VALUE ? "（未設定）" : kuwakuLabelForSelect(kuwakuValue);
+  positionPreviewMeta.innerHTML = `
+    <span>区画（グリッド）: ${escapeHtml(kuwakuLabel)}</span>
+    <span>表示件数: ${drawables.length}件</span>
+  `;
+  positionPreviewMap.innerHTML = `
+    <div class="plan-map-shell position-preview-shell">
+      <div class="plan-axis north">北</div>
+      <div class="plan-axis east">東</div>
+      <div class="plan-axis south">南</div>
+      <div class="plan-axis west">西</div>
+      <div class="plan-grid-corner top-left">${escapeHtml(cornerLabels.topLeft)}</div>
+      <div class="plan-grid-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
+      <div class="plan-grid-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
+      <div class="plan-grid-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
+      <svg class="plan-map-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="平面位置確認" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <rect class="plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
+        ${verticalGrid}
+        ${horizontalGrid}
+        ${pointsSvg}
+      </svg>
+    </div>
+  `;
+  return true;
+}
+
+function openPositionPreviewModal() {
+  if (!positionPreviewModal) {
+    return;
+  }
+  const rendered = renderPositionPreviewModalContent();
+  if (!rendered) {
+    return;
+  }
+  positionPreviewModal.classList.remove("hidden");
+}
+
+function closePositionPreviewModal() {
+  if (!positionPreviewModal) {
+    return;
+  }
+  positionPreviewModal.classList.add("hidden");
 }
 
 function getFilteredPlanRecords() {
