@@ -50,6 +50,27 @@ const OUTPUT_CELL_EDIT_LABELS = {
   position: "平面位置",
   notes: "備考",
 };
+const OUTPUT_LIST_COLUMN_DEFS = [
+  { key: "kuwaku", label: "区画" },
+  { key: "team", label: "発掘班" },
+  { key: "date", label: "日付" },
+  { key: "dataStatus", label: "データ" },
+  { key: "specimenNo", label: "標本番号" },
+  { key: "category", label: "分類" },
+  { key: "nameMemo", label: "名称" },
+  { key: "importantFlag", label: "重要品指定" },
+  { key: "unit", label: "ユニット" },
+  { key: "detail", label: "サブユニット" },
+  { key: "discoverer", label: "発見者" },
+  { key: "identifier", label: "判定者" },
+  { key: "levelRead", label: "レベル読値" },
+  { key: "altitudeM", label: "標高(m)" },
+  { key: "occurrenceSection", label: "産出状況断面" },
+  { key: "occurrenceSketch", label: "産状スケッチ" },
+  { key: "position", label: "平面位置" },
+  { key: "notes", label: "備考" },
+  { key: "actions", label: "操作" },
+];
 const CUSTOM_LARGE_SHAPE_TYPE = "カスタム画像";
 const REQUIRED_FIELD_LABELS = {
   kuwakuHeadA: "区画（グリッド）1番目",
@@ -247,6 +268,14 @@ const createInitialState = () => ({
   records: [],
 });
 
+function createInitialOutputColumnVisibilityMap() {
+  const visibilityMap = {};
+  OUTPUT_LIST_COLUMN_DEFS.forEach((column) => {
+    visibilityMap[column.key] = true;
+  });
+  return visibilityMap;
+}
+
 let stateNeedsRewriteAfterLoad = false;
 let state = loadState();
 let editingRecordId = null;
@@ -265,6 +294,7 @@ let outputFilterMemory = {
   date: "",
   searchText: "",
 };
+let outputListColumnVisibility = createInitialOutputColumnVisibilityMap();
 let activeOutputCellEdit = null;
 let selectedPlanKuwaku = "";
 let selectedPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
@@ -360,6 +390,7 @@ const outputStatusSelect = document.getElementById("output-status-select");
 const outputDateSelect = document.getElementById("output-date-select");
 const outputSearchInput = document.getElementById("output-search-input");
 const outputFilterSummary = document.getElementById("output-filter-summary");
+const outputColumnToggleRow = document.getElementById("output-column-toggle-row");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
 const planCategorySelect = document.getElementById("plan-category-select");
 const planUnitSelect = document.getElementById("plan-unit-select");
@@ -1290,6 +1321,19 @@ function bindEvents() {
       selectedCardRecordId = "";
       rememberOutputFilters();
       renderOutputs();
+    });
+  }
+  if (outputColumnToggleRow) {
+    outputColumnToggleRow.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const button = target.closest("button[data-col-key]");
+      if (!button || !outputColumnToggleRow.contains(button)) {
+        return;
+      }
+      toggleOutputListColumnVisibility(value(button.dataset.colKey));
     });
   }
 
@@ -5951,7 +5995,62 @@ function buildOutputCellEditAnalysisOptionsHtml(selectedTypeRaw) {
   return options.join("");
 }
 
+function isOutputListColumnVisible(columnKeyRaw) {
+  const columnKey = value(columnKeyRaw);
+  if (!columnKey) {
+    return true;
+  }
+  return outputListColumnVisibility[columnKey] !== false;
+}
+
+function getOutputListVisibleColumnCount() {
+  const visibleCount = OUTPUT_LIST_COLUMN_DEFS.reduce((count, column) => {
+    return count + (isOutputListColumnVisible(column.key) ? 1 : 0);
+  }, 0);
+  return visibleCount > 0 ? visibleCount : 1;
+}
+
+function renderOutputColumnToggleRow() {
+  if (!outputColumnToggleRow) {
+    return;
+  }
+  outputColumnToggleRow.innerHTML = OUTPUT_LIST_COLUMN_DEFS.map((column) => {
+    const visible = isOutputListColumnVisible(column.key);
+    return `<button type="button" class="output-column-toggle-btn ${visible ? "active" : ""}" data-col-key="${escapeHtml(
+      column.key
+    )}" aria-pressed="${visible ? "true" : "false"}">${escapeHtml(column.label)}</button>`;
+  }).join("");
+}
+
+function applyOutputListColumnVisibility() {
+  if (!outputListTable) {
+    return;
+  }
+  const allCells = outputListTable.querySelectorAll("[data-col-key]");
+  allCells.forEach((cell) => {
+    const columnKey = value(cell.dataset.colKey);
+    if (!columnKey) {
+      return;
+    }
+    cell.hidden = !isOutputListColumnVisible(columnKey);
+  });
+}
+
+function toggleOutputListColumnVisibility(columnKeyRaw) {
+  const columnKey = value(columnKeyRaw);
+  if (!columnKey || !Object.prototype.hasOwnProperty.call(outputListColumnVisibility, columnKey)) {
+    return;
+  }
+  if (isOutputListColumnVisible(columnKey) && getOutputListVisibleColumnCount() <= 1) {
+    showToast("少なくとも1列は表示してください");
+    return;
+  }
+  outputListColumnVisibility[columnKey] = !isOutputListColumnVisible(columnKey);
+  renderListOutput();
+}
+
 function renderListOutput() {
+  renderOutputColumnToggleRow();
   updateOutputListSortHeader();
   if (!state.records.length) {
     syncOutputKuwakuSelect([]);
@@ -5960,13 +6059,15 @@ function renderListOutput() {
     syncOutputDateSelect([]);
     syncOutputSearchInput();
     updateOutputFilterSummary(0, 0);
-    outputListBody.innerHTML = "<tr><td colspan=\"19\">出力対象データがありません。</td></tr>";
+    outputListBody.innerHTML = `<tr><td colspan="${getOutputListVisibleColumnCount()}">出力対象データがありません。</td></tr>`;
+    applyOutputListColumnVisibility();
     return;
   }
 
   const filteredRecords = getFilteredOutputRecords();
   if (!filteredRecords.length) {
-    outputListBody.innerHTML = "<tr><td colspan=\"19\">条件に一致するデータがありません。</td></tr>";
+    outputListBody.innerHTML = `<tr><td colspan="${getOutputListVisibleColumnCount()}">条件に一致するデータがありません。</td></tr>`;
+    applyOutputListColumnVisibility();
     return;
   }
 
@@ -6021,37 +6122,37 @@ function renderListOutput() {
       ]);
       return `
       <tr class="${selectedClass}" data-record-id="${escapeHtml(value(record.id))}">
-        <td data-cell-edit-key="kuwaku" class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
+        <td data-col-key="kuwaku" data-cell-edit-key="kuwaku" class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
           kuwakuText
         )}</td>
-        <td data-cell-edit-key="team" class="${listCellClass("", teamMissing)}" ${missingTitle}>${escapeHtml(getRecordTeamValue(record))}</td>
-        <td data-cell-edit-key="date">${escapeHtml(getRecordDate(record))}</td>
-        <td class="${listCellClass(dataComplete ? "data-status-complete" : "data-status-incomplete", !dataComplete)}" ${missingTitle}>${
+        <td data-col-key="team" data-cell-edit-key="team" class="${listCellClass("", teamMissing)}" ${missingTitle}>${escapeHtml(getRecordTeamValue(record))}</td>
+        <td data-col-key="date" data-cell-edit-key="date">${escapeHtml(getRecordDate(record))}</td>
+        <td data-col-key="dataStatus" class="${listCellClass(dataComplete ? "data-status-complete" : "data-status-incomplete", !dataComplete)}" ${missingTitle}>${
           dataComplete ? "○" : "未記入"
         }</td>
-        <td data-cell-edit-key="specimenNo" class="${listCellClass("", specimenMissing)}" ${missingTitle}>${escapeHtml(record.specimenNo)}</td>
-        <td data-cell-edit-key="category" class="${listCellClass("category-color-cell", categoryMissing)}" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};" ${missingTitle}>${escapeHtml(
+        <td data-col-key="specimenNo" data-cell-edit-key="specimenNo" class="${listCellClass("", specimenMissing)}" ${missingTitle}>${escapeHtml(record.specimenNo)}</td>
+        <td data-col-key="category" data-cell-edit-key="category" class="${listCellClass("category-color-cell", categoryMissing)}" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};" ${missingTitle}>${escapeHtml(
           formatCategoryForRecord(record)
         )}</td>
-        <td data-cell-edit-key="nameMemo" class="${listCellClass("", nameMissing)}" ${missingTitle}>${escapeHtml(record.nameMemo || "")}</td>
-        <td data-cell-edit-key="importantFlag" class="${listCellClass(record.importantFlag === "有" ? "important-cell-important" : "", importantMissing)}" ${missingTitle}>${escapeHtml(
+        <td data-col-key="nameMemo" data-cell-edit-key="nameMemo" class="${listCellClass("", nameMissing)}" ${missingTitle}>${escapeHtml(record.nameMemo || "")}</td>
+        <td data-col-key="importantFlag" data-cell-edit-key="importantFlag" class="${listCellClass(record.importantFlag === "有" ? "important-cell-important" : "", importantMissing)}" ${missingTitle}>${escapeHtml(
           record.importantFlag || ""
         )}</td>
-        <td data-cell-edit-key="unit" class="${listCellClass("unit-color-cell", unitMissing)}" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};" ${missingTitle}>${escapeHtml(
+        <td data-col-key="unit" data-cell-edit-key="unit" class="${listCellClass("unit-color-cell", unitMissing)}" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};" ${missingTitle}>${escapeHtml(
           record.unit || ""
         )}</td>
-        <td data-cell-edit-key="detail">${escapeHtml(formatDetailForRecord(record))}</td>
-        <td data-cell-edit-key="discoverer" class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
-        <td data-cell-edit-key="identifier" class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
-        <td data-cell-edit-key="levelRead" class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
-        <td data-cell-edit-key="altitudeM" class="${listCellClass("", levelHeightMissing || levelReadMissing)}" ${missingTitle}>${escapeHtml(formatRecordAltitudeM(record))}</td>
-        <td data-cell-edit-key="occurrenceSection" class="${listCellClass("", sectionMissing || sectionChecklistMissing)}" ${missingTitle}>${escapeHtml(
+        <td data-col-key="detail" data-cell-edit-key="detail">${escapeHtml(formatDetailForRecord(record))}</td>
+        <td data-col-key="discoverer" data-cell-edit-key="discoverer" class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
+        <td data-col-key="identifier" data-cell-edit-key="identifier" class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
+        <td data-col-key="levelRead" data-cell-edit-key="levelRead" class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
+        <td data-col-key="altitudeM" data-cell-edit-key="altitudeM" class="${listCellClass("", levelHeightMissing || levelReadMissing)}" ${missingTitle}>${escapeHtml(formatRecordAltitudeM(record))}</td>
+        <td data-col-key="occurrenceSection" data-cell-edit-key="occurrenceSection" class="${listCellClass("", sectionMissing || sectionChecklistMissing)}" ${missingTitle}>${escapeHtml(
           record.occurrenceSection || ""
         )}</td>
-        <td data-cell-edit-key="occurrenceSketch" class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
-        <td data-cell-edit-key="position" class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
-        <td data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
-        <td>
+        <td data-col-key="occurrenceSketch" data-cell-edit-key="occurrenceSketch" class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
+        <td data-col-key="position" data-cell-edit-key="position" class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
+        <td data-col-key="notes" data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
+        <td data-col-key="actions">
           <div class="row-actions">
             <button type="button" data-action="card" data-id="${record.id}">${cardButtonLabel}</button>
             <button type="button" data-action="copy-to-input" data-id="${record.id}" data-kuwaku="${escapeHtml(
@@ -6067,6 +6168,7 @@ function renderListOutput() {
       `;
     })
     .join("");
+  applyOutputListColumnVisibility();
 }
 
 function listCellClass(baseClass, isMissing) {

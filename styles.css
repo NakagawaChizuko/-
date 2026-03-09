@@ -552,6 +552,39 @@ main {
   margin: 0 0 8px;
 }
 
+.output-column-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.output-column-toggle-btn {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.output-column-toggle-btn.active {
+  border-color: #0f766e;
+  background: #dff6f3;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.output-column-toggle-btn:hover {
+  opacity: 1;
+  background: #f1f5f9;
+}
+
+.output-column-toggle-btn.active:hover {
+  background: #c9efe9;
+}
+
 .plan-map-legend {
   margin: 8px 0 10px;
   display: flex;

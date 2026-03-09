@@ -580,29 +580,30 @@
             </label>
           </div>
           <p id="output-filter-summary" class="muted output-filter-summary">表示: 0件 / 全体: 0件</p>
+          <div id="output-column-toggle-row" class="output-column-toggle-row" aria-label="リスト列表示切替"></div>
           <div class="table-wrap">
             <table id="output-list-table">
               <thead>
                 <tr>
-                  <th data-sort-key="kuwaku" tabindex="0">区画</th>
-                  <th data-sort-key="team" tabindex="0">発掘班</th>
-                  <th data-sort-key="date" tabindex="0">日付</th>
-                  <th data-sort-key="dataStatus" tabindex="0">データ</th>
-                  <th data-sort-key="specimenNo" tabindex="0">標本番号</th>
-                  <th data-sort-key="category" tabindex="0">分類</th>
-                  <th data-sort-key="nameMemo" tabindex="0">名称</th>
-                  <th data-sort-key="importantFlag" tabindex="0">重要品指定</th>
-                  <th data-sort-key="unit" tabindex="0">ユニット</th>
-                  <th data-sort-key="detail" tabindex="0">サブユニット</th>
-                  <th data-sort-key="discoverer" tabindex="0">発見者</th>
-                  <th data-sort-key="identifier" tabindex="0">判定者</th>
-                  <th data-sort-key="levelRead" tabindex="0">レベル読値(上面/下底)</th>
-                  <th data-sort-key="altitudeM" tabindex="0">標高(m)</th>
-                  <th data-sort-key="occurrenceSection" tabindex="0">産出状況断面</th>
-                  <th data-sort-key="occurrenceSketch" tabindex="0">産状スケッチ</th>
-                  <th data-sort-key="position" tabindex="0">平面位置</th>
-                  <th data-sort-key="notes" tabindex="0">備考（観察事項など）</th>
-                  <th>操作</th>
+                  <th data-col-key="kuwaku" data-sort-key="kuwaku" tabindex="0">区画</th>
+                  <th data-col-key="team" data-sort-key="team" tabindex="0">発掘班</th>
+                  <th data-col-key="date" data-sort-key="date" tabindex="0">日付</th>
+                  <th data-col-key="dataStatus" data-sort-key="dataStatus" tabindex="0">データ</th>
+                  <th data-col-key="specimenNo" data-sort-key="specimenNo" tabindex="0">標本番号</th>
+                  <th data-col-key="category" data-sort-key="category" tabindex="0">分類</th>
+                  <th data-col-key="nameMemo" data-sort-key="nameMemo" tabindex="0">名称</th>
+                  <th data-col-key="importantFlag" data-sort-key="importantFlag" tabindex="0">重要品指定</th>
+                  <th data-col-key="unit" data-sort-key="unit" tabindex="0">ユニット</th>
+                  <th data-col-key="detail" data-sort-key="detail" tabindex="0">サブユニット</th>
+                  <th data-col-key="discoverer" data-sort-key="discoverer" tabindex="0">発見者</th>
+                  <th data-col-key="identifier" data-sort-key="identifier" tabindex="0">判定者</th>
+                  <th data-col-key="levelRead" data-sort-key="levelRead" tabindex="0">レベル読値(上面/下底)</th>
+                  <th data-col-key="altitudeM" data-sort-key="altitudeM" tabindex="0">標高(m)</th>
+                  <th data-col-key="occurrenceSection" data-sort-key="occurrenceSection" tabindex="0">産出状況断面</th>
+                  <th data-col-key="occurrenceSketch" data-sort-key="occurrenceSketch" tabindex="0">産状スケッチ</th>
+                  <th data-col-key="position" data-sort-key="position" tabindex="0">平面位置</th>
+                  <th data-col-key="notes" data-sort-key="notes" tabindex="0">備考（観察事項など）</th>
+                  <th data-col-key="actions">操作</th>
                 </tr>
               </thead>
               <tbody id="output-list-body"></tbody>
