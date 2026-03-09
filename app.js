@@ -31,6 +31,25 @@ const ANALYSIS_TYPE_MAP = {
   H: "その他",
   MG: "はぎとり資料",
 };
+const OUTPUT_CELL_EDIT_LABELS = {
+  kuwaku: "区画",
+  team: "発掘班",
+  date: "日付",
+  specimenNo: "標本番号",
+  category: "分類",
+  nameMemo: "名称",
+  importantFlag: "重要品指定",
+  unit: "ユニット",
+  detail: "サブユニット",
+  discoverer: "発見者",
+  identifier: "判定者",
+  levelRead: "レベル読値",
+  altitudeM: "標高（m）",
+  occurrenceSection: "産出状況断面",
+  occurrenceSketch: "産状スケッチ",
+  position: "平面位置",
+  notes: "備考",
+};
 const CUSTOM_LARGE_SHAPE_TYPE = "カスタム画像";
 const REQUIRED_FIELD_LABELS = {
   kuwakuHeadA: "区画（グリッド）1番目",
@@ -237,13 +256,16 @@ let selectedCardRecordId = "";
 let selectedOutputKuwaku = ALL_GRIDS_VALUE;
 let selectedOutputCategory = EXPORT_CATEGORY_ALL_VALUE;
 let selectedOutputStatus = "all";
+let selectedOutputDate = "";
 let outputSearchText = "";
 let outputFilterMemory = {
   kuwaku: ALL_GRIDS_VALUE,
   category: EXPORT_CATEGORY_ALL_VALUE,
   status: "all",
+  date: "",
   searchText: "",
 };
+let activeOutputCellEdit = null;
 let selectedPlanKuwaku = "";
 let selectedPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
 let selectedPlanUnit = "";
@@ -322,9 +344,11 @@ const editRecorderInput = document.getElementById("edit-recorder");
 const recordIdInput = document.getElementById("record-id-input");
 const recordSubmitBtn = document.getElementById("record-submit-btn");
 const recordCopyToInputBtn = document.getElementById("record-copy-to-input-btn");
+const recordCopyToInputTopBtn = document.getElementById("record-copy-to-input-top-btn");
 const recordPrevBtn = document.getElementById("record-prev-btn");
 const recordNextBtn = document.getElementById("record-next-btn");
 const recordResetBtn = document.getElementById("record-reset-btn");
+const recordNewBtn = document.getElementById("record-new-btn");
 const recordTableBody = document.getElementById("record-table-body");
 const editRecordTableBody = document.getElementById("edit-record-table-body");
 const outputListBody = document.getElementById("output-list-body");
@@ -333,6 +357,7 @@ const cardOutputList = document.getElementById("card-output-list");
 const outputKuwakuSelect = document.getElementById("output-kuwaku-select");
 const outputCategorySelect = document.getElementById("output-category-select");
 const outputStatusSelect = document.getElementById("output-status-select");
+const outputDateSelect = document.getElementById("output-date-select");
 const outputSearchInput = document.getElementById("output-search-input");
 const outputFilterSummary = document.getElementById("output-filter-summary");
 const planKuwakuSelect = document.getElementById("plan-kuwaku-select");
@@ -468,6 +493,13 @@ const positionPreviewModal = document.getElementById("position-preview-modal");
 const positionPreviewCloseBtn = document.getElementById("position-preview-close-btn");
 const positionPreviewMeta = document.getElementById("position-preview-meta");
 const positionPreviewMap = document.getElementById("position-preview-map");
+const cellEditModal = document.getElementById("cell-edit-modal");
+const cellEditForm = document.getElementById("cell-edit-form");
+const cellEditTitle = document.getElementById("cell-edit-title");
+const cellEditMeta = document.getElementById("cell-edit-meta");
+const cellEditFields = document.getElementById("cell-edit-fields");
+const cellEditCloseBtn = document.getElementById("cell-edit-close-btn");
+const cellEditCancelBtn = document.getElementById("cell-edit-cancel-btn");
 let hoverEditMenuEl = null;
 let hoverEditMenuRecordId = "";
 let hoverEditMenuKuwaku = "";
@@ -569,11 +601,35 @@ function bindEvents() {
       }
     });
   }
+  if (cellEditCloseBtn) {
+    cellEditCloseBtn.addEventListener("click", () => {
+      closeOutputCellEditModal();
+    });
+  }
+  if (cellEditCancelBtn) {
+    cellEditCancelBtn.addEventListener("click", () => {
+      closeOutputCellEditModal();
+    });
+  }
+  if (cellEditModal) {
+    cellEditModal.addEventListener("click", (event) => {
+      if (event.target === cellEditModal) {
+        closeOutputCellEditModal();
+      }
+    });
+  }
+  if (cellEditForm) {
+    cellEditForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveOutputCellEditFromModal();
+    });
+  }
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") {
       return;
     }
     hideHoverEditMenu();
+    closeOutputCellEditModal();
     if (positionPreviewModal && !positionPreviewModal.classList.contains("hidden")) {
       closePositionPreviewModal();
     }
@@ -595,6 +651,25 @@ function bindEvents() {
     },
     true
   );
+  if (viewerCanvasWrap) {
+    viewerCanvasWrap.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const fallbackButton = target.closest("button[data-action='viewer-open-plan']");
+      if (!fallbackButton || !viewerCanvasWrap.contains(fallbackButton)) {
+        return;
+      }
+      event.preventDefault();
+      selectedPlanKuwaku = selectedViewerKuwaku;
+      selectedPlanCategory = selectedViewerCategory;
+      selectedPlanUnit = selectedViewerUnit;
+      selectedPlanDetail = selectedViewerDetail;
+      selectedPlanDetailSub = selectedViewerDetailSub;
+      setActiveTab("plan-tab");
+    });
+  }
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
@@ -1040,6 +1115,15 @@ function bindEvents() {
   recordResetBtn.addEventListener("click", () => {
     resetRecordForm({ showMessage: true });
   });
+  if (recordNewBtn) {
+    recordNewBtn.addEventListener("click", () => {
+      const shouldClear = window.confirm("詳細データは全て消去されます。よろしいですか？");
+      if (!shouldClear) {
+        return;
+      }
+      resetRecordForm({ showMessage: true });
+    });
+  }
   if (recordPrevBtn) {
     recordPrevBtn.addEventListener("click", () => {
       moveToPreviousSpecimenWithoutSave();
@@ -1052,6 +1136,11 @@ function bindEvents() {
   }
   if (recordCopyToInputBtn) {
     recordCopyToInputBtn.addEventListener("click", () => {
+      copyCurrentEditToInput();
+    });
+  }
+  if (recordCopyToInputTopBtn) {
+    recordCopyToInputTopBtn.addEventListener("click", () => {
       copyCurrentEditToInput();
     });
   }
@@ -1110,6 +1199,24 @@ function bindEvents() {
       return;
     }
   });
+  outputListBody.addEventListener("dblclick", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    if (target.closest("button")) {
+      return;
+    }
+    const cell = target.closest("td[data-cell-edit-key]");
+    const row = target.closest("tr[data-record-id]");
+    const editKey = value(cell?.dataset?.cellEditKey);
+    const recordId = value(row?.dataset?.recordId);
+    if (!cell || !row || !editKey || !recordId || !outputListBody.contains(row)) {
+      return;
+    }
+    event.preventDefault();
+    openOutputCellEditModal(recordId, editKey);
+  });
 
   if (outputListTable) {
     const handleSortHeader = (target) => {
@@ -1164,6 +1271,14 @@ function bindEvents() {
   if (outputStatusSelect) {
     outputStatusSelect.addEventListener("change", () => {
       selectedOutputStatus = value(outputStatusSelect.value) || "all";
+      selectedCardRecordId = "";
+      rememberOutputFilters();
+      renderOutputs();
+    });
+  }
+  if (outputDateSelect) {
+    outputDateSelect.addEventListener("change", () => {
+      selectedOutputDate = value(outputDateSelect.value);
       selectedCardRecordId = "";
       rememberOutputFilters();
       renderOutputs();
@@ -1724,6 +1839,7 @@ async function addPhotosFromFiles(fileList) {
 function setActiveTab(tabId) {
   const previousTabId = getActiveTabId();
   hideHoverEditMenu();
+  closeOutputCellEditModal();
   if (previousTabId === "output-tab") {
     rememberOutputFilters();
   }
@@ -1771,6 +1887,9 @@ function syncRecordFormPlacement(tabId) {
     if (recordCopyToInputBtn) {
       recordCopyToInputBtn.classList.remove("hidden");
     }
+    if (recordCopyToInputTopBtn) {
+      recordCopyToInputTopBtn.classList.remove("hidden");
+    }
     return;
   }
 
@@ -1778,7 +1897,10 @@ function syncRecordFormPlacement(tabId) {
     recordFormHost.appendChild(recordForm);
   }
   if (recordCopyToInputBtn) {
-    recordCopyToInputBtn.classList.add("hidden");
+    recordCopyToInputBtn.classList.remove("hidden");
+  }
+  if (recordCopyToInputTopBtn) {
+    recordCopyToInputTopBtn.classList.add("hidden");
   }
 
   if (tabId === "input-tab") {
@@ -1802,6 +1924,7 @@ function rememberOutputFilters() {
     kuwaku: value(selectedOutputKuwaku) || ALL_GRIDS_VALUE,
     category: value(selectedOutputCategory) || EXPORT_CATEGORY_ALL_VALUE,
     status: ["all", "complete", "incomplete"].includes(value(selectedOutputStatus)) ? value(selectedOutputStatus) : "all",
+    date: value(selectedOutputDate),
     searchText: value(outputSearchText),
   };
 }
@@ -1812,6 +1935,7 @@ function restoreOutputFilters() {
   selectedOutputStatus = ["all", "complete", "incomplete"].includes(value(outputFilterMemory.status))
     ? value(outputFilterMemory.status)
     : "all";
+  selectedOutputDate = value(outputFilterMemory.date);
   outputSearchText = value(outputFilterMemory.searchText);
 }
 
@@ -3860,6 +3984,18 @@ function openRecordForEdit(recordId, preferredKuwaku = "") {
   updateEditMissingRequiredHighlights();
 }
 
+function scrollToDetailInputTop() {
+  if (!recordForm) {
+    return;
+  }
+  const anchor = recordForm.querySelector(".detail-input-title-row") || recordForm;
+  window.requestAnimationFrame(() => {
+    if (anchor instanceof HTMLElement) {
+      anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+}
+
 function buildCurrentEditDraftRecord() {
   if (!recordForm) {
     return null;
@@ -3980,13 +4116,29 @@ function buildCurrentEditDraftRecord() {
 }
 
 function copyCurrentEditToInput() {
-  if (getActiveTabId() !== "edit-tab") {
+  const activeTabId = getActiveTabId();
+  if (activeTabId !== "edit-tab" && activeTabId !== "input-tab") {
     return;
   }
   const draft = buildCurrentEditDraftRecord();
   if (!draft) {
-    showToast("編集内容のコピーに失敗しました");
+    showToast("入力内容のコピーに失敗しました");
     return;
+  }
+  if (activeTabId === "input-tab" && siteForm) {
+    const siteFormData = new FormData(siteForm);
+    const siteKuwakuHeadA = normalizeKuwakuHeadA(siteFormData.get("kuwakuHeadA"));
+    const siteKuwakuHeadB = normalizeKuwakuHeadB(siteFormData.get("kuwakuHeadB"));
+    const siteKuwakuBlock = normalizeKuwakuBlock(siteFormData.get("kuwakuBlock"));
+    const siteKuwakuNo = normalizeKuwakuNo(siteFormData.get("kuwakuNo"));
+    const siteTeamState = normalizeTeamState(value(siteFormData.get("team")), value(siteFormData.get("teamOther")));
+    draft.kuwaku = buildKuwaku(siteKuwakuHeadA, siteKuwakuHeadB, siteKuwakuBlock, siteKuwakuNo);
+    draft.levelHeight = value(siteFormData.get("levelHeight"));
+    draft.date = value(siteFormData.get("date"));
+    draft.team = siteTeamState.team;
+    draft.teamOther = siteTeamState.teamOther;
+    draft.teamLead = value(siteFormData.get("teamLead"));
+    draft.recorder = value(siteFormData.get("recorder"));
   }
 
   const kuwakuParts = parseKuwaku(draft.kuwaku);
@@ -4442,6 +4594,8 @@ function handleRecordTableActionClick(event) {
   if (!button) {
     return;
   }
+  const sourceTableBody = event.currentTarget;
+  const shouldScrollToDetailTop = sourceTableBody === recordTableBody || sourceTableBody === editRecordTableBody;
   const recordId = button.dataset.id;
   const action = button.dataset.action;
   const record = findRecord(recordId);
@@ -4453,6 +4607,9 @@ function handleRecordTableActionClick(event) {
   if (action === "edit") {
     const rowKuwaku = value(button.dataset.kuwaku);
     openRecordForEdit(record.id, rowKuwaku);
+    if (shouldScrollToDetailTop) {
+      scrollToDetailInputTop();
+    }
     return;
   }
   if (action === "copy-to-input") {
@@ -5318,21 +5475,498 @@ function normalizeDateForExportRange(dateRaw) {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+function openOutputCellEditModal(recordId, editKey) {
+  if (!cellEditModal || !cellEditTitle || !cellEditMeta || !cellEditFields) {
+    return;
+  }
+  const record = findRecord(recordId);
+  if (!record) {
+    showToast("対象データが見つかりません");
+    return;
+  }
+  const label = OUTPUT_CELL_EDIT_LABELS[editKey];
+  if (!label) {
+    return;
+  }
+  const fieldsHtml = buildOutputCellEditFieldsHtml(record, editKey);
+  if (!fieldsHtml) {
+    showToast("このセルは直接編集に対応していません");
+    return;
+  }
+
+  activeOutputCellEdit = {
+    recordId: value(record.id),
+    editKey: value(editKey),
+  };
+  cellEditTitle.textContent = `${label}を編集`;
+  cellEditMeta.textContent = `標本番号 ${record.specimenNo || "-"} / 区画 ${getRecordKuwaku(record) || "-"}`;
+  cellEditFields.innerHTML = fieldsHtml;
+  cellEditModal.classList.remove("hidden");
+  bindOutputCellEditDynamicFields(editKey);
+  const focusTarget = cellEditFields.querySelector("input, select, textarea");
+  if (focusTarget instanceof HTMLElement) {
+    focusTarget.focus();
+    if (focusTarget instanceof HTMLInputElement || focusTarget instanceof HTMLTextAreaElement) {
+      focusTarget.select?.();
+    }
+  }
+}
+
+function closeOutputCellEditModal() {
+  if (!cellEditModal || !cellEditFields) {
+    return;
+  }
+  cellEditModal.classList.add("hidden");
+  cellEditFields.innerHTML = "";
+  activeOutputCellEdit = null;
+}
+
+function buildOutputCellEditFieldsHtml(record, editKey) {
+  const teamState = normalizeTeamState(record?.team, record?.teamOther);
+  const teamOtherHiddenClass = teamState.team === OTHER_TEAM_NAME ? "" : " hidden";
+  const parsedSpecimen = parseSpecimenNo(record?.specimenNo, record?.specimenPrefix, record?.specimenSerial);
+  const specimenPrefix = normalizeSpecimenPrefix(parsedSpecimen.prefix);
+  const analysisHiddenClass = specimenPrefix === "a" ? "" : " hidden";
+  const analysisType = normalizeAnalysisType(record?.analysisType);
+  const altitudeDirectEnabled = normalizeToggleFlag(record?.altitudeInputEnabled) === "1";
+  const altitudeDirectHiddenClass = altitudeDirectEnabled ? "" : " hidden";
+
+  switch (editKey) {
+    case "kuwaku":
+      return `
+        <label>
+          <span class="label-title">区画（グリッド）</span>
+          <input name="kuwaku" type="text" value="${escapeHtml(getRecordKuwaku(record))}" placeholder="例: 24-Ⅰ-C-4" />
+        </label>
+      `;
+    case "team":
+      return `
+        <label>
+          <span class="label-title">発掘班</span>
+          <select name="team" data-cell-edit-team-select>
+            <option value="" ${teamState.team === "" ? "selected" : ""}>未設定</option>
+            <option value="1" ${teamState.team === "1" ? "selected" : ""}>1</option>
+            <option value="2" ${teamState.team === "2" ? "selected" : ""}>2</option>
+            <option value="3" ${teamState.team === "3" ? "selected" : ""}>3</option>
+            <option value="4" ${teamState.team === "4" ? "selected" : ""}>4</option>
+            <option value="その他" ${teamState.team === "その他" ? "selected" : ""}>その他</option>
+          </select>
+        </label>
+        <label data-cell-edit-team-other class="${teamOtherHiddenClass}">
+          <span class="label-title">発掘班（その他）</span>
+          <input name="teamOther" type="text" value="${escapeHtml(teamState.teamOther)}" />
+        </label>
+      `;
+    case "date":
+      return `
+        <label>
+          <span class="label-title">日付</span>
+          <input name="date" type="date" value="${escapeHtml(normalizeDateForExportRange(getRecordDate(record)))}" />
+        </label>
+      `;
+    case "specimenNo":
+      return `
+        <label>
+          <span class="label-title">標本番号</span>
+          <input name="specimenNo" type="text" value="${escapeHtml(parsedSpecimen.specimenNo)}" placeholder="例: m-1" />
+        </label>
+      `;
+    case "category":
+      return `
+        <label>
+          <span class="label-title">分類</span>
+          <select name="specimenPrefix" data-cell-edit-prefix-select>
+            ${buildOutputCellEditPrefixOptionsHtml(specimenPrefix)}
+          </select>
+        </label>
+        <label data-cell-edit-analysis-row class="${analysisHiddenClass}">
+          <span class="label-title">分析用試料の区分</span>
+          <select name="analysisType">
+            ${buildOutputCellEditAnalysisOptionsHtml(analysisType)}
+          </select>
+        </label>
+      `;
+    case "nameMemo":
+      return `
+        <label>
+          <span class="label-title">化石・遺物名称</span>
+          <input name="nameMemo" type="text" value="${escapeHtml(value(record?.nameMemo))}" />
+        </label>
+      `;
+    case "importantFlag":
+      return `
+        <label>
+          <span class="label-title">重要品指定</span>
+          <select name="importantFlag">
+            <option value="無" ${value(record?.importantFlag) === "無" ? "selected" : ""}>無</option>
+            <option value="有" ${value(record?.importantFlag) === "有" ? "selected" : ""}>有</option>
+          </select>
+        </label>
+      `;
+    case "unit":
+      return `
+        <label>
+          <span class="label-title">ユニット</span>
+          <input name="unit" type="text" value="${escapeHtml(value(record?.unit))}" />
+        </label>
+      `;
+    case "detail":
+      return `
+        <label>
+          <span class="label-title">サブユニット</span>
+          <input name="detail" type="text" value="${escapeHtml(value(record?.detail))}" />
+        </label>
+        <label>
+          <span class="label-title">細分</span>
+          <input name="detailSub" type="text" value="${escapeHtml(value(record?.detailSub))}" />
+        </label>
+      `;
+    case "discoverer":
+      return `
+        <label>
+          <span class="label-title">発見者氏名</span>
+          <input name="discoverer" type="text" value="${escapeHtml(value(record?.discoverer))}" />
+        </label>
+      `;
+    case "identifier":
+      return `
+        <label>
+          <span class="label-title">判定者氏名</span>
+          <input name="identifier" type="text" value="${escapeHtml(value(record?.identifier))}" />
+        </label>
+      `;
+    case "levelRead":
+      return `
+        <label>
+          <span class="label-title">レベル読値（上面）</span>
+          <div class="inline-cm-row compact-cm-row">
+            <input name="levelUpperCm" type="text" value="${escapeHtml(value(record?.levelUpperCm))}" />
+            <span>cm</span>
+          </div>
+        </label>
+        <label>
+          <span class="label-title">レベル読値（下底）</span>
+          <div class="inline-cm-row compact-cm-row">
+            <input name="levelLowerCm" type="text" value="${escapeHtml(value(record?.levelLowerCm))}" />
+            <span>cm</span>
+          </div>
+        </label>
+      `;
+    case "altitudeM":
+      return `
+        <label>
+          <span class="label-title">レベル高</span>
+          <div class="inline-cm-row compact-cm-row">
+            <input name="levelHeight" type="text" value="${escapeHtml(value(record?.levelHeight))}" />
+            <span>m</span>
+          </div>
+        </label>
+        <label class="level-altitude-toggle">
+          <input name="altitudeInputEnabled" type="checkbox" value="1" ${altitudeDirectEnabled ? "checked" : ""} data-cell-edit-altitude-check />
+          標高（下底）を直接入力
+        </label>
+        <label data-cell-edit-altitude-direct class="${altitudeDirectHiddenClass}">
+          <span class="label-title">標高（下底）</span>
+          <div class="inline-cm-row compact-cm-row">
+            <input name="altitudeDirectM" type="text" value="${escapeHtml(value(record?.altitudeDirectM))}" />
+            <span>m</span>
+          </div>
+        </label>
+      `;
+    case "occurrenceSection":
+      return `
+        <label>
+          <span class="label-title">産出状況断面</span>
+          <select name="occurrenceSection">
+            <option value="要" ${value(record?.occurrenceSection) === "否" ? "" : "selected"}>要</option>
+            <option value="否" ${value(record?.occurrenceSection) === "否" ? "selected" : ""}>否</option>
+          </select>
+        </label>
+      `;
+    case "occurrenceSketch":
+      return `
+        <label>
+          <span class="label-title">産状スケッチ</span>
+          <select name="occurrenceSketch">
+            <option value="要" ${value(record?.occurrenceSketch) === "否" ? "" : "selected"}>要</option>
+            <option value="否" ${value(record?.occurrenceSketch) === "否" ? "selected" : ""}>否</option>
+          </select>
+        </label>
+      `;
+    case "position":
+      return `
+        <label>
+          <span class="label-title">北から / 南から</span>
+          <div class="inline-cm-row compact-cm-row">
+            <select name="nsDir">
+              <option value="北から" ${normalizeNsDir(record?.nsDir) === "北から" ? "selected" : ""}>北から</option>
+              <option value="南から" ${normalizeNsDir(record?.nsDir) === "南から" ? "selected" : ""}>南から</option>
+            </select>
+            <input name="nsCm" type="text" value="${escapeHtml(value(record?.nsCm))}" />
+            <span>cm</span>
+          </div>
+        </label>
+        <label>
+          <span class="label-title">東から / 西から</span>
+          <div class="inline-cm-row compact-cm-row">
+            <select name="ewDir">
+              <option value="東から" ${normalizeEwDir(record?.ewDir) === "東から" ? "selected" : ""}>東から</option>
+              <option value="西から" ${normalizeEwDir(record?.ewDir) === "西から" ? "selected" : ""}>西から</option>
+            </select>
+            <input name="ewCm" type="text" value="${escapeHtml(value(record?.ewCm))}" />
+            <span>cm</span>
+          </div>
+        </label>
+      `;
+    case "notes":
+      return `
+        <label>
+          <span class="label-title">備考</span>
+          <textarea name="notes" rows="4">${escapeHtml(value(record?.notes))}</textarea>
+        </label>
+      `;
+    default:
+      return "";
+  }
+}
+
+function bindOutputCellEditDynamicFields(editKey) {
+  if (!cellEditFields) {
+    return;
+  }
+  if (editKey === "team") {
+    const teamSelect = cellEditFields.querySelector("[data-cell-edit-team-select]");
+    const teamOtherLabel = cellEditFields.querySelector("[data-cell-edit-team-other]");
+    if (teamSelect instanceof HTMLSelectElement && teamOtherLabel instanceof HTMLElement) {
+      const toggle = () => {
+        const isOther = value(teamSelect.value) === OTHER_TEAM_NAME;
+        teamOtherLabel.classList.toggle("hidden", !isOther);
+      };
+      teamSelect.addEventListener("change", toggle);
+      toggle();
+    }
+  }
+  if (editKey === "category") {
+    const prefixSelect = cellEditFields.querySelector("[data-cell-edit-prefix-select]");
+    const analysisRow = cellEditFields.querySelector("[data-cell-edit-analysis-row]");
+    if (prefixSelect instanceof HTMLSelectElement && analysisRow instanceof HTMLElement) {
+      const toggle = () => {
+        analysisRow.classList.toggle("hidden", normalizeSpecimenPrefix(prefixSelect.value) !== "a");
+      };
+      prefixSelect.addEventListener("change", toggle);
+      toggle();
+    }
+  }
+  if (editKey === "altitudeM") {
+    const check = cellEditFields.querySelector("[data-cell-edit-altitude-check]");
+    const directRow = cellEditFields.querySelector("[data-cell-edit-altitude-direct]");
+    const directInput = directRow?.querySelector("input[name='altitudeDirectM']");
+    if (check instanceof HTMLInputElement && directRow instanceof HTMLElement) {
+      const toggle = () => {
+        const enabled = check.checked;
+        directRow.classList.toggle("hidden", !enabled);
+        if (directInput instanceof HTMLInputElement) {
+          directInput.disabled = !enabled;
+          if (!enabled) {
+            directInput.value = "";
+          }
+        }
+      };
+      check.addEventListener("change", toggle);
+      toggle();
+    }
+  }
+}
+
+function saveOutputCellEditFromModal() {
+  if (!activeOutputCellEdit || !cellEditForm) {
+    return;
+  }
+  const record = findRecord(activeOutputCellEdit.recordId);
+  if (!record) {
+    closeOutputCellEditModal();
+    showToast("対象データが見つかりません");
+    return;
+  }
+  const formData = new FormData(cellEditForm);
+  const result = applyOutputCellEditToRecord(record, activeOutputCellEdit.editKey, formData);
+  if (!result.ok) {
+    if (result.message) {
+      showToast(result.message);
+    }
+    return;
+  }
+  record.updatedAt = nowIso();
+  const specimenNoForMessage = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial).specimenNo || record.specimenNo;
+  persist(`標本番号 ${specimenNoForMessage || "-"} を上書き保存しました`);
+  renderRecordTable();
+  renderOutputs();
+  closeOutputCellEditModal();
+}
+
+function applyOutputCellEditToRecord(record, editKey, formData) {
+  if (!(record && formData instanceof FormData)) {
+    return { ok: false, message: "編集データを取得できませんでした" };
+  }
+  if (editKey === "kuwaku") {
+    const parsed = parseKuwaku(formData.get("kuwaku"));
+    const nextKuwaku = buildKuwaku(parsed.headA, parsed.headB, parsed.block, parsed.no);
+    if (!parsed.block || !parsed.no || !nextKuwaku) {
+      return { ok: false, message: "区画（例: 24-Ⅰ-C-4）を入力してください" };
+    }
+    const duplicate = findDuplicateRecordByKuwakuAndSpecimen(nextKuwaku, record.specimenNo, record.id);
+    if (duplicate) {
+      return { ok: false, message: `この区画には ${record.specimenNo} がすでにあります` };
+    }
+    record.kuwaku = nextKuwaku;
+    return { ok: true };
+  }
+  if (editKey === "team") {
+    const teamState = normalizeTeamState(formData.get("team"), formData.get("teamOther"));
+    record.team = teamState.team;
+    record.teamOther = teamState.teamOther;
+    return { ok: true };
+  }
+  if (editKey === "date") {
+    record.date = value(formData.get("date"));
+    return { ok: true };
+  }
+  if (editKey === "specimenNo") {
+    const parsed = parseSpecimenNo(formData.get("specimenNo"), record.specimenPrefix, record.specimenSerial);
+    if (!parsed.serial) {
+      return { ok: false, message: "標本番号を入力してください（例: m-1）" };
+    }
+    const nextSpecimenNo = buildSpecimenNo(parsed.prefix, parsed.serial);
+    const duplicate = findDuplicateRecordByKuwakuAndSpecimen(getRecordKuwaku(record), nextSpecimenNo, record.id);
+    if (duplicate) {
+      return { ok: false, message: `この区画には ${nextSpecimenNo} がすでにあります` };
+    }
+    record.specimenPrefix = normalizeSpecimenPrefix(parsed.prefix);
+    record.specimenSerial = compactNoSpaceValue(parsed.serial);
+    record.specimenNo = nextSpecimenNo;
+    record.category = categoryFromPrefix(record.specimenPrefix);
+    if (record.specimenPrefix !== "a") {
+      record.analysisType = "";
+    }
+    return { ok: true };
+  }
+  if (editKey === "category") {
+    const nextPrefix = normalizeSpecimenPrefix(formData.get("specimenPrefix"));
+    const currentSpecimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
+    const nextSerial = compactNoSpaceValue(currentSpecimen.serial || record.specimenSerial);
+    if (!nextSerial) {
+      return { ok: false, message: "先に標本番号セルで番号を設定してください" };
+    }
+    const nextSpecimenNo = buildSpecimenNo(nextPrefix, nextSerial);
+    const duplicate = findDuplicateRecordByKuwakuAndSpecimen(getRecordKuwaku(record), nextSpecimenNo, record.id);
+    if (duplicate) {
+      return { ok: false, message: `この区画には ${nextSpecimenNo} がすでにあります` };
+    }
+    record.specimenPrefix = nextPrefix;
+    record.specimenSerial = nextSerial;
+    record.specimenNo = nextSpecimenNo;
+    record.category = categoryFromPrefix(nextPrefix);
+    record.analysisType = nextPrefix === "a" ? normalizeAnalysisType(formData.get("analysisType")) : "";
+    return { ok: true };
+  }
+  if (editKey === "nameMemo") {
+    record.nameMemo = value(formData.get("nameMemo"));
+    return { ok: true };
+  }
+  if (editKey === "importantFlag") {
+    record.importantFlag = normalizeHasFlag(formData.get("importantFlag")) || "無";
+    return { ok: true };
+  }
+  if (editKey === "unit") {
+    record.unit = compactNoSpaceValue(formData.get("unit"));
+    return { ok: true };
+  }
+  if (editKey === "detail") {
+    record.detail = compactNoSpaceValue(formData.get("detail"));
+    record.detailSub = value(formData.get("detailSub"));
+    return { ok: true };
+  }
+  if (editKey === "discoverer") {
+    record.discoverer = value(formData.get("discoverer"));
+    return { ok: true };
+  }
+  if (editKey === "identifier") {
+    record.identifier = value(formData.get("identifier"));
+    return { ok: true };
+  }
+  if (editKey === "levelRead") {
+    record.levelUpperCm = value(formData.get("levelUpperCm"));
+    record.levelLowerCm = value(formData.get("levelLowerCm"));
+    return { ok: true };
+  }
+  if (editKey === "altitudeM") {
+    record.levelHeight = value(formData.get("levelHeight"));
+    const useDirectAltitude = normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1";
+    record.altitudeInputEnabled = useDirectAltitude ? "1" : "";
+    record.altitudeDirectM = useDirectAltitude ? value(formData.get("altitudeDirectM")) : "";
+    return { ok: true };
+  }
+  if (editKey === "occurrenceSection") {
+    record.occurrenceSection = normalizeNeedFlag(formData.get("occurrenceSection"));
+    return { ok: true };
+  }
+  if (editKey === "occurrenceSketch") {
+    record.occurrenceSketch = normalizeNeedFlag(formData.get("occurrenceSketch"));
+    return { ok: true };
+  }
+  if (editKey === "position") {
+    record.nsDir = normalizeNsDir(formData.get("nsDir"));
+    record.nsCm = value(formData.get("nsCm"));
+    record.ewDir = normalizeEwDir(formData.get("ewDir"));
+    record.ewCm = value(formData.get("ewCm"));
+    return { ok: true };
+  }
+  if (editKey === "notes") {
+    record.notes = value(formData.get("notes"));
+    return { ok: true };
+  }
+  return { ok: false, message: "このセルは直接編集に対応していません" };
+}
+
+function buildOutputCellEditPrefixOptionsHtml(selectedPrefixRaw) {
+  const selectedPrefix = normalizeSpecimenPrefix(selectedPrefixRaw);
+  const order = ["m", "b", "l", "s", "i", "g", "h", "a"];
+  return order
+    .map((prefix) => {
+      const label = `${prefix}: ${SPECIMEN_CATEGORY_MAP[prefix] || ""}`;
+      return `<option value="${prefix}" ${prefix === selectedPrefix ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
+function buildOutputCellEditAnalysisOptionsHtml(selectedTypeRaw) {
+  const selectedType = normalizeAnalysisType(selectedTypeRaw);
+  const order = ["A", "C", "M", "F", "P", "B", "I", "D", "R", "S", "H", "MG"];
+  const options = [`<option value="" ${selectedType ? "" : "selected"}>未設定</option>`];
+  order.forEach((code) => {
+    const displayCode = code === "MG" ? "Mg" : code;
+    const optionValue = `${displayCode}: ${ANALYSIS_TYPE_MAP[code]}`;
+    options.push(`<option value="${escapeHtml(optionValue)}" ${optionValue === selectedType ? "selected" : ""}>${escapeHtml(optionValue)}</option>`);
+  });
+  return options.join("");
+}
+
 function renderListOutput() {
   updateOutputListSortHeader();
   if (!state.records.length) {
     syncOutputKuwakuSelect([]);
     syncOutputCategorySelect([]);
     syncOutputStatusSelect();
+    syncOutputDateSelect([]);
     syncOutputSearchInput();
     updateOutputFilterSummary(0, 0);
-    outputListBody.innerHTML = "<tr><td colspan=\"18\">出力対象データがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"19\">出力対象データがありません。</td></tr>";
     return;
   }
 
   const filteredRecords = getFilteredOutputRecords();
   if (!filteredRecords.length) {
-    outputListBody.innerHTML = "<tr><td colspan=\"18\">条件に一致するデータがありません。</td></tr>";
+    outputListBody.innerHTML = "<tr><td colspan=\"19\">条件に一致するデータがありません。</td></tr>";
     return;
   }
 
@@ -5386,36 +6020,37 @@ function renderListOutput() {
         "customLargeImageDataUrl",
       ]);
       return `
-      <tr class="${selectedClass}">
-        <td class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
+      <tr class="${selectedClass}" data-record-id="${escapeHtml(value(record.id))}">
+        <td data-cell-edit-key="kuwaku" class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
           kuwakuText
         )}</td>
-        <td class="${listCellClass("", teamMissing)}" ${missingTitle}>${escapeHtml(getRecordTeamValue(record))}</td>
+        <td data-cell-edit-key="team" class="${listCellClass("", teamMissing)}" ${missingTitle}>${escapeHtml(getRecordTeamValue(record))}</td>
+        <td data-cell-edit-key="date">${escapeHtml(getRecordDate(record))}</td>
         <td class="${listCellClass(dataComplete ? "data-status-complete" : "data-status-incomplete", !dataComplete)}" ${missingTitle}>${
           dataComplete ? "○" : "未記入"
         }</td>
-        <td class="${listCellClass("", specimenMissing)}" ${missingTitle}>${escapeHtml(record.specimenNo)}</td>
-        <td class="${listCellClass("category-color-cell", categoryMissing)}" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};" ${missingTitle}>${escapeHtml(
+        <td data-cell-edit-key="specimenNo" class="${listCellClass("", specimenMissing)}" ${missingTitle}>${escapeHtml(record.specimenNo)}</td>
+        <td data-cell-edit-key="category" class="${listCellClass("category-color-cell", categoryMissing)}" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};" ${missingTitle}>${escapeHtml(
           formatCategoryForRecord(record)
         )}</td>
-        <td class="${listCellClass("", nameMissing)}" ${missingTitle}>${escapeHtml(record.nameMemo || "")}</td>
-        <td class="${listCellClass(record.importantFlag === "有" ? "important-cell-important" : "", importantMissing)}" ${missingTitle}>${escapeHtml(
+        <td data-cell-edit-key="nameMemo" class="${listCellClass("", nameMissing)}" ${missingTitle}>${escapeHtml(record.nameMemo || "")}</td>
+        <td data-cell-edit-key="importantFlag" class="${listCellClass(record.importantFlag === "有" ? "important-cell-important" : "", importantMissing)}" ${missingTitle}>${escapeHtml(
           record.importantFlag || ""
         )}</td>
-        <td class="${listCellClass("unit-color-cell", unitMissing)}" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};" ${missingTitle}>${escapeHtml(
+        <td data-cell-edit-key="unit" class="${listCellClass("unit-color-cell", unitMissing)}" style="background:${unitStyle.background};color:${unitStyle.color};border-color:${unitStyle.border};" ${missingTitle}>${escapeHtml(
           record.unit || ""
         )}</td>
-        <td>${escapeHtml(formatDetailForRecord(record))}</td>
-        <td class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
-        <td class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
-        <td class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
-        <td class="${listCellClass("", levelHeightMissing || levelReadMissing)}" ${missingTitle}>${escapeHtml(formatRecordAltitudeM(record))}</td>
-        <td class="${listCellClass("", sectionMissing || sectionChecklistMissing)}" ${missingTitle}>${escapeHtml(
+        <td data-cell-edit-key="detail">${escapeHtml(formatDetailForRecord(record))}</td>
+        <td data-cell-edit-key="discoverer" class="${listCellClass("", discovererMissing)}" ${missingTitle}>${escapeHtml(record.discoverer || "")}</td>
+        <td data-cell-edit-key="identifier" class="${listCellClass("", identifierMissing)}" ${missingTitle}>${escapeHtml(record.identifier || "")}</td>
+        <td data-cell-edit-key="levelRead" class="${listCellClass("", levelReadMissing)}" ${missingTitle}>${escapeHtml(formatLevelRead(record))}</td>
+        <td data-cell-edit-key="altitudeM" class="${listCellClass("", levelHeightMissing || levelReadMissing)}" ${missingTitle}>${escapeHtml(formatRecordAltitudeM(record))}</td>
+        <td data-cell-edit-key="occurrenceSection" class="${listCellClass("", sectionMissing || sectionChecklistMissing)}" ${missingTitle}>${escapeHtml(
           record.occurrenceSection || ""
         )}</td>
-        <td class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
-        <td class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
-        <td>${escapeHtml(record.notes || "")}</td>
+        <td data-cell-edit-key="occurrenceSketch" class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
+        <td data-cell-edit-key="position" class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
+        <td data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
         <td>
           <div class="row-actions">
             <button type="button" data-action="card" data-id="${record.id}">${cardButtonLabel}</button>
@@ -5490,6 +6125,9 @@ function compareOutputRecordsForList(a, b) {
     case "team":
       compared = compareSortText(getRecordTeamValue(a), getRecordTeamValue(b));
       break;
+    case "date":
+      compared = compareSortDate(getRecordDate(a), getRecordDate(b));
+      break;
     case "specimenNo":
       compared = compareRecordsBySpecimenNo(a, b);
       break;
@@ -5561,6 +6199,21 @@ function compareNullableNumber(a, b) {
     return 1;
   }
   return 0;
+}
+
+function compareSortDate(aRaw, bRaw) {
+  const a = normalizeDateForExportRange(aRaw);
+  const b = normalizeDateForExportRange(bRaw);
+  if (a && b) {
+    return a.localeCompare(b, "ja", { numeric: true, sensitivity: "base" });
+  }
+  if (a) {
+    return -1;
+  }
+  if (b) {
+    return 1;
+  }
+  return compareSortText(aRaw, bRaw);
 }
 
 function dataStatusSortText(record) {
@@ -5710,7 +6363,6 @@ function getFilteredOutputRecords() {
 
   syncOutputCategorySelect(kuwakuScopedRecords);
   syncOutputStatusSelect();
-  syncOutputSearchInput();
 
   let filteredRecords = kuwakuScopedRecords;
   if (selectedOutputCategory && selectedOutputCategory !== EXPORT_CATEGORY_ALL_VALUE) {
@@ -5724,7 +6376,14 @@ function getFilteredOutputRecords() {
   } else if (selectedOutputStatus === "incomplete") {
     filteredRecords = filteredRecords.filter((record) => !isRecordDataComplete(record));
   }
+  syncOutputDateSelect(filteredRecords);
+  if (selectedOutputDate) {
+    filteredRecords = filteredRecords.filter(
+      (record) => normalizeDateForExportRange(getRecordDate(record)) === selectedOutputDate
+    );
+  }
 
+  syncOutputSearchInput();
   const searchText = value(outputSearchText).toLowerCase();
   if (searchText) {
     filteredRecords = filteredRecords.filter((record) => buildOutputFilterSearchText(record).includes(searchText));
@@ -5780,6 +6439,24 @@ function syncOutputStatusSelect() {
   outputStatusSelect.value = selectedOutputStatus;
 }
 
+function syncOutputDateSelect(records) {
+  if (!outputDateSelect) {
+    return;
+  }
+  const options = collectOutputDateOptions(records);
+  if (!options.some((item) => item.value === selectedOutputDate)) {
+    selectedOutputDate = "";
+  }
+  outputDateSelect.innerHTML = options
+    .map(
+      (item) =>
+        `<option value="${escapeHtml(item.value)}" ${item.value === selectedOutputDate ? "selected" : ""}>${escapeHtml(
+          item.label
+        )}</option>`
+    )
+    .join("");
+}
+
 function syncOutputSearchInput() {
   if (!outputSearchInput) {
     return;
@@ -5828,6 +6505,26 @@ function collectOutputKuwakuOptions(records) {
       label: kuwakuLabelForSelect(kuwakuValue),
     }));
   return [{ value: ALL_GRIDS_VALUE, label: "全グリッド" }, ...options];
+}
+
+function collectOutputDateOptions(records) {
+  if (!records.length) {
+    return [{ value: "", label: "すべて" }];
+  }
+  const dateSet = new Set();
+  records.forEach((record) => {
+    const normalizedDate = normalizeDateForExportRange(getRecordDate(record));
+    if (normalizedDate) {
+      dateSet.add(normalizedDate);
+    }
+  });
+  const options = Array.from(dateSet)
+    .sort((a, b) => b.localeCompare(a, "ja", { numeric: true, sensitivity: "base" }))
+    .map((dateValue) => ({
+      value: dateValue,
+      label: dateValue,
+    }));
+  return [{ value: "", label: "すべて" }, ...options];
 }
 
 function renderPlanOutput() {
@@ -6260,6 +6957,40 @@ function applyViewerVerticalScale(zRaw, baseZRaw) {
   return baseZ + (z - baseZ) * viewerVerticalScale;
 }
 
+function hideViewerFallbackPanel() {
+  if (!viewerCanvasWrap) {
+    return;
+  }
+  const panel = viewerCanvasWrap.querySelector(".viewer-fallback-panel");
+  if (panel) {
+    panel.remove();
+  }
+}
+
+function showViewerFallbackPanel(reasonText, context = {}) {
+  if (!viewerCanvasWrap) {
+    return;
+  }
+  const reason = value(reasonText) || "この端末では3D表示が利用できません。";
+  const kuwakuLabel = value(context.kuwakuLabel) || "-";
+  const totalCount = Number.isFinite(Number(context.totalCount)) ? Number(context.totalCount) : 0;
+  const drawableCount = Number.isFinite(Number(context.drawableCount)) ? Number(context.drawableCount) : 0;
+  let panel = viewerCanvasWrap.querySelector(".viewer-fallback-panel");
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.className = "viewer-fallback-panel";
+    viewerCanvasWrap.appendChild(panel);
+  }
+  panel.innerHTML = `
+    <div class="viewer-fallback-card">
+      <p class="viewer-fallback-title">この端末では3D表示が使えません</p>
+      <p class="viewer-fallback-reason">${escapeHtml(reason)}</p>
+      <p class="viewer-fallback-meta">区画: ${escapeHtml(kuwakuLabel)} / 対象 ${totalCount}件 / 描画可能 ${drawableCount}件</p>
+      <button type="button" class="viewer-fallback-open-plan-btn" data-action="viewer-open-plan">平面図タブで確認</button>
+    </div>
+  `;
+}
+
 function renderViewerOutput(options = {}) {
   const preserveCamera = Boolean(options?.preserveCamera);
   if (
@@ -6272,6 +7003,7 @@ function renderViewerOutput(options = {}) {
   ) {
     return;
   }
+  hideViewerFallbackPanel();
   viewerMapLegend.innerHTML = buildPlanLegendHtml();
   syncViewerVerticalScaleUi();
   syncViewerViewButtons();
@@ -6295,6 +7027,7 @@ function renderViewerOutput(options = {}) {
     }
     viewerStatus.textContent = "表示対象データがありません。";
     clearViewerScene();
+    hideViewerFallbackPanel();
     return;
   }
 
@@ -6319,6 +7052,7 @@ function renderViewerOutput(options = {}) {
     viewerDetailSubSelect.innerHTML = "";
     viewerStatus.textContent = "この条件では表示対象データがありません。";
     clearViewerScene();
+    hideViewerFallbackPanel();
     return;
   }
 
@@ -6412,6 +7146,7 @@ function renderViewerOutput(options = {}) {
 
   if (!viewerCandidates.length) {
     clearViewerScene();
+    hideViewerFallbackPanel();
     return;
   }
 
@@ -6419,8 +7154,14 @@ function renderViewerOutput(options = {}) {
     return;
   }
   if (!ensureViewerInitialized()) {
+    showViewerFallbackPanel(viewerStatus?.textContent, {
+      kuwakuLabel,
+      totalCount: detailSubRecords.length,
+      drawableCount: viewerCandidates.length,
+    });
     return;
   }
+  hideViewerFallbackPanel();
 
   const metrics = buildViewerGridMetrics(viewerCandidates);
   const shapes = viewerCandidates.map((candidate) => buildViewerShapeFromCandidate(candidate, metrics)).filter(Boolean);
@@ -6891,6 +7632,65 @@ function syncViewerViewButtons() {
   }
 }
 
+function createViewerRendererWithFallback() {
+  if (!window.THREE) {
+    return { renderer: null, error: new Error("THREE未読込") };
+  }
+  const createRendererWithContext = (contextType, contextAttrs) => {
+    const canvas = document.createElement("canvas");
+    const gl =
+      canvas.getContext(contextType, contextAttrs) ||
+      (contextType === "webgl" ? canvas.getContext("experimental-webgl", contextAttrs) : null);
+    if (!gl) {
+      throw new Error(`${contextType} context unavailable`);
+    }
+    return new THREE.WebGLRenderer({
+      canvas,
+      context: gl,
+      antialias: false,
+      alpha: Boolean(contextAttrs?.alpha),
+      powerPreference: "low-power",
+      precision: "mediump",
+    });
+  };
+  const attempts = [
+    () =>
+      new THREE.WebGLRenderer({
+        antialias: false,
+        alpha: false,
+        stencil: false,
+        powerPreference: "low-power",
+        precision: "mediump",
+      }),
+    () => createRendererWithContext("webgl2", { antialias: false, alpha: false, depth: true, stencil: false }),
+    () => createRendererWithContext("webgl", { antialias: false, alpha: false, depth: true, stencil: false }),
+    () => createRendererWithContext("webgl", { antialias: false, alpha: true, depth: true, stencil: false }),
+  ];
+  if (typeof THREE.WebGL1Renderer === "function") {
+    attempts.push(() => new THREE.WebGL1Renderer({ antialias: false, alpha: false, stencil: false }));
+  }
+  let lastError = null;
+  for (const makeRenderer of attempts) {
+    try {
+      const renderer = makeRenderer();
+      if (renderer) {
+        return { renderer, error: null };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  const probeCanvas = document.createElement("canvas");
+  const hasWebGl =
+    Boolean(probeCanvas.getContext("webgl")) ||
+    Boolean(probeCanvas.getContext("experimental-webgl")) ||
+    Boolean(probeCanvas.getContext("webgl2"));
+  if (!hasWebGl) {
+    lastError = new Error("この端末・ブラウザでWebGLが利用できません");
+  }
+  return { renderer: null, error: lastError || new Error("WebGLRenderer生成失敗") };
+}
+
 function ensureViewerInitialized() {
   if (!viewerCanvasWrap || viewer3d.initialized) {
     return viewer3d.initialized;
@@ -6905,10 +7705,18 @@ function ensureViewerInitialized() {
     viewer3d.scene = new THREE.Scene();
     viewer3d.scene.background = new THREE.Color(0xf8fafc);
     viewer3d.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 10000);
-    viewer3d.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const rendererResult = createViewerRendererWithFallback();
+    if (!rendererResult.renderer) {
+      throw rendererResult.error || new Error("WebGLRenderer生成失敗");
+    }
+    viewer3d.renderer = rendererResult.renderer;
     viewer3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     viewer3d.renderer.domElement.setAttribute("aria-label", "3Dビュアー");
-    viewerCanvasWrap.prepend(viewer3d.renderer.domElement);
+    if (typeof viewerCanvasWrap.prepend === "function") {
+      viewerCanvasWrap.prepend(viewer3d.renderer.domElement);
+    } else {
+      viewerCanvasWrap.insertBefore(viewer3d.renderer.domElement, viewerCanvasWrap.firstChild);
+    }
 
     viewer3d.controls =
       typeof THREE.OrbitControls === "function"
@@ -6973,11 +7781,26 @@ function ensureViewerInitialized() {
     ensureViewerCanvasSize();
     animateViewerScene();
     return true;
-  } catch (_error) {
+  } catch (error) {
     viewer3d.available = false;
     viewer3d.initialized = false;
+    if (viewer3d.renderer) {
+      try {
+        viewer3d.renderer.dispose();
+      } catch (_disposeError) {
+        // noop
+      }
+      const canvas = viewer3d.renderer.domElement;
+      if (canvas?.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+      viewer3d.renderer = null;
+    }
     if (viewerStatus) {
-      viewerStatus.textContent = "3D表示の初期化に失敗しました。";
+      const reason = value(error?.message);
+      viewerStatus.textContent = reason
+        ? `3D表示の初期化に失敗しました（${reason}）。`
+        : "3D表示の初期化に失敗しました。";
     }
     return false;
   }

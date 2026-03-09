@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>第24次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260309-viewergrid9" />
+    <link rel="stylesheet" href="./styles.css?v=20260309-cellquickedit1" />
   </head>
   <body>
     <header class="app-header">
@@ -15,6 +15,7 @@
         <h1>第24次野尻湖湖底発掘　化石・遺物 入力フォーム</h1>
         <p class="header-update-note">3D表現が可能になりました(2026.03.07)</p>
         <p class="header-update-note">画像のアップが可能になりました(2026.03.08)</p>
+        <p class="header-update-note">リストから編集が可能になりました（2026.03.09）</p>
       </div>
       <div class="header-actions">
         <div class="cloud-controls">
@@ -40,7 +41,7 @@
         <form id="site-form" class="panel">
           <h2>区画（グリッド）情報（<span class="required-note">*は必須項目です</span>）</h2>
           <div class="grid cols-3">
-            <label class="span-2"><span class="label-title">区画（グリッド）名<span class="required">*</span>　　　　例：（24 - Ⅰ - C - 4 )</span>
+            <label class="site-kuwaku"><span class="label-title">区画（グリッド）名<span class="required">*</span>　　　　例：（24 - Ⅰ - C - 4 )</span>
               <div class="kuwaku-input">
                 <input name="kuwakuHeadA" type="text" value="24" />
                 <span class="sep">-</span>
@@ -51,16 +52,16 @@
                 <input name="kuwakuNo" type="text" inputmode="numeric" />
               </div>
             </label>
-            <label><span class="label-title">レベル高<span class="required">*</span></span>
+            <label class="site-level"><span class="label-title">レベル高<span class="required">*</span></span>
               <div class="inline-cm-row compact-cm-row">
                 <input name="levelHeight" type="text" />
                 <span>m</span>
               </div>
             </label>
-            <label><span class="label-title">日付<span class="required">*</span></span>
+            <label class="site-date"><span class="label-title">日付<span class="required">*</span></span>
               <input name="date" type="date" />
             </label>
-            <label><span class="label-title">発掘班<span class="required">*</span></span>
+            <label class="site-team"><span class="label-title">発掘班<span class="required">*</span></span>
               <div class="team-select-row">
                 <select name="team">
                   <option value="">未設定</option>
@@ -73,10 +74,10 @@
                 <input id="team-other-input" name="teamOther" type="text" class="hidden" placeholder="その他の班名を入力" />
               </div>
             </label>
-            <label class="span-3 large-input"><span class="label-title">班長<span class="required">*</span></span>
+            <label class="site-lead large-input"><span class="label-title">班長<span class="required">*</span></span>
               <input name="teamLead" type="text" />
             </label>
-            <label class="span-3 large-input"><span class="label-title">記載係<span class="required">*</span></span>
+            <label class="site-recorder large-input"><span class="label-title">記載係<span class="required">*</span></span>
               <input name="recorder" type="text" />
             </label>
           </div>
@@ -87,7 +88,13 @@
 
         <div id="record-form-host">
           <form id="record-form" class="panel">
-            <h2>詳細情報入力（<span class="required-note">*は必須項目です</span>）</h2>
+            <div class="detail-input-title-row">
+              <h2>詳細情報入力（<span class="required-note">*は必須項目です</span>）</h2>
+              <div class="detail-input-action-row">
+                <button id="record-new-btn" type="button">新規入力</button>
+                <button id="record-copy-to-input-top-btn" class="hidden" type="button">コピーして新規入力</button>
+              </div>
+            </div>
             <input id="record-id-input" type="hidden" />
 
           <div class="grid cols-3">
@@ -458,7 +465,7 @@
           </div>
 
           <label>備考（走向傾斜と長軸の傾斜方向（プランジ），破損状況，ほか観察事項などを記入）
-            <textarea name="notes" rows="4"></textarea>
+            <textarea name="notes" rows="2"></textarea>
           </label>
 
           <section class="diagram-upload-wrap">
@@ -515,7 +522,7 @@
               <button id="record-prev-btn" type="button">前へ</button>
               <button id="record-next-btn" type="button">次へ</button>
               <button id="record-submit-btn" type="submit">記録を保存</button>
-              <button id="record-copy-to-input-btn" class="hidden" type="button">コピーして新規入力</button>
+              <button id="record-copy-to-input-btn" type="button">コピーして新規入力</button>
               <button id="record-reset-btn" type="button">入力クリア</button>
             </div>
           </form>
@@ -545,11 +552,15 @@
 
       <section id="output-tab" class="tab-panel active">
         <section class="panel">
-          <h2>リスト形式プレビュー</h2>
+          <h2>リスト形式プレビュー（セルをダブルクリックすると編集ウインドウが開きます）</h2>
           <div class="output-filter-row">
             <label class="output-filter-item output-grid-row">
               区画（グリッド）
               <select id="output-kuwaku-select"></select>
+            </label>
+            <label class="output-filter-item">
+              日付
+              <select id="output-date-select"></select>
             </label>
             <label class="output-filter-item">
               分類
@@ -575,6 +586,7 @@
                 <tr>
                   <th data-sort-key="kuwaku" tabindex="0">区画</th>
                   <th data-sort-key="team" tabindex="0">発掘班</th>
+                  <th data-sort-key="date" tabindex="0">日付</th>
                   <th data-sort-key="dataStatus" tabindex="0">データ</th>
                   <th data-sort-key="specimenNo" tabindex="0">標本番号</th>
                   <th data-sort-key="category" tabindex="0">分類</th>
@@ -947,9 +959,26 @@
       </div>
     </div>
 
+    <div id="cell-edit-modal" class="cell-edit-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cell-edit-title">
+      <div class="cell-edit-dialog">
+        <div class="cell-edit-header">
+          <h3 id="cell-edit-title">セル編集</h3>
+          <button id="cell-edit-close-btn" type="button" aria-label="閉じる">×</button>
+        </div>
+        <p id="cell-edit-meta" class="muted"></p>
+        <form id="cell-edit-form" class="cell-edit-form">
+          <div id="cell-edit-fields" class="cell-edit-fields"></div>
+          <div class="panel-actions cell-edit-actions">
+            <button id="cell-edit-save-btn" type="submit">上書き保存</button>
+            <button id="cell-edit-cancel-btn" type="button">キャンセル</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260309-viewergrid9"></script>
+    <script src="./app.js?v=20260309-cellquickedit1"></script>
   </body>
 </html>
