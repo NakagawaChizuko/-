@@ -498,6 +498,8 @@ const viewer3d = {
   labelGroup: null,
   gridGroup: null,
   renderNonce: 0,
+  shiftPanActive: false,
+  defaultLeftMouseAction: null,
 };
 const planLargeShapeImageCache = new Map();
 const planLargeShapeTintedCanvasCache = new Map();
@@ -6902,7 +6904,7 @@ function ensureViewerInitialized() {
   try {
     viewer3d.scene = new THREE.Scene();
     viewer3d.scene.background = new THREE.Color(0xf8fafc);
-    viewer3d.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
+    viewer3d.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 10000);
     viewer3d.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     viewer3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     viewer3d.renderer.domElement.setAttribute("aria-label", "3Dビュアー");
@@ -6913,9 +6915,20 @@ function ensureViewerInitialized() {
         ? new THREE.OrbitControls(viewer3d.camera, viewer3d.renderer.domElement)
         : null;
     if (viewer3d.controls) {
-      viewer3d.controls.enableDamping = true;
+      viewer3d.controls.enableDamping = false;
       viewer3d.controls.enablePan = true;
-      viewer3d.controls.zoomSpeed = 0.45;
+      viewer3d.controls.rotateSpeed = 1.25;
+      viewer3d.controls.zoomSpeed = 0.62;
+      viewer3d.controls.panSpeed = 1.1;
+      viewer3d.controls.screenSpacePanning = true;
+      if (THREE.MOUSE) {
+        viewer3d.controls.mouseButtons = {
+          LEFT: THREE.MOUSE.ROTATE,
+          MIDDLE: THREE.MOUSE.PAN,
+          RIGHT: null,
+        };
+        viewer3d.defaultLeftMouseAction = THREE.MOUSE.ROTATE;
+      }
       viewer3d.controls.target.set(0, 0, 0);
     }
 
@@ -6942,6 +6955,13 @@ function ensureViewerInitialized() {
     viewerCanvasWrap.addEventListener("pointercancel", handleViewerPointerEnd);
     viewerCanvasWrap.addEventListener("pointerleave", handleViewerPointerLeave);
     viewerCanvasWrap.addEventListener("contextmenu", handleViewerContextMenu);
+    if (viewer3d.renderer?.domElement) {
+      viewer3d.renderer.domElement.addEventListener("pointerdown", handleViewerControlPointerDown);
+      viewer3d.renderer.domElement.addEventListener("pointerup", handleViewerControlPointerUp);
+      viewer3d.renderer.domElement.addEventListener("pointercancel", handleViewerControlPointerUp);
+    }
+    window.addEventListener("pointerup", handleViewerControlPointerUp);
+    window.addEventListener("blur", handleViewerControlPointerUp);
     if (typeof ResizeObserver === "function") {
       viewer3d.resizeObserver = new ResizeObserver(() => {
         ensureViewerCanvasSize();
@@ -7224,7 +7244,7 @@ function renderViewerGrid(metrics) {
     viewer3d.gridGroup.add(new THREE.Line(geometry, gridMat));
   }
 
-  const cardinalOffset = 0.9;
+  const cardinalOffset = 1.18;
   const cardinalZ = zBase + 0.06;
   const cardinalLabels = [
     { text: "北", x: width / 2, y: height + cardinalOffset },
@@ -7242,26 +7262,64 @@ function renderViewerGrid(metrics) {
     viewer3d.gridGroup.add(sprite);
   });
 
+  const colNorthY = height + 0.62;
+  const colSouthY = -0.62;
+  const rowWestX = -0.62;
+  const rowEastX = width + 0.62;
+  const colCount = Math.max(1, metrics.maxXIndex - metrics.minXIndex + 1);
+  const rowCount = Math.max(1, metrics.maxNo - metrics.minNo + 1);
+  const denseFactor = Math.max(colCount, rowCount);
+  const frameLabelWidth = clamp(2.002 - denseFactor * 0.0208, 1.17, 1.664);
+  const frameLabelHeight = clamp(0.598 - denseFactor * 0.00624, 0.312, 0.468);
+  const stakeLabelWidth = clamp(1.3824 - denseFactor * 0.01296, 0.72, 1.0944);
+  const stakeLabelHeight = clamp(0.432 - denseFactor * 0.004032, 0.2016, 0.3168);
+  const labelPlaneZ = zBase + 0.004;
   for (let xIndex = metrics.minXIndex; xIndex <= metrics.maxXIndex; xIndex += 1) {
-    const headBlock = viewerXIndexToHeadBlock(xIndex);
-    for (let no = metrics.minNo; no <= metrics.maxNo; no += 1) {
-      const label = `${headBlock.head}-${headBlock.block}-${no}`;
-      const cellX0 = (xIndex - metrics.minXIndex) * 4;
-      const cellY0 = (metrics.maxNo - no) * 4;
-      // グリッドの北西隅（角）に寄せて配置
-      const x = cellX0 + 0.08;
-      const y = cellY0 + 3.94;
-      const sprite = createViewerTextSprite(label, "#334155", {
-        fontPx: 124,
-        scaleX: 1.88,
-        scaleY: 0.46,
-      });
-      // Spriteの基準点を左上へ寄せ、角配置を明確化
-      sprite.center.set(0, 1);
-      sprite.position.set(x, y, zBase + 0.01);
-      viewer3d.gridGroup.add(sprite);
-    }
+    const block = viewerXIndexToHeadBlock(xIndex).block;
+    const centerX = (xIndex - metrics.minXIndex) * 4 + 2;
+    const northLabel = createViewerTextPlane(block, "#1f3b35", {
+      fontPx: 127,
+      width: frameLabelWidth,
+      height: frameLabelHeight,
+    });
+    northLabel.position.set(centerX, colNorthY, labelPlaneZ);
+    viewer3d.gridGroup.add(northLabel);
+    const southLabel = createViewerTextPlane(block, "#1f3b35", {
+      fontPx: 127,
+      width: frameLabelWidth,
+      height: frameLabelHeight,
+    });
+    southLabel.position.set(centerX, colSouthY, labelPlaneZ);
+    viewer3d.gridGroup.add(southLabel);
   }
+  for (let no = metrics.minNo; no <= metrics.maxNo; no += 1) {
+    const rowText = String(no);
+    const centerY = (metrics.maxNo - no) * 4 + 2;
+    const westLabel = createViewerTextPlane(rowText, "#1f3b35", {
+      fontPx: 127,
+      width: frameLabelWidth,
+      height: frameLabelHeight,
+    });
+    westLabel.position.set(rowWestX, centerY, labelPlaneZ);
+    viewer3d.gridGroup.add(westLabel);
+    const eastLabel = createViewerTextPlane(rowText, "#1f3b35", {
+      fontPx: 127,
+      width: frameLabelWidth,
+      height: frameLabelHeight,
+    });
+    eastLabel.position.set(rowEastX, centerY, labelPlaneZ);
+    viewer3d.gridGroup.add(eastLabel);
+  }
+  const allCornerStakes = buildViewerAllGridCornerStakeLabels(metrics);
+  allCornerStakes.forEach((corner) => {
+    const label = createViewerTextPlane(corner.label, "#97a7bc", {
+      fontPx: 98,
+      width: stakeLabelWidth,
+      height: stakeLabelHeight,
+    });
+    label.position.set(corner.x, corner.y, labelPlaneZ);
+    viewer3d.gridGroup.add(label);
+  });
 
   const zStart = applyViewerVerticalScale(axisMinAltitude, metrics.minZ);
   const zEnd = applyViewerVerticalScale(axisMaxAltitude, metrics.minZ);
@@ -7302,6 +7360,27 @@ function renderViewerGrid(metrics) {
     axisLabel.position.set(corner.x + corner.dirX * 1.5, corner.y + corner.dirY * 1.5, zEnd + 0.85);
     viewer3d.gridGroup.add(axisLabel);
   });
+}
+
+function buildViewerAllGridCornerStakeLabels(metrics) {
+  const cols = Math.max(1, metrics.maxXIndex - metrics.minXIndex + 1);
+  const rows = Math.max(1, metrics.maxNo - metrics.minNo + 1);
+  const labels = [];
+  const cellSize = 4;
+  for (let xLine = 0; xLine <= cols; xLine += 1) {
+    const block = incrementGridBlock(viewerXIndexToHeadBlock(metrics.minXIndex).block, xLine);
+    const x = xLine * cellSize;
+    for (let yLine = 0; yLine <= rows; yLine += 1) {
+      const no = String(metrics.minNo + yLine);
+      const y = metrics.gridHeightM - yLine * cellSize;
+      labels.push({
+        label: `${block}-${no}`,
+        x,
+        y,
+      });
+    }
+  }
+  return labels;
 }
 
 function renderViewerSegment(start, end, color, radius = 0.04) {
@@ -7819,25 +7898,65 @@ function createViewerTextSprite(textRaw, colorRaw, options = {}) {
   const fontPx = Math.max(12, Number(options?.fontPx) || 44);
   const scaleX = Math.max(0.05, Number(options?.scaleX) || 0.95);
   const scaleY = Math.max(0.05, Number(options?.scaleY) || 0.24);
+  const resolutionScale = clamp(Math.round(Number(options?.resolutionScale) || 2), 1, 4);
+  const sizeAttenuation = options?.sizeAttenuation !== false;
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 128;
+  canvas.width = 512 * resolutionScale;
+  canvas.height = 128 * resolutionScale;
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = `700 ${fontPx}px 'Yu Gothic', sans-serif`;
+  ctx.font = `700 ${fontPx * resolutionScale}px 'Yu Gothic', sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = value(colorRaw) || "#111827";
   ctx.strokeStyle = "rgba(255,255,255,0.96)";
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 8 * resolutionScale;
   ctx.strokeText(value(textRaw) || "-", canvas.width / 2, canvas.height / 2);
   ctx.fillText(value(textRaw) || "-", canvas.width / 2, canvas.height / 2);
   const texture = new THREE.CanvasTexture(canvas);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, sizeAttenuation });
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(scaleX, scaleY, 1);
   return sprite;
+}
+
+function createViewerTextPlane(textRaw, colorRaw, options = {}) {
+  const fontPx = Math.max(12, Number(options?.fontPx) || 44);
+  const width = Math.max(0.05, Number(options?.width) || 0.8);
+  const height = Math.max(0.05, Number(options?.height) || 0.22);
+  const resolutionScale = clamp(Math.round(Number(options?.resolutionScale) || 2), 1, 4);
+  const canvas = document.createElement("canvas");
+  canvas.width = 512 * resolutionScale;
+  canvas.height = 128 * resolutionScale;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = `700 ${fontPx * resolutionScale}px 'Yu Gothic', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = value(colorRaw) || "#111827";
+  ctx.strokeStyle = "rgba(255,255,255,0.96)";
+  ctx.lineWidth = 8 * resolutionScale;
+  ctx.strokeText(value(textRaw) || "-", canvas.width / 2, canvas.height / 2);
+  ctx.fillText(value(textRaw) || "-", canvas.width / 2, canvas.height / 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    side: THREE.DoubleSide,
+  });
+  const geometry = new THREE.PlaneGeometry(width, height);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = 5;
+  return mesh;
 }
 
 function computeViewerBounds(shapes, metrics) {
@@ -7898,17 +8017,17 @@ function applyViewerPerspective() {
   const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
   const scale = normalizeViewerVerticalScale(viewerVerticalScale);
   const unscaledSpanZ = Math.max(1, spanZ / scale);
-  const focus = new THREE.Vector3(center.x, center.y, bounds.minZ + spanZ * 0.18);
-  const baseDist = Math.max(spanX, spanY) * 0.92 + Math.max(4, unscaledSpanZ * 2.8);
+  const focus = new THREE.Vector3(center.x, center.y, bounds.minZ + spanZ * 0.16);
+  const baseDist = Math.max(spanX, spanY) * 0.68 + Math.max(3.2, unscaledSpanZ * 2.2);
   const zoomInFactor = Math.pow(scale, -0.7);
-  const dist = baseDist * zoomInFactor * 0.88;
+  const dist = baseDist * zoomInFactor * 0.82;
   const perspective = selectedViewerPerspective === "iso" ? "se" : selectedViewerPerspective;
   if (perspective === "top") {
     viewer3d.camera.up.set(0, 1, 0);
     viewer3d.camera.position.set(focus.x, focus.y, focus.z + dist);
   } else {
     viewer3d.camera.up.set(0, 0, 1);
-    const sideElev = dist * 0.22;
+    const sideElev = dist * 0.14;
     if (perspective === "east") {
       viewer3d.camera.position.set(focus.x + dist, focus.y, focus.z + sideElev);
     } else if (perspective === "west") {
@@ -7927,6 +8046,35 @@ function applyViewerPerspective() {
   } else {
     viewer3d.camera.lookAt(focus);
   }
+}
+
+function handleViewerControlPointerDown(event) {
+  if (!viewer3d.controls || !window.THREE?.MOUSE) {
+    return;
+  }
+  if (isTouchLikePointerEvent(event)) {
+    return;
+  }
+  if (Number(event.button) === 0 && event.shiftKey) {
+    viewer3d.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+    viewer3d.shiftPanActive = true;
+    return;
+  }
+  viewer3d.controls.mouseButtons.LEFT =
+    viewer3d.defaultLeftMouseAction != null ? viewer3d.defaultLeftMouseAction : THREE.MOUSE.ROTATE;
+  viewer3d.shiftPanActive = false;
+}
+
+function handleViewerControlPointerUp() {
+  if (!viewer3d.controls || !window.THREE?.MOUSE) {
+    return;
+  }
+  if (!viewer3d.shiftPanActive) {
+    return;
+  }
+  viewer3d.controls.mouseButtons.LEFT =
+    viewer3d.defaultLeftMouseAction != null ? viewer3d.defaultLeftMouseAction : THREE.MOUSE.ROTATE;
+  viewer3d.shiftPanActive = false;
 }
 
 function handleViewerPointerMove(event) {
