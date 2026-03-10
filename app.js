@@ -279,6 +279,7 @@ function createInitialOutputColumnVisibilityMap() {
 let stateNeedsRewriteAfterLoad = false;
 let state = loadState();
 let editingRecordId = null;
+let activeEditRecordContext = null;
 let currentSectionDiagrams = [];
 let currentPhotos = [];
 let selectedCardRecordId = "";
@@ -927,7 +928,9 @@ function bindEvents() {
 
     const nowIsoValue = new Date().toISOString();
     const editingId = editingRecordId || recordIdInput.value;
-    const found = findRecord(editingId);
+    const found = isEditTab
+      ? findRecordByEditContext(editingId, activeEditRecordContext?.recordIndex, activeEditRecordContext?.recordSnapshot)
+      : findRecord(editingId);
     if (isEditTab && !found) {
       showToast("編集対象が見つかりません。リストから編集を選び直してください");
       return;
@@ -1093,7 +1096,9 @@ function bindEvents() {
       deletedAt: "",
     };
 
-    const targetIndex = state.records.findIndex((item) => item.id === recordBase.id);
+    const targetIndex = isEditTab
+      ? state.records.findIndex((item) => item === found)
+      : state.records.findIndex((item) => item.id === recordBase.id);
     const previousRecord = targetIndex >= 0 ? state.records[targetIndex] : null;
     const historyAction = isEditTab ? "上書き保存" : targetIndex >= 0 ? "更新保存" : "新規保存";
     const record = {
@@ -1120,6 +1125,12 @@ function bindEvents() {
       renderOutputs();
       markOverwriteUpdatedState(found, record, value(found?.kuwaku), recordKuwaku);
       overwriteOriginalRecord = { ...record };
+      const savedRecordIndex = state.records.findIndex((item) => item === record);
+      activeEditRecordContext = {
+        recordId: value(record.id),
+        recordIndex: String(savedRecordIndex >= 0 ? savedRecordIndex : ""),
+        recordSnapshot: buildCellEditRecordSnapshot(record),
+      };
       renderEditHistory(record);
       updateEditMissingRequiredHighlights();
       return;
@@ -1190,38 +1201,50 @@ function bindEvents() {
     }
     const action = button.dataset.action;
     const recordId = button.dataset.id;
-    const record = findRecord(recordId);
-    if (!record) {
-      showToast("対象データが見つかりません");
-      return;
-    }
+    const row = button.closest("tr[data-record-index]");
+    const recordIndex = value(button.dataset.recordIndex) || value(row?.dataset?.recordIndex);
+    const record = findRecordByEditContext(recordId, recordIndex, null);
 
     if (action === "edit") {
       const rowKuwaku = value(button.dataset.kuwaku);
-      openRecordForEdit(recordId, rowKuwaku);
+      openRecordForEdit(recordId, rowKuwaku, recordIndex);
       return;
     }
     if (action === "copy-to-input") {
+      if (!record) {
+        showToast("対象データが見つかりません");
+        return;
+      }
       const rowKuwaku = value(button.dataset.kuwaku);
-      copySavedRecordToInput(recordId, rowKuwaku);
+      copySavedRecordToInput(value(record.id) || recordId, rowKuwaku, record);
       return;
     }
     if (action === "card") {
-      selectedCardRecordId = selectedCardRecordId === recordId ? "" : recordId;
+      if (!record) {
+        showToast("対象データが見つかりません");
+        return;
+      }
+      const nextCardId = value(record.id) || recordId;
+      selectedCardRecordId = selectedCardRecordId === nextCardId ? "" : nextCardId;
       renderListOutput();
       renderCardOutput();
       return;
     }
     if (action === "delete") {
+      if (!record) {
+        showToast("対象データが見つかりません");
+        return;
+      }
       const answer = window.confirm(`標本番号 ${record.specimenNo} を削除しますか？`);
       if (!answer) {
         return;
       }
-      state.records = state.records.filter((item) => item.id !== recordId);
-      if (editingRecordId === recordId) {
+      const deletingId = value(record.id) || recordId;
+      state.records = state.records.filter((item) => item !== record);
+      if (editingRecordId === deletingId) {
         resetRecordForm({ showMessage: false });
       }
-      if (selectedCardRecordId === recordId) {
+      if (selectedCardRecordId === deletingId) {
         selectedCardRecordId = "";
       }
       persist("記録を削除しました");
@@ -1242,11 +1265,12 @@ function bindEvents() {
     const row = target.closest("tr[data-record-id]");
     const editKey = value(cell?.dataset?.cellEditKey);
     const recordId = value(row?.dataset?.recordId);
+    const recordIndex = value(row?.dataset?.recordIndex);
     if (!cell || !row || !editKey || !recordId || !outputListBody.contains(row)) {
       return;
     }
     event.preventDefault();
-    openOutputCellEditModal(recordId, editKey);
+    openOutputCellEditModal(recordId, editKey, recordIndex);
   });
 
   if (outputListTable) {
@@ -2480,6 +2504,7 @@ function loadRecordIntoInputForNavigation(record, preferredKuwaku = "") {
   clearOverwriteUpdatedState();
   clearEditHistory();
   editingRecordId = null;
+  activeEditRecordContext = null;
   if (recordIdInput) {
     recordIdInput.value = "";
   }
@@ -3688,6 +3713,7 @@ function resetRecordForm({ showMessage }) {
   isOverwriteMode = false;
   overwriteOriginalRecord = null;
   editingRecordId = null;
+  activeEditRecordContext = null;
   recordIdInput.value = "";
   recordSubmitBtn.textContent = "記録を保存";
   clearCarryForwardSavedFields();
@@ -3975,8 +4001,8 @@ function populateRecordForm(record) {
   updateEditMissingRequiredHighlights();
 }
 
-function openRecordForEdit(recordId, preferredKuwaku = "") {
-  const record = findRecord(recordId);
+function openRecordForEdit(recordId, preferredKuwaku = "", recordIndexRaw = "") {
+  const record = findRecordByEditContext(recordId, recordIndexRaw, null);
   if (!record) {
     showToast("対象データが見つかりません");
     return;
@@ -4020,6 +4046,12 @@ function openRecordForEdit(recordId, preferredKuwaku = "") {
   }
   isOverwriteMode = true;
   overwriteOriginalRecord = { ...record };
+  const recordIndex = state.records.findIndex((item) => item === record);
+  activeEditRecordContext = {
+    recordId: value(record.id),
+    recordIndex: String(recordIndex >= 0 ? recordIndex : ""),
+    recordSnapshot: buildCellEditRecordSnapshot(record),
+  };
   clearOverwriteUpdatedState();
   populateRecordForm(record);
   renderEditHistory(record);
@@ -4206,6 +4238,7 @@ function copyCurrentEditToInput() {
   clearOverwriteUpdatedState();
   clearEditHistory();
   editingRecordId = null;
+  activeEditRecordContext = null;
   if (recordIdInput) {
     recordIdInput.value = "";
   }
@@ -4223,6 +4256,7 @@ function copyCurrentEditToInput() {
     photoRulerChecked: "",
   });
   editingRecordId = null;
+  activeEditRecordContext = null;
   if (recordIdInput) {
     recordIdInput.value = "";
   }
@@ -4230,8 +4264,8 @@ function copyCurrentEditToInput() {
   showToast("コピーして新規入力を作成しました");
 }
 
-function copySavedRecordToInput(recordId, preferredKuwaku = "") {
-  const record = findRecord(recordId);
+function copySavedRecordToInput(recordId, preferredKuwaku = "", recordRaw = null) {
+  const record = recordRaw && typeof recordRaw === "object" ? recordRaw : findRecord(recordId);
   if (!record) {
     showToast("対象データが見つかりません");
     return;
@@ -4259,6 +4293,7 @@ function copySavedRecordToInput(recordId, preferredKuwaku = "") {
   clearOverwriteUpdatedState();
   clearEditHistory();
   editingRecordId = null;
+  activeEditRecordContext = null;
   if (recordIdInput) {
     recordIdInput.value = "";
   }
@@ -4276,6 +4311,7 @@ function copySavedRecordToInput(recordId, preferredKuwaku = "") {
     photoRulerChecked: "",
   });
   editingRecordId = null;
+  activeEditRecordContext = null;
   if (recordIdInput) {
     recordIdInput.value = "";
   }
@@ -4605,10 +4641,22 @@ function renderRecordTableBodyRows(targetBody, records, emptyMessage) {
     targetBody.innerHTML = `<tr><td colspan="8">${escapeHtml(emptyMessage || "表示対象データがありません。")}</td></tr>`;
     return;
   }
-  targetBody.innerHTML = records.map((record) => buildRecordTableRowHtml(record)).join("");
+  const recordIndexMap = new Map();
+  state.records.forEach((record, index) => {
+    if (record && typeof record === "object") {
+      recordIndexMap.set(record, index);
+    }
+  });
+  targetBody.innerHTML = records
+    .map((record) => {
+      const recordIndex = Number(recordIndexMap.get(record));
+      return buildRecordTableRowHtml(record, Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : "");
+    })
+    .join("");
 }
 
-function buildRecordTableRowHtml(record) {
+function buildRecordTableRowHtml(record, recordIndexRaw = "") {
+  const recordIndex = value(recordIndexRaw);
   return `
       <tr>
         <td>${escapeHtml(getRecordKuwaku(record))}</td>
@@ -4622,11 +4670,11 @@ function buildRecordTableRowHtml(record) {
           <div class="row-actions">
             <button type="button" data-action="edit" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
-            )}">編集</button>
+            )}" data-record-index="${escapeHtml(recordIndex)}">編集</button>
             <button type="button" data-action="copy-to-input" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
-            )}">コピーして新規入力</button>
-            <button class="danger" type="button" data-action="delete" data-id="${record.id}">削除</button>
+            )}" data-record-index="${escapeHtml(recordIndex)}">コピーして新規入力</button>
+            <button class="danger" type="button" data-action="delete" data-id="${record.id}" data-record-index="${escapeHtml(recordIndex)}">削除</button>
           </div>
         </td>
       </tr>
@@ -4641,8 +4689,10 @@ function handleRecordTableActionClick(event) {
   const sourceTableBody = event.currentTarget;
   const shouldScrollToDetailTop = sourceTableBody === recordTableBody || sourceTableBody === editRecordTableBody;
   const recordId = button.dataset.id;
+  const row = button.closest("tr[data-record-index]");
+  const recordIndex = value(button.dataset.recordIndex) || value(row?.dataset?.recordIndex);
   const action = button.dataset.action;
-  const record = findRecord(recordId);
+  const record = findRecordByEditContext(recordId, recordIndex, null);
   if (!record) {
     showToast("対象データが見つかりません");
     return;
@@ -4650,7 +4700,7 @@ function handleRecordTableActionClick(event) {
 
   if (action === "edit") {
     const rowKuwaku = value(button.dataset.kuwaku);
-    openRecordForEdit(record.id, rowKuwaku);
+    openRecordForEdit(record.id, rowKuwaku, recordIndex);
     if (shouldScrollToDetailTop) {
       scrollToDetailInputTop();
     }
@@ -4658,7 +4708,7 @@ function handleRecordTableActionClick(event) {
   }
   if (action === "copy-to-input") {
     const rowKuwaku = value(button.dataset.kuwaku);
-    copySavedRecordToInput(recordId, rowKuwaku);
+    copySavedRecordToInput(recordId, rowKuwaku, record);
     return;
   }
   if (action === "delete") {
@@ -4666,8 +4716,9 @@ function handleRecordTableActionClick(event) {
     if (!answer) {
       return;
     }
-    state.records = state.records.filter((item) => item.id !== recordId);
-    if (editingRecordId === recordId) {
+    const deletingId = value(record.id) || recordId;
+    state.records = state.records.filter((item) => item !== record);
+    if (editingRecordId === deletingId) {
       resetRecordForm({ showMessage: false });
     }
     persist("記録を削除しました");
@@ -5519,11 +5570,86 @@ function normalizeDateForExportRange(dateRaw) {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function openOutputCellEditModal(recordId, editKey) {
+function parseRecordIndex(recordIndexRaw) {
+  const index = Number(recordIndexRaw);
+  if (!Number.isInteger(index) || index < 0) {
+    return -1;
+  }
+  return index;
+}
+
+function buildCellEditRecordSnapshot(record) {
+  return {
+    id: value(record?.id),
+    specimenNo: parseSpecimenNo(record?.specimenNo, record?.specimenPrefix, record?.specimenSerial).specimenNo,
+    kuwaku: normalizeKuwakuText(getRecordKuwaku(record)),
+    createdAt: value(record?.createdAt),
+  };
+}
+
+function matchesCellEditRecordSnapshot(record, snapshotRaw) {
+  const snapshot = snapshotRaw && typeof snapshotRaw === "object" ? snapshotRaw : {};
+  if (!record) {
+    return false;
+  }
+  if (value(snapshot.id) && value(record.id) !== value(snapshot.id)) {
+    return false;
+  }
+  if (value(snapshot.specimenNo)) {
+    const specimenNo = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial).specimenNo;
+    if (specimenNo !== value(snapshot.specimenNo)) {
+      return false;
+    }
+  }
+  if (value(snapshot.kuwaku) && normalizeKuwakuText(getRecordKuwaku(record)) !== value(snapshot.kuwaku)) {
+    return false;
+  }
+  if (value(snapshot.createdAt) && value(record.createdAt) !== value(snapshot.createdAt)) {
+    return false;
+  }
+  return true;
+}
+
+function findRecordByEditContext(recordIdRaw, recordIndexRaw = "", snapshotRaw = null) {
+  const recordId = value(recordIdRaw);
+  const recordIndex = parseRecordIndex(recordIndexRaw);
+  const snapshot = snapshotRaw && typeof snapshotRaw === "object" ? snapshotRaw : null;
+
+  if (recordIndex >= 0 && recordIndex < state.records.length) {
+    const byIndex = state.records[recordIndex];
+    if (byIndex && (!recordId || value(byIndex.id) === recordId) && matchesCellEditRecordSnapshot(byIndex, snapshot)) {
+      return byIndex;
+    }
+  }
+
+  if (snapshot) {
+    const exactMatches = state.records.filter((item) => matchesCellEditRecordSnapshot(item, snapshot));
+    if (exactMatches.length === 1) {
+      return exactMatches[0];
+    }
+  }
+
+  if (recordId) {
+    const idMatches = state.records.filter((item) => value(item?.id) === recordId);
+    if (idMatches.length === 1) {
+      return idMatches[0];
+    }
+    if (snapshot) {
+      const idAndSnapshotMatches = idMatches.filter((item) => matchesCellEditRecordSnapshot(item, snapshot));
+      if (idAndSnapshotMatches.length === 1) {
+        return idAndSnapshotMatches[0];
+      }
+    }
+  }
+
+  return null;
+}
+
+function openOutputCellEditModal(recordId, editKey, recordIndexRaw = "") {
   if (!cellEditModal || !cellEditTitle || !cellEditMeta || !cellEditFields) {
     return;
   }
-  const record = findRecord(recordId);
+  const record = findRecordByEditContext(recordId, recordIndexRaw, null);
   if (!record) {
     showToast("対象データが見つかりません");
     return;
@@ -5541,6 +5667,8 @@ function openOutputCellEditModal(recordId, editKey) {
   activeOutputCellEdit = {
     recordId: value(record.id),
     editKey: value(editKey),
+    recordIndex: String(parseRecordIndex(recordIndexRaw)),
+    recordSnapshot: buildCellEditRecordSnapshot(record),
   };
   cellEditTitle.textContent = `${label}を編集`;
   cellEditMeta.textContent = `標本番号 ${record.specimenNo || "-"} / 区画 ${getRecordKuwaku(record) || "-"}`;
@@ -5826,10 +5954,14 @@ function saveOutputCellEditFromModal() {
   if (!activeOutputCellEdit || !cellEditForm) {
     return;
   }
-  const record = findRecord(activeOutputCellEdit.recordId);
+  const record = findRecordByEditContext(
+    activeOutputCellEdit.recordId,
+    activeOutputCellEdit.recordIndex,
+    activeOutputCellEdit.recordSnapshot
+  );
   if (!record) {
     closeOutputCellEditModal();
-    showToast("対象データが見つかりません");
+    showToast("対象データが見つかりません（一覧を再表示してから再度編集してください）");
     return;
   }
   const formData = new FormData(cellEditForm);
@@ -6071,6 +6203,13 @@ function renderListOutput() {
     return;
   }
 
+  const recordIndexMap = new Map();
+  state.records.forEach((record, index) => {
+    if (record && typeof record === "object") {
+      recordIndexMap.set(record, index);
+    }
+  });
+
   outputListBody.innerHTML = sortOutputRecordsForList(filteredRecords)
     .map((record) => {
       const selectedClass = record.id === selectedCardRecordId ? "selected-card-row" : "";
@@ -6120,8 +6259,9 @@ function renderListOutput() {
         "customLargeImageName",
         "customLargeImageDataUrl",
       ]);
+      const recordIndex = Number(recordIndexMap.get(record));
       return `
-      <tr class="${selectedClass}" data-record-id="${escapeHtml(value(record.id))}">
+      <tr class="${selectedClass}" data-record-id="${escapeHtml(value(record.id))}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">
         <td data-col-key="kuwaku" data-cell-edit-key="kuwaku" class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
           kuwakuText
         )}</td>
@@ -6154,14 +6294,14 @@ function renderListOutput() {
         <td data-col-key="notes" data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
         <td data-col-key="actions">
           <div class="row-actions">
-            <button type="button" data-action="card" data-id="${record.id}">${cardButtonLabel}</button>
+            <button type="button" data-action="card" data-id="${record.id}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">${cardButtonLabel}</button>
             <button type="button" data-action="copy-to-input" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
-            )}">コピーして新規入力</button>
+            )}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">コピーして新規入力</button>
             <button type="button" data-action="edit" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
-            )}">編集</button>
-            <button class="danger" type="button" data-action="delete" data-id="${record.id}">削除</button>
+            )}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">編集</button>
+            <button class="danger" type="button" data-action="delete" data-id="${record.id}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">削除</button>
           </div>
         </td>
       </tr>
@@ -10432,6 +10572,27 @@ function hasSpacingNormalizationDiff(beforeState, afterState) {
   }
 }
 
+function ensureUniqueRecordIds(recordsRaw) {
+  if (!Array.isArray(recordsRaw)) {
+    return [];
+  }
+  const seenIds = new Set();
+  return recordsRaw.map((recordRaw) => {
+    if (!recordRaw || typeof recordRaw !== "object") {
+      return recordRaw;
+    }
+    const record = { ...recordRaw };
+    const currentId = value(record.id);
+    if (!currentId || seenIds.has(currentId)) {
+      record.id = newId("record");
+      seenIds.add(record.id);
+      return record;
+    }
+    seenIds.add(currentId);
+    return record;
+  });
+}
+
 function normalizeState(candidate) {
   const safe = createInitialState();
   if (!candidate || typeof candidate !== "object") {
@@ -10460,7 +10621,7 @@ function normalizeState(candidate) {
   };
 
   if (Array.isArray(candidate.records)) {
-    safe.records = candidate.records.map((item) => normalizeRecord(item, safe.site)).filter(Boolean);
+    safe.records = ensureUniqueRecordIds(candidate.records.map((item) => normalizeRecord(item, safe.site)).filter(Boolean));
     return safe;
   }
 
@@ -10468,7 +10629,8 @@ function normalizeState(candidate) {
   const cards = candidate.cards && typeof candidate.cards === "object" ? candidate.cards : {};
   const photos = candidate.photos && typeof candidate.photos === "object" ? candidate.photos : {};
 
-  safe.records = artifacts
+  safe.records = ensureUniqueRecordIds(
+    artifacts
     .map((artifact) => {
       if (!artifact || typeof artifact !== "object") {
         return null;
@@ -10526,7 +10688,8 @@ function normalizeState(candidate) {
         updatedAt: value(artifact.updatedAt),
       }, safe.site);
     })
-    .filter(Boolean);
+    .filter(Boolean)
+  );
 
   return safe;
 }
