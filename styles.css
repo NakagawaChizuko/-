@@ -877,6 +877,18 @@ main {
   fill: none;
 }
 
+.plan-map-svg .plan-shape-multipoint-hull {
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: none;
+  fill: none;
+}
+
+.plan-map-svg .plan-shape-multipoint-dot {
+  stroke: #ffffff;
+  stroke-width: 1.1;
+}
+
 .plan-image-hotspot {
   pointer-events: all;
 }
@@ -1245,7 +1257,7 @@ main {
 
 .unit-detail-inline {
   display: grid;
-  grid-template-columns: repeat(3, minmax(88px, 128px));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 128px));
   justify-content: start;
   align-items: end;
   gap: 8px;
@@ -1265,7 +1277,12 @@ main {
   gap: 0;
 }
 
-.detail-sub-input::placeholder {
+.unit-detail-inline .layer-facies-group {
+  grid-column: span 2;
+}
+
+.detail-sub-input::placeholder,
+.layer-facies-input::placeholder {
   color: #94a3b8;
 }
 
@@ -1822,6 +1839,78 @@ textarea {
   margin-top: 6px;
   display: grid;
   gap: 8px;
+}
+
+.multi-point-section {
+  margin-top: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+}
+
+.multi-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.multi-point-add-btn {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  background: #f7fafc;
+  color: #203043;
+  border-color: var(--line);
+}
+
+.multi-point-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.multi-point-row {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.multi-point-input {
+  display: grid;
+  grid-template-columns: auto minmax(82px, 108px) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.multi-point-row select,
+.multi-point-row input {
+  margin-top: 4px;
+}
+
+.multi-point-input span {
+  color: #5b6777;
+  font-size: 0.84rem;
+}
+
+.multi-point-remove {
+  padding: 5px 9px;
+  font-size: 0.78rem;
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.multi-point-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .image-shape-tabs {
@@ -2535,6 +2624,10 @@ th.sortable-header.sort-desc::after {
     gap: 8px;
   }
 
+  .unit-detail-inline .layer-facies-group {
+    grid-column: span 1;
+  }
+
   #site-form .site-kuwaku,
   #site-form .site-level,
   #site-form .site-date,
@@ -2588,6 +2681,10 @@ th.sortable-header.sort-desc::after {
   }
 
   .large-line-axis-row {
+    grid-template-columns: 1fr;
+  }
+
+  .multi-point-row {
     grid-template-columns: 1fr;
   }
 }

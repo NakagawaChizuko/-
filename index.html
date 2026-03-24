@@ -13,9 +13,9 @@
     <header class="app-header">
       <div>
         <h1>第24次野尻湖湖底発掘　化石・遺物 入力フォーム</h1>
-        <p class="header-update-note">3D表現が可能になりました(2026.03.07)</p>
-        <p class="header-update-note">画像のアップが可能になりました(2026.03.08)</p>
-        <p class="header-update-note">リストから編集が可能になりました（2026.03.09）</p>
+        <p class="header-update-note">リストで行を増やせるようになりました（2026.03.23）</p>
+        <p class="header-update-note">層相の記入欄をつくりました（2026.03.23）</p>
+        <p class="header-update-note">複数の点を表示できるようになりました（2026.03.24）</p>
       </div>
       <div class="header-actions">
         <div class="cloud-controls">
@@ -29,7 +29,7 @@
     </header>
 
     <nav class="tabs" aria-label="入力セクション">
-      <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
+      <button class="tab-button active" data-tab="output-tab" type="button">1．リスト</button>
       <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
       <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
       <button class="tab-button" data-tab="viewer-tab" type="button">4. 3Dビュアー</button>
@@ -242,10 +242,19 @@
             <fieldset class="inline-fieldset span-3">
               <legend>平面位置（大きなもの・画像利用）</legend>
               <div class="dir-tabs" role="tablist" aria-label="大きなもの設定">
-                <button class="dir-tab active" data-group="planSizeMode" data-value="通常" type="button">通常（点）</button>
+                <button class="dir-tab active" data-group="planSizeMode" data-value="通常" type="button">通常（1点）</button>
+                <button class="dir-tab" data-group="planSizeMode" data-value="複数点" type="button">複数点</button>
                 <button class="dir-tab" data-group="planSizeMode" data-value="大きなもの" type="button">大きなもの・画像利用</button>
               </div>
               <input id="plan-size-mode-input" name="planSizeMode" type="hidden" value="通常" />
+              <div id="multi-point-section" class="multi-point-section hidden">
+                <div class="multi-point-header">
+                  <strong>複数点入力</strong>
+                  <button id="multi-point-add-btn" class="multi-point-add-btn" type="button">点を追加</button>
+                </div>
+                <p class="hint-text">平面位置[北から・南から] と 平面位置[東から・西から] の組を複数入力できます。</p>
+                <div id="multi-point-rows" class="multi-point-rows"></div>
+              </div>
 
               <div id="large-shape-section" class="large-shape-section hidden">
                 <div class="dir-tabs" role="tablist" aria-label="大きなもの形状">
@@ -444,6 +453,9 @@
               <label class="compact-input-group"><span class="label-title">細分</span>
                 <input class="detail-sub-input" name="detailSub" type="text" placeholder="上，下など" aria-label="細分" />
               </label>
+              <label class="compact-input-group layer-facies-group"><span class="label-title">層相</span>
+                <input class="layer-facies-input" name="layerFacies" type="text" placeholder="例：暗灰色中粒砂" aria-label="層相（自由表記）" />
+              </label>
             </div>
             <fieldset class="inline-fieldset span-2">
               <legend>地層中の位置<span class="required">*</span></legend>
@@ -611,10 +623,6 @@
           </div>
         </section>
 
-        <section class="panel">
-          <h2>カード形式プレビュー</h2>
-          <div id="card-output-list" class="card-output-list"></div>
-        </section>
       </section>
 
       <section id="plan-tab" class="tab-panel">
@@ -940,7 +948,7 @@
       </section>
     </main>
     <nav class="tabs tabs-bottom" aria-label="入力セクション（下部）">
-      <button class="tab-button active" data-tab="output-tab" type="button">1. リスト/カード</button>
+      <button class="tab-button active" data-tab="output-tab" type="button">1．リスト</button>
       <button class="tab-button" data-tab="input-tab" type="button">2. 入力画面</button>
       <button class="tab-button" data-tab="plan-tab" type="button">3. 平面図</button>
       <button class="tab-button" data-tab="viewer-tab" type="button">4. 3Dビュアー</button>

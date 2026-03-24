@@ -104,6 +104,7 @@ const REQUIRED_FIELD_LABELS = {
   nsCm: "平面位置（北から/南からの距離）",
   ewDir: "平面位置（東から/西から）",
   ewCm: "平面位置（東から/西からの距離）",
+  multiPoints: "平面位置（複数点）",
   largeShapeType: "大きなもの形状",
   largeAxisDirection: "長軸・長辺・長半径方向（例:N30W）",
   largeAxisPlungeDeg: "プランジ角（度）",
@@ -147,6 +148,7 @@ const HISTORY_SNAPSHOT_FIELDS = [
   { key: "layerName", label: "地層名" },
   { key: "unit", label: "ユニット" },
   { key: "detail", label: "サブユニット" },
+  { key: "layerFacies", label: "層相" },
   { key: "layerPosition", label: "地層中の位置" },
 ];
 const HISTORY_SNAPSHOT_FIELD_KEYS = new Set(HISTORY_SNAPSHOT_FIELDS.map((field) => field.key));
@@ -493,6 +495,9 @@ const line1NsDirInput = document.getElementById("line1-ns-dir-input");
 const line1EwDirInput = document.getElementById("line1-ew-dir-input");
 const line2NsDirInput = document.getElementById("line2-ns-dir-input");
 const line2EwDirInput = document.getElementById("line2-ew-dir-input");
+const multiPointSection = document.getElementById("multi-point-section");
+const multiPointRows = document.getElementById("multi-point-rows");
+const multiPointAddBtn = document.getElementById("multi-point-add-btn");
 const largeShapeSection = document.getElementById("large-shape-section");
 const largeShapePanels = document.querySelectorAll(".large-shape-panel[data-large-shape-panel]");
 const layerTabButtons = document.querySelectorAll(".layer-tab");
@@ -828,6 +833,34 @@ function bindEvents() {
     }
     activateDirectionTab(button.dataset.group, button.dataset.value);
   });
+  if (multiPointAddBtn && multiPointRows) {
+    multiPointAddBtn.addEventListener("click", () => {
+      multiPointRows.append(createMultiPointRowElement(createDefaultPlanMultiPoint()));
+      syncMultiPointRemoveButtonState();
+    });
+  }
+  if (multiPointRows) {
+    multiPointRows.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const removeButton = target.closest("[data-multi-point-remove]");
+      if (!(removeButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const row = removeButton.closest("[data-multi-point-row]");
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+      const rows = multiPointRows.querySelectorAll("[data-multi-point-row]");
+      if (rows.length <= 1) {
+        return;
+      }
+      row.remove();
+      syncMultiPointRemoveButtonState();
+    });
+  }
 
   layerTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -936,6 +969,15 @@ function bindEvents() {
       return;
     }
     const specimenNo = buildSpecimenNo(specimenPrefix, specimenSerial);
+    const parsedKuwakuForDuplicateCheck = parseKuwaku(recordKuwaku);
+    const hasKuwakuForDuplicateCheck = value(parsedKuwakuForDuplicateCheck.block) && value(parsedKuwakuForDuplicateCheck.no);
+    const duplicateRecord = hasKuwakuForDuplicateCheck
+      ? findDuplicateRecordByKuwakuAndSpecimen(recordKuwaku, specimenNo, value(found?.id))
+      : null;
+    if (duplicateRecord) {
+      showToast(`この区画には ${specimenNo} がすでにあります`);
+      return;
+    }
     const saveAnswer = window.confirm(
       isEditTab ? `${specimenNo}の情報を上書き保存しますか？` : `${specimenNo}の情報を保存しますか？`
     );
@@ -963,6 +1005,7 @@ function bindEvents() {
         };
     const recordTeamState = normalizeTeamState(recordSiteSnapshot.team, recordSiteSnapshot.teamOther);
     const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+    const planMultiPoints = planSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
     const rawLargeShapeType = value(formData.get("largeShapeType"));
     const largeShapeType =
       planSizeMode === "大きなもの"
@@ -1031,6 +1074,7 @@ function bindEvents() {
       nsCm: value(formData.get("nsCm")),
       ewDir: normalizeEwDir(value(formData.get("ewDir"))),
       ewCm: value(formData.get("ewCm")),
+      multiPoints: planMultiPoints,
       planSizeMode,
       largeShapeType,
       largeAxisDirection: isLargeImageShape || !usesAxisDirection ? "" : largeAxisDirection,
@@ -1085,6 +1129,7 @@ function bindEvents() {
       layerName: getSelectedLayerName(),
       detail: compactNoSpaceValue(formData.get("detail")),
       detailSub: value(formData.get("detailSub")),
+      layerFacies: value(formData.get("layerFacies")),
       layerRef: value(formData.get("layerRef")),
       layerFromCm: value(formData.get("layerFromCm")),
       layerRelative: value(formData.get("layerRelative")),
@@ -1141,6 +1186,7 @@ function bindEvents() {
       unit: record.unit,
       detail: record.detail,
       detailSub: record.detailSub,
+      layerFacies: record.layerFacies,
       layerRef: record.layerRef,
       layerFromCm: record.layerFromCm,
       layerRelative: record.layerRelative,
@@ -1219,15 +1265,13 @@ function bindEvents() {
       copySavedRecordToInput(value(record.id) || recordId, rowKuwaku, record);
       return;
     }
-    if (action === "card") {
+    if (action === "insert-row") {
       if (!record) {
         showToast("対象データが見つかりません");
         return;
       }
-      const nextCardId = value(record.id) || recordId;
-      selectedCardRecordId = selectedCardRecordId === nextCardId ? "" : nextCardId;
-      renderListOutput();
-      renderCardOutput();
+      const rowKuwaku = value(button.dataset.kuwaku);
+      insertRowFromList(value(record.id) || recordId, rowKuwaku, record);
       return;
     }
     if (action === "delete") {
@@ -1935,7 +1979,6 @@ function setActiveTab(tabId) {
   if (tabId === "output-tab") {
     restoreOutputFilters();
     renderListOutput();
-    renderCardOutput();
   }
   if (CLOUD_AUTO_PULL_ENABLED && cloudEndpoint && (tabId === "output-tab" || tabId === "plan-tab" || tabId === "viewer-tab" || tabId === "export-tab")) {
     void pullStateFromCloud({ force: false, showToastOnSuccess: false, silentOnError: true });
@@ -2045,9 +2088,6 @@ function updateDuplicateSpecimenWarning() {
   if (!specimenDuplicateWarning) {
     return;
   }
-  if (recordSubmitBtn) {
-    recordSubmitBtn.disabled = false;
-  }
   const activeTabId = getActiveTabId();
   if (activeTabId !== "input-tab" && activeTabId !== "edit-tab") {
     hideDuplicateSpecimenWarning();
@@ -2075,9 +2115,6 @@ function updateDuplicateSpecimenWarning() {
   }
   specimenDuplicateWarning.textContent = `警告: この区画には ${specimenNo} がすでにあります`;
   specimenDuplicateWarning.classList.remove("hidden");
-  if (recordSubmitBtn) {
-    recordSubmitBtn.disabled = true;
-  }
 }
 
 function currentKuwakuForDuplicateWarning(activeTabId = getActiveTabId()) {
@@ -2108,9 +2145,6 @@ function hideDuplicateSpecimenWarning() {
   }
   specimenDuplicateWarning.textContent = "";
   specimenDuplicateWarning.classList.add("hidden");
-  if (recordSubmitBtn) {
-    recordSubmitBtn.disabled = false;
-  }
 }
 
 function moveToPreviousSpecimenWithoutSave() {
@@ -2784,6 +2818,194 @@ function formatLengthInputValue(lengthRaw) {
   return String(Number(length.toFixed(3)));
 }
 
+function normalizePlanMultiPointDir(valueRaw, axis = "ns") {
+  return axis === "ew" ? normalizeEwDir(valueRaw) : normalizeNsDir(valueRaw);
+}
+
+function normalizePlanMultiPointDistance(valueRaw) {
+  const distance = parseDistanceToCm(valueRaw);
+  if (distance == null || distance < 0) {
+    return "";
+  }
+  return formatLengthInputValue(distance);
+}
+
+function createDefaultPlanMultiPoint() {
+  return {
+    nsDir: "北から",
+    nsCm: "",
+    ewDir: "東から",
+    ewCm: "",
+  };
+}
+
+function normalizePlanMultiPointEntry(entryRaw) {
+  const entry = entryRaw && typeof entryRaw === "object" ? entryRaw : {};
+  const nsDir = normalizePlanMultiPointDir(value(entry.nsDir), "ns");
+  const ewDir = normalizePlanMultiPointDir(value(entry.ewDir), "ew");
+  const nsCm = normalizePlanMultiPointDistance(value(entry.nsCm));
+  const ewCm = normalizePlanMultiPointDistance(value(entry.ewCm));
+  if (!nsCm || !ewCm) {
+    return null;
+  }
+  return {
+    nsDir,
+    nsCm,
+    ewDir,
+    ewCm,
+  };
+}
+
+function normalizePlanMultiPoints(pointsRaw) {
+  const points = Array.isArray(pointsRaw) ? pointsRaw : [];
+  const normalized = [];
+  const seen = new Set();
+  points.forEach((point) => {
+    const entry = normalizePlanMultiPointEntry(point);
+    if (!entry) {
+      return;
+    }
+    const key = `${entry.nsDir}|${entry.nsCm}|${entry.ewDir}|${entry.ewCm}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    normalized.push(entry);
+  });
+  return normalized;
+}
+
+function createMultiPointRowElement(pointRaw = {}) {
+  const normalized = normalizePlanMultiPointEntry(pointRaw) || {
+    ...createDefaultPlanMultiPoint(),
+    nsDir: normalizePlanMultiPointDir(value(pointRaw?.nsDir), "ns"),
+    ewDir: normalizePlanMultiPointDir(value(pointRaw?.ewDir), "ew"),
+  };
+  const row = document.createElement("div");
+  row.className = "multi-point-row";
+  row.dataset.multiPointRow = "1";
+
+  const nsLabel = document.createElement("label");
+  nsLabel.textContent = "平面位置[北から・南から]";
+  const nsWrap = document.createElement("div");
+  nsWrap.className = "multi-point-input";
+  const nsDirSelect = document.createElement("select");
+  nsDirSelect.dataset.multiPointNsDir = "1";
+  ["北から", "南から"].forEach((dir) => {
+    const option = document.createElement("option");
+    option.value = dir;
+    option.textContent = dir;
+    nsDirSelect.append(option);
+  });
+  nsDirSelect.value = normalized.nsDir;
+  const nsCmInput = document.createElement("input");
+  nsCmInput.type = "text";
+  nsCmInput.placeholder = "cm";
+  nsCmInput.inputMode = "decimal";
+  nsCmInput.dataset.multiPointNsCm = "1";
+  nsCmInput.value = value(normalized.nsCm);
+  const nsUnit = document.createElement("span");
+  nsUnit.textContent = "cm";
+  nsWrap.append(nsDirSelect, nsCmInput, nsUnit);
+  nsLabel.append(nsWrap);
+
+  const ewLabel = document.createElement("label");
+  ewLabel.textContent = "平面位置[東から・西から]";
+  const ewWrap = document.createElement("div");
+  ewWrap.className = "multi-point-input";
+  const ewDirSelect = document.createElement("select");
+  ewDirSelect.dataset.multiPointEwDir = "1";
+  ["東から", "西から"].forEach((dir) => {
+    const option = document.createElement("option");
+    option.value = dir;
+    option.textContent = dir;
+    ewDirSelect.append(option);
+  });
+  ewDirSelect.value = normalized.ewDir;
+  const ewCmInput = document.createElement("input");
+  ewCmInput.type = "text";
+  ewCmInput.placeholder = "cm";
+  ewCmInput.inputMode = "decimal";
+  ewCmInput.dataset.multiPointEwCm = "1";
+  ewCmInput.value = value(normalized.ewCm);
+  const ewUnit = document.createElement("span");
+  ewUnit.textContent = "cm";
+  ewWrap.append(ewDirSelect, ewCmInput, ewUnit);
+  ewLabel.append(ewWrap);
+
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.className = "multi-point-remove";
+  removeButton.dataset.multiPointRemove = "1";
+  removeButton.textContent = "削除";
+
+  row.append(nsLabel, ewLabel, removeButton);
+  return row;
+}
+
+function renderMultiPointRows(pointsRaw = []) {
+  if (!multiPointRows) {
+    return;
+  }
+  const points = normalizePlanMultiPoints(pointsRaw);
+  const source = points.length ? points : [createDefaultPlanMultiPoint()];
+  multiPointRows.innerHTML = "";
+  source.forEach((point) => {
+    multiPointRows.append(createMultiPointRowElement(point));
+  });
+  syncMultiPointRemoveButtonState();
+}
+
+function syncMultiPointRemoveButtonState() {
+  if (!multiPointRows) {
+    return;
+  }
+  const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
+  const canRemove = rows.length > 1;
+  rows.forEach((row) => {
+    const removeButton = row.querySelector("[data-multi-point-remove]");
+    if (removeButton instanceof HTMLButtonElement) {
+      removeButton.disabled = !canRemove;
+    }
+  });
+}
+
+function readMultiPointRowsFromForm() {
+  if (!multiPointRows) {
+    return [];
+  }
+  const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
+  const points = rows.map((row) => ({
+    nsDir: value(row.querySelector("[data-multi-point-ns-dir]")?.value),
+    nsCm: value(row.querySelector("[data-multi-point-ns-cm]")?.value),
+    ewDir: value(row.querySelector("[data-multi-point-ew-dir]")?.value),
+    ewCm: value(row.querySelector("[data-multi-point-ew-cm]")?.value),
+  }));
+  return normalizePlanMultiPoints(points);
+}
+
+function collectPlanMultiPointCoords(record) {
+  const points = normalizePlanMultiPoints(record?.multiPoints);
+  if (!points.length) {
+    return [];
+  }
+  const coords = [];
+  const seen = new Set();
+  points.forEach((point) => {
+    const coord = convertPositionToPlanCoords(point.nsDir, point.nsCm, point.ewDir, point.ewCm);
+    if (!coord) {
+      return;
+    }
+    const key = `${coord.x.toFixed(4)}|${coord.y.toFixed(4)}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    coords.push(coord);
+  });
+  return coords;
+}
+
 function readImageAspectRatio(dataUrlRaw) {
   const dataUrl = normalizeCustomLargeImageDataUrl(dataUrlRaw);
   if (!dataUrl) {
@@ -3051,7 +3273,7 @@ function syncLargeShapeImagePreview(shapeTypeRaw, explicitImagePathRaw = "", exp
 }
 
 function syncLargeShapeSectionFromForm() {
-  if (!largeShapeSection) {
+  if (!largeShapeSection && !multiPointSection) {
     return;
   }
   const mode = normalizePlanSizeMode(planSizeModeInput?.value);
@@ -3059,7 +3281,16 @@ function syncLargeShapeSectionFromForm() {
     planSizeModeInput.value = mode;
   }
   const isLarge = mode === "大きなもの";
-  largeShapeSection.classList.toggle("hidden", !isLarge);
+  const isMultiPoint = mode === "複数点";
+  if (largeShapeSection) {
+    largeShapeSection.classList.toggle("hidden", !isLarge);
+  }
+  if (multiPointSection) {
+    multiPointSection.classList.toggle("hidden", !isMultiPoint);
+  }
+  if (isMultiPoint && multiPointRows && !multiPointRows.querySelector("[data-multi-point-row]")) {
+    renderMultiPointRows([]);
+  }
   if (!isLarge) {
     if (largeShapeTypeInput) {
       largeShapeTypeInput.value = "";
@@ -3209,6 +3440,7 @@ function applyCarryForwardFields(saved) {
   recordForm.elements.unit.value = value(saved?.unit);
   recordForm.elements.detail.value = value(saved?.detail);
   recordForm.elements.detailSub.value = value(saved?.detailSub);
+  recordForm.elements.layerFacies.value = value(saved?.layerFacies);
   recordForm.elements.layerRef.value = value(saved?.layerRef);
   recordForm.elements.layerFromCm.value = value(saved?.layerFromCm);
   recordForm.elements.layerRelative.value = value(saved?.layerRelative);
@@ -3226,6 +3458,9 @@ function markCarryForwardSavedFields(saved) {
   }
   if (value(saved?.detailSub)) {
     recordForm.elements.detailSub.classList.add("saved-carry-value");
+  }
+  if (value(saved?.layerFacies)) {
+    recordForm.elements.layerFacies.classList.add("saved-carry-value");
   }
   if (value(saved?.layerRef)) {
     recordForm.elements.layerRef.classList.add("saved-carry-value");
@@ -3247,6 +3482,7 @@ function clearCarryForwardSavedFields() {
   recordForm.elements.unit.classList.remove("saved-carry-value");
   recordForm.elements.detail.classList.remove("saved-carry-value");
   recordForm.elements.detailSub.classList.remove("saved-carry-value");
+  recordForm.elements.layerFacies.classList.remove("saved-carry-value");
   recordForm.elements.layerRef.classList.remove("saved-carry-value");
   recordForm.elements.layerFromCm.classList.remove("saved-carry-value");
   recordForm.elements.layerRelative.classList.remove("saved-carry-value");
@@ -3330,6 +3566,7 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
     "customLargeImageAspect",
     "detail",
     "detailSub",
+    "layerFacies",
     "layerRef",
     "layerFromCm",
     "layerRelative",
@@ -3458,6 +3695,7 @@ function handleRecordFormFieldEdit(event) {
     (target.name === "unit" ||
       target.name === "detail" ||
       target.name === "detailSub" ||
+      target.name === "layerFacies" ||
       target.name === "layerRef" ||
       target.name === "layerFromCm" ||
       target.name === "layerRelative");
@@ -3740,6 +3978,7 @@ function resetRecordForm({ showMessage }) {
   if (recordForm.elements.planSizeMode) {
     recordForm.elements.planSizeMode.value = "通常";
   }
+  renderMultiPointRows([]);
   if (recordForm.elements.largeShapeType) {
     recordForm.elements.largeShapeType.value = "";
   }
@@ -3866,6 +4105,7 @@ function populateRecordForm(record) {
   if (recordForm.elements.planSizeMode) {
     recordForm.elements.planSizeMode.value = normalizePlanSizeMode(record.planSizeMode);
   }
+  renderMultiPointRows(record.multiPoints);
   if (recordForm.elements.largeShapeType) {
     recordForm.elements.largeShapeType.value = normalizeLargeShapeType(record.largeShapeType);
   }
@@ -3940,6 +4180,7 @@ function populateRecordForm(record) {
   setLayerFromValue(record.layerName);
   recordForm.elements.detail.value = record.detail || "";
   recordForm.elements.detailSub.value = record.detailSub || "";
+  recordForm.elements.layerFacies.value = record.layerFacies || "";
   if (recordForm.elements.rectSide1Cm) {
     recordForm.elements.rectSide1Cm.value = record.rectSide1Cm || "";
   }
@@ -4078,6 +4319,8 @@ function buildCurrentEditDraftRecord() {
   }
   const formData = new FormData(recordForm);
   const teamState = normalizeTeamState(value(editTeamInput?.value), value(editTeamOtherInput?.value));
+  const draftPlanSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+  const draftMultiPoints = draftPlanSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
   const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
   const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
   const draftRawShapeType = value(formData.get("largeShapeType"));
@@ -4126,7 +4369,8 @@ function buildCurrentEditDraftRecord() {
     nsCm: value(formData.get("nsCm")),
     ewDir: value(formData.get("ewDir")),
     ewCm: value(formData.get("ewCm")),
-    planSizeMode: normalizePlanSizeMode(value(formData.get("planSizeMode"))),
+    multiPoints: draftMultiPoints,
+    planSizeMode: draftPlanSizeMode,
     largeShapeType: draftShapeType,
     largeAxisDirection:
       draftIsImageShape || !draftUsesAxisDirection ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
@@ -4182,6 +4426,7 @@ function buildCurrentEditDraftRecord() {
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
     detailSub: value(formData.get("detailSub")),
+    layerFacies: value(formData.get("layerFacies")),
     layerRef: value(formData.get("layerRef")),
     layerRelative: value(formData.get("layerRelative")),
     layerFromCm: value(formData.get("layerFromCm")),
@@ -4264,12 +4509,13 @@ function copyCurrentEditToInput() {
   showToast("コピーして新規入力を作成しました");
 }
 
-function copySavedRecordToInput(recordId, preferredKuwaku = "", recordRaw = null) {
+function copySavedRecordToInput(recordId, preferredKuwaku = "", recordRaw = null, options = {}) {
   const record = recordRaw && typeof recordRaw === "object" ? recordRaw : findRecord(recordId);
   if (!record) {
     showToast("対象データが見つかりません");
     return;
   }
+  const shouldShowToast = options && typeof options === "object" ? options.showToast !== false : true;
 
   const kuwakuSource = value(preferredKuwaku) || value(record.kuwaku) || getRecordKuwaku(record);
   const kuwakuParts = parseKuwaku(kuwakuSource);
@@ -4316,7 +4562,135 @@ function copySavedRecordToInput(recordId, preferredKuwaku = "", recordRaw = null
     recordIdInput.value = "";
   }
   updateDuplicateSpecimenWarning();
-  showToast("コピーして新規入力を作成しました");
+  if (shouldShowToast) {
+    showToast("コピーして新規入力を作成しました");
+  }
+}
+
+function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
+  const record = recordRaw && typeof recordRaw === "object" ? recordRaw : findRecord(recordId);
+  if (!record) {
+    showToast("対象データが見つかりません");
+    return;
+  }
+  const kuwaku = normalizeKuwakuText(value(preferredKuwaku) || value(record.kuwaku) || getRecordKuwaku(record));
+  const teamState = normalizeTeamState(value(record.team), value(record.teamOther));
+  const nowIsoValue = nowIso();
+  const insertedBase = {
+    id: newId("record"),
+    kuwaku,
+    specimenPrefix: DEFAULT_SPECIMEN_PREFIX,
+    specimenSerial: "",
+    specimenNo: "",
+    category: categoryFromPrefix(DEFAULT_SPECIMEN_PREFIX),
+    analysisType: "",
+    levelHeight: "",
+    date: value(record.date),
+    team: teamState.team,
+    teamOther: teamState.teamOther,
+    teamLead: value(record.teamLead),
+    recorder: value(record.recorder),
+    nameMemo: "",
+    unit: "",
+    discoverer: "",
+    identifier: "",
+    levelUpperCm: "",
+    levelLowerCm: "",
+    altitudeInputEnabled: "",
+    altitudeDirectM: "",
+    occurrenceSection: "要",
+    occurrenceSketch: "要",
+    sectionDiagrams: [],
+    photos: [],
+    sectionDiagramDistanceChecked: "",
+    sectionDiagramHorizonChecked: "",
+    sectionDiagramLayerFaciesChecked: "",
+    photoClinometerChecked: "",
+    photoRulerChecked: "",
+    nsDir: "北から",
+    nsCm: "",
+    ewDir: "東から",
+    ewCm: "",
+    multiPoints: [],
+    planSizeMode: "通常",
+    largeShapeType: "",
+    largeAxisDirection: "",
+    largeAxisPlungeDeg: "",
+    largeAxisPlungeDir8: "",
+    planeStrikeDirection: "",
+    planeDipDeg: "",
+    planeDipDir8: "",
+    lineLengthCm: "",
+    line1NsDir: "",
+    line1NsCm: "",
+    line1EwDir: "",
+    line1EwCm: "",
+    line2NsDir: "",
+    line2NsCm: "",
+    line2EwDir: "",
+    line2EwCm: "",
+    rectSide1Cm: "",
+    rectSide2Cm: "",
+    ellipseLongRadiusCm: "",
+    ellipseShortRadiusCm: "",
+    imgP1NsDir: "",
+    imgP1NsCm: "",
+    imgP1EwDir: "",
+    imgP1EwCm: "",
+    imgP2NsDir: "",
+    imgP2NsCm: "",
+    imgP2EwDir: "",
+    imgP2EwCm: "",
+    imgP3NsDir: "",
+    imgP3NsCm: "",
+    imgP3EwDir: "",
+    imgP3EwCm: "",
+    imgP4NsDir: "",
+    imgP4NsCm: "",
+    imgP4EwDir: "",
+    imgP4EwCm: "",
+    imgRotateDeg: "",
+    imgFrameWidthCm: "",
+    imgFrameHeightCm: "",
+    imgSkewXDeg: "",
+    imgSkewYDeg: "",
+    imgFlipH: "0",
+    imgFlipV: "0",
+    imgLockAspectRatio: "0",
+    imgUseOriginalColor: "0",
+    customLargeImageName: "",
+    customLargeImageDataUrl: "",
+    customLargeImageAspect: "",
+    importantFlag: "無",
+    simpleRecordFlag: "-",
+    layerName: PRESET_LAYER_NAMES[0],
+    detail: "",
+    detailSub: "",
+    layerFacies: "",
+    layerRef: "",
+    layerFromCm: "",
+    layerRelative: "",
+    notes: "",
+    createdAt: nowIsoValue,
+    updatedAt: nowIsoValue,
+    deletedAt: "",
+  };
+  const insertedRecord = {
+    ...insertedBase,
+    history: buildNextRecordHistory(null, insertedBase, "行挿入"),
+  };
+  state.records.unshift(insertedRecord);
+  persist("行挿入しました");
+  if (getActiveTabId() !== "output-tab") {
+    setActiveTab("output-tab");
+  }
+  selectedCardRecordId = "";
+  renderRecordTable();
+  renderOutputs();
+  const insertedIndex = state.records.findIndex((item) => item === insertedRecord);
+  window.requestAnimationFrame(() => {
+    openOutputCellEditModal(insertedRecord.id, "specimenNo", String(insertedIndex >= 0 ? insertedIndex : ""));
+  });
 }
 
 function getRecordFormFieldByName(name) {
@@ -4456,6 +4830,9 @@ function updateEditMissingRequiredHighlights() {
   }
   if (missingKeys.has("ewCm")) {
     markEditMissingFieldByName("ewCm");
+  }
+  if (missingKeys.has("multiPoints")) {
+    markEditMissingGroupByName("planSizeMode");
   }
   if (missingKeys.has("largeShapeType")) {
     markEditMissingGroupByName("planSizeMode");
@@ -4668,6 +5045,9 @@ function buildRecordTableRowHtml(record, recordIndexRaw = "") {
         <td>${escapeHtml(formatLevelRead(record))}</td>
         <td>
           <div class="row-actions">
+            <button type="button" data-action="insert-row" data-id="${record.id}" data-kuwaku="${escapeHtml(
+              getRecordKuwaku(record)
+            )}" data-record-index="${escapeHtml(recordIndex)}">行挿入</button>
             <button type="button" data-action="edit" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
             )}" data-record-index="${escapeHtml(recordIndex)}">編集</button>
@@ -4711,6 +5091,11 @@ function handleRecordTableActionClick(event) {
     copySavedRecordToInput(recordId, rowKuwaku, record);
     return;
   }
+  if (action === "insert-row") {
+    const rowKuwaku = value(button.dataset.kuwaku);
+    insertRowFromList(recordId, rowKuwaku, record);
+    return;
+  }
   if (action === "delete") {
     const answer = window.confirm(`標本番号 ${record.specimenNo} を削除しますか？`);
     if (!answer) {
@@ -4728,7 +5113,6 @@ function handleRecordTableActionClick(event) {
 }
 
 function renderOutputs() {
-  renderCardOutput();
   renderListOutput();
   if (getActiveTabId() === "plan-tab") {
     renderPlanOutput();
@@ -6212,8 +6596,6 @@ function renderListOutput() {
 
   outputListBody.innerHTML = sortOutputRecordsForList(filteredRecords)
     .map((record) => {
-      const selectedClass = record.id === selectedCardRecordId ? "selected-card-row" : "";
-      const cardButtonLabel = record.id === selectedCardRecordId ? "プレビュー表示中" : "カード";
       const kuwakuText = getRecordKuwaku(record);
       const kuwakuStyle = getKuwakuCellStyle(kuwakuText);
       const categoryColor = getRecordSpecimenColor(record);
@@ -6261,7 +6643,7 @@ function renderListOutput() {
       ]);
       const recordIndex = Number(recordIndexMap.get(record));
       return `
-      <tr class="${selectedClass}" data-record-id="${escapeHtml(value(record.id))}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">
+      <tr data-record-id="${escapeHtml(value(record.id))}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">
         <td data-col-key="kuwaku" data-cell-edit-key="kuwaku" class="${listCellClass("kuwaku-color-cell", kuwakuMissing)}" style="background:${kuwakuStyle.background};color:${kuwakuStyle.color};border-color:${kuwakuStyle.border};" ${missingTitle}>${escapeHtml(
           kuwakuText
         )}</td>
@@ -6294,7 +6676,9 @@ function renderListOutput() {
         <td data-col-key="notes" data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
         <td data-col-key="actions">
           <div class="row-actions">
-            <button type="button" data-action="card" data-id="${record.id}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">${cardButtonLabel}</button>
+            <button type="button" data-action="insert-row" data-id="${record.id}" data-kuwaku="${escapeHtml(
+              getRecordKuwaku(record)
+            )}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">行挿入</button>
             <button type="button" data-action="copy-to-input" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
             )}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">コピーして新規入力</button>
@@ -6475,7 +6859,14 @@ function formatPlanPosition(record) {
   } else {
     base = nsPart || ewPart;
   }
-  if (normalizePlanSizeMode(record?.planSizeMode) !== "大きなもの") {
+  const planSizeMode = normalizePlanSizeMode(record?.planSizeMode);
+  if (planSizeMode === "複数点") {
+    const multiPointCount = collectPlanMultiPointCoords(record).length;
+    if (multiPointCount > 0) {
+      return base ? `複数点(${multiPointCount}点) / ${base}` : `複数点(${multiPointCount}点)`;
+    }
+  }
+  if (planSizeMode !== "大きなもの") {
     return base;
   }
   const axisDirection = normalizeLargeAxisDirection(record?.largeAxisDirection);
@@ -6578,6 +6969,7 @@ function renderCardOutput() {
         <div><span>地層名</span><strong>${escapeHtml(selectedRecord.layerName || "")}</strong></div>
         <div><span>ユニット</span><strong>${escapeHtml(selectedRecord.unit || "")}</strong></div>
         <div><span>サブユニット</span><strong>${escapeHtml(formatDetailForRecord(selectedRecord))}</strong></div>
+        <div><span>層相</span><strong>${escapeHtml(selectedRecord.layerFacies || "")}</strong></div>
         <div><span>地層中の位置</span><strong>${escapeHtml(formatLayerPosition(selectedRecord))}</strong></div>
         <div><span>発見者</span><strong>${escapeHtml(selectedRecord.discoverer || "")}</strong></div>
         <div><span>判定者</span><strong>${escapeHtml(selectedRecord.identifier || "")}</strong></div>
@@ -6961,6 +7353,7 @@ function buildCurrentRecordDraftForPositionPreview() {
   const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
   const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
   const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+  const draftMultiPoints = planSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
   const rawLargeShapeType = value(formData.get("largeShapeType"));
   const largeShapeType =
     planSizeMode === "大きなもの" ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType) : "";
@@ -6982,6 +7375,7 @@ function buildCurrentRecordDraftForPositionPreview() {
     nsCm: value(formData.get("nsCm")),
     ewDir: normalizeEwDir(value(formData.get("ewDir"))),
     ewCm: value(formData.get("ewCm")),
+    multiPoints: draftMultiPoints,
     planSizeMode,
     largeShapeType,
     largeAxisDirection: normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
@@ -7601,6 +7995,33 @@ function buildViewerShapeFromCandidate(candidate, metrics) {
       x: worldCenter.x,
       y: worldCenter.y,
       z: altitudeZ,
+      ...meta,
+    };
+  }
+
+  if (drawable.type === "multipoint") {
+    let points = (drawable.points || [])
+      .map((point) => {
+        const world = convertViewerPointCmToWorld(point.x, point.y, candidate.grid, metrics);
+        return { x: world.x, y: world.y, z: getViewerZForPlanPoint(point) };
+      })
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z));
+    if (!points.length) {
+      return null;
+    }
+    if (directBottomAltitudeEnabled) {
+      const anchored = anchorViewerPointsToBottomAltitude(points, bottomTargetZ);
+      points = anchored.points;
+    }
+    const hull = buildHullPointsFromSource(points, points[0]?.z);
+    const centerZ = points.reduce((sum, point) => sum + point.z, 0) / points.length;
+    return {
+      type: "multipoint",
+      points,
+      hull,
+      x: worldCenter.x,
+      y: worldCenter.y,
+      z: centerZ,
       ...meta,
     };
   }
@@ -8241,6 +8662,25 @@ function renderViewerScene(shapes, metrics, options = {}) {
       );
       pointMesh.position.set(shape.x, shape.y, shape.z);
       viewer3d.dataGroup.add(pointMesh);
+    } else if (shape.type === "multipoint") {
+      (shape.points || []).forEach((point) => {
+        const pointMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.085, 12, 12),
+          new THREE.MeshBasicMaterial({ color })
+        );
+        pointMesh.position.set(point.x, point.y, point.z);
+        viewer3d.dataGroup.add(pointMesh);
+      });
+      const hull = Array.isArray(shape.hull) ? shape.hull : [];
+      if (hull.length === 2) {
+        renderViewerSegment(hull[0], hull[1], color, 0.025);
+      } else if (hull.length >= 3) {
+        for (let i = 0; i < hull.length; i += 1) {
+          const start = hull[i];
+          const end = hull[(i + 1) % hull.length];
+          renderViewerSegment(start, end, color, 0.025);
+        }
+      }
     } else if (shape.type === "line") {
       renderViewerSegment(shape.points[0], shape.points[1], color, 0.05);
     } else if (shape.type === "polyline") {
@@ -8255,23 +8695,29 @@ function renderViewerScene(shapes, metrics, options = {}) {
     label.position.set(shape.x, shape.y, shape.z + 0.16);
     viewer3d.labelGroup.add(label);
 
-    const pickMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 10, 10),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
-    );
-    pickMesh.position.set(shape.x, shape.y, shape.z);
-    pickMesh.userData = {
-      id: shape.id,
-      label: shape.label,
-      nameMemo: shape.nameMemo,
-      unit: shape.unit,
-      detail: shape.detail,
-      kuwaku: shape.kuwaku,
-      altitudeM: shape.altitudeM,
-      altitudeEstimated: Boolean(shape.altitudeEstimated),
-    };
-    viewer3d.pickMeshes.push(pickMesh);
-    viewer3d.dataGroup.add(pickMesh);
+    const pickTargets =
+      shape.type === "multipoint" && Array.isArray(shape.points) && shape.points.length
+        ? shape.points
+        : [{ x: shape.x, y: shape.y, z: shape.z }];
+    pickTargets.forEach((targetPoint) => {
+      const pickMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 10, 10),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+      );
+      pickMesh.position.set(targetPoint.x, targetPoint.y, targetPoint.z);
+      pickMesh.userData = {
+        id: shape.id,
+        label: shape.label,
+        nameMemo: shape.nameMemo,
+        unit: shape.unit,
+        detail: shape.detail,
+        kuwaku: shape.kuwaku,
+        altitudeM: shape.altitudeM,
+        altitudeEstimated: Boolean(shape.altitudeEstimated),
+      };
+      viewer3d.pickMeshes.push(pickMesh);
+      viewer3d.dataGroup.add(pickMesh);
+    });
     viewer3d.meshesByRecordId.set(shape.id, shape);
   });
 
@@ -9543,6 +9989,78 @@ function pointsToAzimuthDeg(pointA, pointB) {
   return (deg + 360) % 360;
 }
 
+function buildConvexHull2d(pointsRaw) {
+  const points = Array.isArray(pointsRaw) ? pointsRaw : [];
+  const uniqueMap = new Map();
+  points.forEach((point) => {
+    const x = Number(point?.x);
+    const y = Number(point?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    const key = `${x.toFixed(6)}|${y.toFixed(6)}`;
+    if (!uniqueMap.has(key)) {
+      uniqueMap.set(key, { x, y });
+    }
+  });
+  const unique = Array.from(uniqueMap.values());
+  if (unique.length <= 2) {
+    return unique;
+  }
+  unique.sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+  const cross = (origin, a, b) => (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x);
+
+  const lower = [];
+  unique.forEach((point) => {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+      lower.pop();
+    }
+    lower.push(point);
+  });
+
+  const upper = [];
+  for (let i = unique.length - 1; i >= 0; i -= 1) {
+    const point = unique[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
+function buildHullPointsFromSource(pointsRaw, zFallback = null) {
+  const points = Array.isArray(pointsRaw) ? pointsRaw : [];
+  if (points.length <= 2) {
+    return points.filter((point) => Number.isFinite(Number(point?.x)) && Number.isFinite(Number(point?.y)));
+  }
+  const hull2d = buildConvexHull2d(points);
+  if (!hull2d.length) {
+    return [];
+  }
+  const keyOf = (xRaw, yRaw) => `${Number(xRaw).toFixed(6)}|${Number(yRaw).toFixed(6)}`;
+  const pointMap = new Map();
+  points.forEach((point) => {
+    const x = Number(point?.x);
+    const y = Number(point?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    pointMap.set(keyOf(x, y), point);
+  });
+  const fallbackZ = Number.isFinite(Number(zFallback)) ? Number(zFallback) : 0;
+  return hull2d.map((point) => {
+    const original = pointMap.get(keyOf(point.x, point.y));
+    if (original) {
+      return original;
+    }
+    return { x: point.x, y: point.y, z: fallbackZ };
+  });
+}
+
 function parseImageQuadPlanPoints(record, center = null) {
   const centerPointRaw = center
     ? { x: Number(center.x), y: Number(center.y) }
@@ -9639,6 +10157,27 @@ function buildPlanDrawable(record) {
   const meta = buildPlanDrawableMeta(record);
 
   const planSizeMode = normalizePlanSizeMode(record.planSizeMode);
+  if (planSizeMode === "複数点") {
+    const multiPoints = collectPlanMultiPointCoords(record);
+    const fallbackCenter = convertPositionToPlanCoords(record?.nsDir, record?.nsCm, record?.ewDir, record?.ewCm);
+    const points = multiPoints.length ? multiPoints : fallbackCenter ? [fallbackCenter] : [];
+    if (!points.length) {
+      return null;
+    }
+    const centroid = points.reduce(
+      (acc, point) => ({ x: acc.x + point.x / points.length, y: acc.y + point.y / points.length }),
+      { x: 0, y: 0 }
+    );
+    return {
+      type: "multipoint",
+      points,
+      hull: buildHullPointsFromSource(points),
+      x: centroid.x,
+      y: centroid.y,
+      ...meta,
+    };
+  }
+
   const shapeType = normalizeLargeShapeType(record.largeShapeType);
   const normalizedShapeLabel = normalizeLargeShapeLabel(record.largeShapeType);
   const customImagePath = isCustomLargeShapeType(shapeType) ? normalizeCustomLargeImageDataUrl(record.customLargeImageDataUrl) : "";
@@ -9657,6 +10196,7 @@ function buildPlanDrawable(record) {
   if (!center) {
     return null;
   }
+
   const resolvedImageType = isImageShape ? shapeType : hasMappedImageType ? normalizedShapeLabel : "";
   const shouldUseImageQuad =
     planSizeMode === "大きなもの" && (isImageShape || (resolvedImageType && rawImageCorners.length > 0));
@@ -9781,6 +10321,20 @@ function renderPlanDrawableSvg(drawable, index = 0) {
   let shapeSvg = "";
   if (drawable.type === "line") {
     shapeSvg = `<line class="plan-shape-line" x1="${drawable.x1}" y1="${drawable.y1}" x2="${drawable.x2}" y2="${drawable.y2}" stroke="${drawable.color}" />`;
+  } else if (drawable.type === "multipoint") {
+    const points = Array.isArray(drawable.points) ? drawable.points : [];
+    const hull = Array.isArray(drawable.hull) ? drawable.hull : [];
+    const hullPointsText = hull.map((point) => `${point.x},${point.y}`).join(" ");
+    let hullSvg = "";
+    if (hull.length >= 3) {
+      hullSvg = `<polygon class="plan-shape-multipoint-hull" points="${hullPointsText}" stroke="${drawable.color}" />`;
+    } else if (hull.length === 2) {
+      hullSvg = `<line class="plan-shape-multipoint-hull" x1="${hull[0].x}" y1="${hull[0].y}" x2="${hull[1].x}" y2="${hull[1].y}" stroke="${drawable.color}" />`;
+    }
+    const pointsSvg = points
+      .map((point) => `<circle class="plan-shape-multipoint-dot" cx="${point.x}" cy="${point.y}" r="4.5" fill="${drawable.color}" />`)
+      .join("");
+    shapeSvg = `${hullSvg}${pointsSvg}`;
   } else if (drawable.type === "rect") {
     const transform = Number.isFinite(drawable.rotationDeg)
       ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
@@ -9804,12 +10358,25 @@ function renderPlanDrawableSvg(drawable, index = 0) {
     shapeSvg = `<circle class="plan-point-hit" cx="${drawable.x}" cy="${drawable.y}" r="5" fill="${drawable.color}" />`;
   }
 
-  const hotspotSvg =
-    drawable.type === "imageQuad"
-      ? `<polygon class="plan-point-hotspot plan-image-hotspot" points="${(drawable.points || [])
-          .map((point) => `${point.x},${point.y}`)
-          .join(" ")}" fill="transparent" />`
-      : `<circle class="plan-point-hotspot" cx="${drawable.x}" cy="${drawable.y}" r="12" fill="transparent" />`;
+  let hotspotSvg = `<circle class="plan-point-hotspot" cx="${drawable.x}" cy="${drawable.y}" r="12" fill="transparent" />`;
+  if (drawable.type === "imageQuad") {
+    hotspotSvg = `<polygon class="plan-point-hotspot plan-image-hotspot" points="${(drawable.points || [])
+      .map((point) => `${point.x},${point.y}`)
+      .join(" ")}" fill="transparent" />`;
+  } else if (drawable.type === "multipoint") {
+    const points = Array.isArray(drawable.points) ? drawable.points : [];
+    const hull = Array.isArray(drawable.hull) ? drawable.hull : [];
+    const hotspotPoints = points
+      .map((point) => `<circle class="plan-point-hotspot" cx="${point.x}" cy="${point.y}" r="10" fill="transparent" />`)
+      .join("");
+    if (hull.length >= 3) {
+      hotspotSvg = `<polygon class="plan-point-hotspot" points="${hull
+        .map((point) => `${point.x},${point.y}`)
+        .join(" ")}" fill="transparent" />${hotspotPoints}`;
+    } else {
+      hotspotSvg = hotspotPoints || hotspotSvg;
+    }
+  }
 
   return `
       <g
@@ -9967,6 +10534,23 @@ function getPlanDrawableExtent(drawable) {
   if (drawable.type === "imageQuad" && Array.isArray(drawable.points) && drawable.points.length) {
     const xs = drawable.points.map((point) => Number(point?.x)).filter((num) => Number.isFinite(num));
     const ys = drawable.points.map((point) => Number(point?.y)).filter((num) => Number.isFinite(num));
+    if (!xs.length || !ys.length) {
+      return null;
+    }
+    return {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+    };
+  }
+  if (drawable.type === "multipoint") {
+    const points = [
+      ...(Array.isArray(drawable.points) ? drawable.points : []),
+      ...(Array.isArray(drawable.hull) ? drawable.hull : []),
+    ];
+    const xs = points.map((point) => Number(point?.x)).filter((num) => Number.isFinite(num));
+    const ys = points.map((point) => Number(point?.y)).filter((num) => Number.isFinite(num));
     if (!xs.length || !ys.length) {
       return null;
     }
@@ -10674,6 +11258,7 @@ function normalizeState(candidate) {
         layerName: value(card.layerName),
         detail: value(card.detail),
         detailSub: value(card.detailSub),
+        layerFacies: value(card.layerFacies),
         layerRef: value(card.layerRef) || value(card.layerPosition),
         layerFromCm: value(card.layerFromCm),
         layerRelative: value(card.layerRelative),
@@ -10751,6 +11336,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     nsCm: value(item.nsCm),
     ewDir: normalizeEwDir(value(item.ewDir)),
     ewCm: value(item.ewCm),
+    multiPoints: normalizePlanMultiPoints(item.multiPoints),
     planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)),
     largeShapeType: normalizedLargeShapeType,
     largeAxisDirection: normalizeLargeAxisDirection(value(item.largeAxisDirection)),
@@ -10807,6 +11393,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     layerName: normalizeLayerName(value(item.layerName)),
     detail: compactNoSpaceValue(item.detail),
     detailSub: value(item.detailSub),
+    layerFacies: value(item.layerFacies),
     layerRef: value(item.layerRef) || value(item.layerPosition),
     layerFromCm: value(item.layerFromCm),
     layerRelative: value(item.layerRelative),
@@ -10878,6 +11465,7 @@ function createHistorySnapshot(record) {
     layerName: value(record?.layerName),
     unit: value(record?.unit),
     detail: formatDetailForRecord(record),
+    layerFacies: value(record?.layerFacies),
     layerPosition: formatLayerPosition(record),
   };
 }
@@ -11744,6 +12332,7 @@ function buildCardCsv() {
     "ユニット",
     "サブユニット",
     "細分",
+    "層相",
     "地層中の位置",
     "レベル読値",
     "平面位置",
@@ -11766,6 +12355,7 @@ function buildCardCsv() {
     record.unit,
     record.detail,
     record.detailSub,
+    record.layerFacies,
     formatLayerPosition(record),
     formatLevelRead(record),
     formatPlanPosition(record),
@@ -11953,6 +12543,7 @@ function buildCardPdfHtml(records) {
               <tr><th>サブユニット</th><td>${escapeHtml(record.detail || "")}</td><th>細分</th><td>${escapeHtml(
                 record.detailSub || ""
               )}</td></tr>
+              <tr><th>層相</th><td colspan="3">${escapeHtml(record.layerFacies || "")}</td></tr>
               <tr><th>地層中の位置</th><td colspan="3">${escapeHtml(formatLayerPosition(record))}</td></tr>
               <tr><th>発見者氏名</th><td>${escapeHtml(record.discoverer || "")}</td><th>判定者氏名</th><td>${escapeHtml(
                 record.identifier || ""
@@ -12263,6 +12854,19 @@ function renderPlanPdfDrawableSvg(drawable, index = 0) {
   let shapeSvg = "";
   if (drawable.type === "line") {
     shapeSvg = `<line class="pdf-plan-shape-line" x1="${drawable.x1}" y1="${drawable.y1}" x2="${drawable.x2}" y2="${drawable.y2}" stroke="${drawable.color}" />`;
+  } else if (drawable.type === "multipoint") {
+    const points = Array.isArray(drawable.points) ? drawable.points : [];
+    const hull = Array.isArray(drawable.hull) ? drawable.hull : [];
+    let hullSvg = "";
+    if (hull.length >= 3) {
+      hullSvg = `<polygon points="${hull.map((point) => `${point.x},${point.y}`).join(" ")}" fill="none" stroke="${drawable.color}" stroke-width="1.8" />`;
+    } else if (hull.length === 2) {
+      hullSvg = `<line x1="${hull[0].x}" y1="${hull[0].y}" x2="${hull[1].x}" y2="${hull[1].y}" stroke="${drawable.color}" stroke-width="1.8" />`;
+    }
+    const pointsSvg = points
+      .map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.8" fill="${drawable.color}" stroke="#ffffff" stroke-width="0.9" />`)
+      .join("");
+    shapeSvg = `${hullSvg}${pointsSvg}`;
   } else if (drawable.type === "rect") {
     const transform = Number.isFinite(drawable.rotationDeg)
       ? ` transform="rotate(${drawable.rotationDeg} ${drawable.x} ${drawable.y})"`
@@ -13058,20 +13662,26 @@ function getMissingRequiredKeys(record) {
   if (!value(record.occurrenceSketch)) {
     missing.add("occurrenceSketch");
   }
-  if (!value(record.nsDir)) {
-    missing.add("nsDir");
-  }
-  if (!value(record.nsCm)) {
-    missing.add("nsCm");
-  }
-  if (!value(record.ewDir)) {
-    missing.add("ewDir");
-  }
-  if (!value(record.ewCm)) {
-    missing.add("ewCm");
+  const planSizeMode = normalizePlanSizeMode(value(record.planSizeMode));
+  if (planSizeMode === "複数点") {
+    if (!collectPlanMultiPointCoords(record).length) {
+      missing.add("multiPoints");
+    }
+  } else {
+    if (!value(record.nsDir)) {
+      missing.add("nsDir");
+    }
+    if (!value(record.nsCm)) {
+      missing.add("nsCm");
+    }
+    if (!value(record.ewDir)) {
+      missing.add("ewDir");
+    }
+    if (!value(record.ewCm)) {
+      missing.add("ewCm");
+    }
   }
 
-  const planSizeMode = normalizePlanSizeMode(value(record.planSizeMode));
   if (planSizeMode === "大きなもの") {
     const largeShapeType = normalizeLargeShapeType(value(record.largeShapeType));
     const isImageShape = isLargeShapeImageType(largeShapeType);
@@ -13334,6 +13944,9 @@ function parseCompass8Azimuth(valueRaw) {
 
 function normalizePlanSizeMode(valueRaw) {
   const mode = value(valueRaw);
+  if (mode === "複数点" || mode === "複数") {
+    return "複数点";
+  }
   if (mode === "大きなもの" || mode === "大きいもの") {
     return "大きなもの";
   }
