@@ -1,12 +1,14 @@
-var CACHE_NAME = "kaseki25-pwa-v1";
-var ASSETS = [
+var CACHE_NAME = "kaseki25-pwa-v2";
+var REQUIRED_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./team_roster_data.js",
   "./manifest.webmanifest",
-  "./icon.svg",
+  "./icon.svg"
+];
+var OPTIONAL_ASSETS = [
   "./shapes/inline_data.js",
   "./shapes/palmate_antler.png",
   "./shapes/triangle.png",
@@ -30,10 +32,25 @@ var ASSETS = [
   "./assets/large-shapes/c_shape.png"
 ];
 
+function cacheOptional(cache, url) {
+  return fetch(url, { cache: "no-cache" }).then(function (response) {
+    if (response && response.ok) {
+      return cache.put(url, response);
+    }
+    return null;
+  }).catch(function () {
+    return null;
+  });
+}
+
 self.addEventListener("install", function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(ASSETS);
+      return cache.addAll(REQUIRED_ASSETS).then(function () {
+        return Promise.all(OPTIONAL_ASSETS.map(function (url) {
+          return cacheOptional(cache, url);
+        }));
+      });
     })
   );
   self.skipWaiting();
@@ -42,14 +59,12 @@ self.addEventListener("install", function (event) {
 self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(
-        keys.map(function (key) {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-          return null;
-        })
-      );
+      return Promise.all(keys.map(function (key) {
+        if (key !== CACHE_NAME) {
+          return caches.delete(key);
+        }
+        return null;
+      }));
     })
   );
   self.clients.claim();
@@ -65,11 +80,15 @@ self.addEventListener("fetch", function (event) {
         return cached;
       }
       return fetch(event.request).then(function (response) {
-        var copy = response.clone();
-        caches.open(CACHE_NAME).then(function (cache) {
-          cache.put(event.request, copy);
-        });
+        if (response && response.ok) {
+          var copy = response.clone();
+          caches.open(CACHE_NAME).then(function (cache) {
+            cache.put(event.request, copy);
+          });
+        }
         return response;
+      }).catch(function () {
+        return caches.match("./index.html");
       });
     })
   );
