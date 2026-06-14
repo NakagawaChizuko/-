@@ -6354,7 +6354,7 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
     case "specimenNo":
       return "\n        <label>\n          <span class=\"label-title\">\u6A19\u672C\u756A\u53F7</span>\n          <input name=\"specimenNo\" type=\"text\" value=\"".concat(escapeHtml(parsedSpecimen.specimenNo), "\" placeholder=\"\u4F8B: m-1\" />\n        </label>\n      ");
     case "category":
-      return "\n        <label>\n          <span class=\"label-title\">\u5206\u985E</span>\n          <select name=\"specimenPrefix\" data-cell-edit-prefix-select>\n            ".concat(buildOutputCellEditPrefixOptionsHtml(specimenPrefix), "\n          </select>\n        </label>\n        <label data-cell-edit-analysis-row class=\"").concat(analysisHiddenClass, "\">\n          <span class=\"label-title\">\u5206\u6790\u7528\u8A66\u6599\u306E\u533A\u5206</span>\n          <select name=\"analysisType\">\n            ").concat(buildOutputCellEditAnalysisOptionsHtml(analysisType), "\n          </select>\n        </label>\n      ");
+      return "\n        <label>\n          <span class=\"label-title\">\u5206\u985E</span>\n          <select name=\"specimenPrefix\" data-cell-edit-prefix-select>\n            ".concat(buildOutputCellEditPrefixOptionsHtml(specimenPrefix), "\n          </select>\n        </label>\n        <label>\n          <span class=\"label-title\">\u6A19\u672C\u756A\u53F7</span>\n          <input name=\"specimenNo\" type=\"text\" value=\"").concat(escapeHtml(parsedSpecimen.specimenNo), "\" placeholder=\"\u4F8B: ").concat(specimenPrefix, "-1\" data-cell-edit-specimen-no />\n        </label>\n        <label data-cell-edit-analysis-row class=\"").concat(analysisHiddenClass, "\">\n          <span class=\"label-title\">\u5206\u6790\u7528\u8A66\u6599\u306E\u533A\u5206</span>\n          <select name=\"analysisType\">\n            ").concat(buildOutputCellEditAnalysisOptionsHtml(analysisType), "\n          </select>\n        </label>\n      ");
     case "nameMemo":
       return "\n        <label>\n          <span class=\"label-title\">\u5316\u77F3\u30FB\u907A\u7269\u540D\u79F0</span>\n          <input name=\"nameMemo\" type=\"text\" value=\"".concat(escapeHtml(value(record === null || record === void 0 ? void 0 : record.nameMemo)), "\" />\n        </label>\n      ");
     case "importantFlag":
@@ -6402,9 +6402,20 @@ function bindOutputCellEditDynamicFields(editKey) {
   if (editKey === "category") {
     var prefixSelect = cellEditFields.querySelector("[data-cell-edit-prefix-select]");
     var analysisRow = cellEditFields.querySelector("[data-cell-edit-analysis-row]");
+    var specimenNoInput = cellEditFields.querySelector("[data-cell-edit-specimen-no]");
     if (prefixSelect instanceof HTMLSelectElement && analysisRow instanceof HTMLElement) {
       var _toggle = function _toggle() {
-        analysisRow.classList.toggle("hidden", normalizeSpecimenPrefix(prefixSelect.value) !== "a");
+        var prefix = normalizeSpecimenPrefix(prefixSelect.value);
+        analysisRow.classList.toggle("hidden", prefix !== "a");
+        if (specimenNoInput instanceof HTMLInputElement) {
+          var parsed = parseSpecimenNo(specimenNoInput.value, prefix, "");
+          var serial = compactNoSpaceValue(parsed.serial);
+          if (!serial || normalizeSpecimenPrefix(parsed.prefix) !== prefix) {
+            serial = findSmallestUnusedSpecimenSerialForActiveEdit(prefix);
+          }
+          specimenNoInput.value = buildSpecimenNo(prefix, serial);
+          specimenNoInput.placeholder = "\u4F8B: ".concat(prefix, "-").concat(serial || "1");
+        }
       };
       prefixSelect.addEventListener("change", _toggle);
       _toggle();
@@ -6553,8 +6564,8 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
   }
   if (editKey === "category") {
     var nextPrefix = normalizeSpecimenPrefix(formData.get("specimenPrefix"));
-    var currentSpecimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
-    var nextSerial = compactNoSpaceValue(currentSpecimen.serial || record.specimenSerial);
+    var currentSpecimen = parseSpecimenNo(formData.get("specimenNo"), nextPrefix, "");
+    var nextSerial = compactNoSpaceValue(currentSpecimen.serial) || findSmallestUnusedSpecimenSerial(getRecordKuwaku(record), nextPrefix, record.id);
     if (!nextSerial) {
       record.specimenPrefix = nextPrefix;
       record.specimenSerial = "";
@@ -6666,6 +6677,40 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     ok: false,
     message: "このセルは直接編集に対応していません"
   };
+}
+function findSmallestUnusedSpecimenSerialForActiveEdit(prefixRaw) {
+  if (!activeOutputCellEdit) {
+    return "1";
+  }
+  var record = findRecordByEditContext(activeOutputCellEdit.recordId, activeOutputCellEdit.recordIndex, activeOutputCellEdit.recordSnapshot);
+  if (!record) {
+    return "1";
+  }
+  return findSmallestUnusedSpecimenSerial(getRecordKuwaku(record), prefixRaw, record.id);
+}
+function findSmallestUnusedSpecimenSerial(kuwakuRaw, prefixRaw, excludeRecordIdRaw) {
+  var kuwaku = normalizeKuwakuText(kuwakuRaw);
+  var prefix = normalizeSpecimenPrefix(prefixRaw);
+  var excludeRecordId = value(excludeRecordIdRaw);
+  var used = new Set();
+  state.records.forEach(function (item) {
+    if (!item || value(item.id) === excludeRecordId || normalizeKuwakuText(getRecordKuwaku(item)) !== kuwaku) {
+      return;
+    }
+    var specimen = parseSpecimenNo(item.specimenNo, item.specimenPrefix, item.specimenSerial);
+    if (normalizeSpecimenPrefix(specimen.prefix) !== prefix) {
+      return;
+    }
+    var serial = compactNoSpaceValue(specimen.serial);
+    if (/^\d+$/.test(serial)) {
+      used.add(Number(serial));
+    }
+  });
+  var next = 1;
+  while (used.has(next)) {
+    next += 1;
+  }
+  return String(next);
 }
 function buildOutputCellEditPrefixOptionsHtml(selectedPrefixRaw) {
   var selectedPrefix = normalizeSpecimenPrefix(selectedPrefixRaw);
