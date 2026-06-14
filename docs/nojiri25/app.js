@@ -6440,7 +6440,7 @@ function saveOutputCellEditFromModal() {
     showToast("対象データが見つかりません（一覧を再表示してから再度編集してください）");
     return;
   }
-  var formData = new FormData(cellEditForm);
+  var formData = createOutputCellEditFormData();
   var result = applyOutputCellEditToRecord(record, activeOutputCellEdit.editKey, formData);
   if (!result.ok) {
     if (result.message) {
@@ -6455,8 +6455,35 @@ function saveOutputCellEditFromModal() {
   renderOutputs();
   closeOutputCellEditModal();
 }
+function createOutputCellEditFormData() {
+  var values = {};
+  if (cellEditFields) {
+    var fields = cellEditFields.querySelectorAll("input[name], select[name], textarea[name]");
+    fields.forEach(function (field) {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) || field.disabled) {
+        return;
+      }
+      var name = value(field.name);
+      if (!name) {
+        return;
+      }
+      if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) {
+        if (field.checked) {
+          values[name] = field.value;
+        }
+        return;
+      }
+      values[name] = field.value;
+    });
+  }
+  return {
+    get: function get(name) {
+      return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : null;
+    }
+  };
+}
 function applyOutputCellEditToRecord(record, editKey, formData) {
-  if (!(record && formData instanceof FormData)) {
+  if (!(record && formData && typeof formData.get === "function")) {
     return {
       ok: false,
       message: "編集データを取得できませんでした"
