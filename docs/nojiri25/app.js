@@ -5088,7 +5088,7 @@ function insertRowFromList(recordId) {
     return item === insertedRecord;
   });
   window.requestAnimationFrame(function () {
-    openOutputCellEditModal(insertedRecord.id, "specimenNo", String(insertedIndex >= 0 ? insertedIndex : ""));
+    openOutputCellEditModal(insertedRecord.id, "category", String(insertedIndex >= 0 ? insertedIndex : ""));
   });
 }
 function getRecordFormFieldByName(name) {
@@ -6529,9 +6529,13 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     var currentSpecimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
     var nextSerial = compactNoSpaceValue(currentSpecimen.serial || record.specimenSerial);
     if (!nextSerial) {
+      record.specimenPrefix = nextPrefix;
+      record.specimenSerial = "";
+      record.specimenNo = "";
+      record.category = categoryFromPrefix(nextPrefix);
+      record.analysisType = nextPrefix === "a" ? normalizeAnalysisType(formData.get("analysisType")) : "";
       return {
-        ok: false,
-        message: "先に標本番号セルで番号を設定してください"
+        ok: true
       };
     }
     var _nextSpecimenNo = buildSpecimenNo(nextPrefix, nextSerial);
