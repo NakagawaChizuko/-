@@ -667,6 +667,7 @@ var cellEditTitle = document.getElementById("cell-edit-title");
 var cellEditMeta = document.getElementById("cell-edit-meta");
 var cellEditFields = document.getElementById("cell-edit-fields");
 var cellEditCloseBtn = document.getElementById("cell-edit-close-btn");
+var cellEditSaveBtn = document.getElementById("cell-edit-save-btn");
 var cellEditCancelBtn = document.getElementById("cell-edit-cancel-btn");
 var hoverEditMenuEl = null;
 var hoverEditMenuRecordId = "";
@@ -789,10 +790,14 @@ function bindEvents() {
     });
   }
   if (cellEditForm) {
-    cellEditForm.addEventListener("submit", function (event) {
+    var handleCellEditSave = function handleCellEditSave(event) {
       event.preventDefault();
       saveOutputCellEditFromModal();
-    });
+    };
+    cellEditForm.addEventListener("submit", handleCellEditSave);
+    if (cellEditSaveBtn) {
+      cellEditSaveBtn.addEventListener("click", handleCellEditSave);
+    }
   }
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") {
