@@ -1,9 +1,11 @@
-var CACHE_NAME = "kaseki25-pwa-v2";
+var CACHE_NAME = "kaseki25-pwa-v3";
 var REQUIRED_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./vendor/three.min.js",
+  "./vendor/OrbitControls.js",
   "./team_roster_data.js",
   "./manifest.webmanifest",
   "./icon.svg"
