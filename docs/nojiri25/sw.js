@@ -1,4 +1,4 @@
-var CACHE_NAME = "kaseki25-pwa-v7";
+var CACHE_NAME = "kaseki25-pwa-v8";
 var REQUIRED_ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,8 @@ var REQUIRED_ASSETS = [
   "./vendor/OrbitControls.js",
   "./team_roster_data.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./icon-512.png"
 ];
 var OPTIONAL_ASSETS = [
   "./shapes/inline_data.js",
