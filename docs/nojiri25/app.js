@@ -10217,7 +10217,16 @@ function buildPlanDrawable(record) {
   if (planSizeMode === "複数点") {
     var multiPoints = collectPlanMultiPointCoords(record);
     var fallbackCenter = convertPositionToPlanCoords(record === null || record === void 0 ? void 0 : record.nsDir, record === null || record === void 0 ? void 0 : record.nsCm, record === null || record === void 0 ? void 0 : record.ewDir, record === null || record === void 0 ? void 0 : record.ewCm);
-    var points = multiPoints.length ? multiPoints : fallbackCenter ? [fallbackCenter] : [];
+    var points = [];
+    var seenPointKeys = new Set();
+    [fallbackCenter].concat(_toConsumableArray(multiPoints)).filter(Boolean).forEach(function (point) {
+      var pointKey = "".concat(point.x.toFixed(4), "|").concat(point.y.toFixed(4));
+      if (seenPointKeys.has(pointKey)) {
+        return;
+      }
+      seenPointKeys.add(pointKey);
+      points.push(point);
+    });
     if (!points.length) {
       return null;
     }
