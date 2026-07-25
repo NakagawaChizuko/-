@@ -7415,7 +7415,12 @@ function renderPositionPreviewModalContent() {
   }
   const currentDrawableRaw = buildPlanDrawable(draftRecord);
   if (!currentDrawableRaw) {
-    showToast("平面位置の入力値を確認してください");
+    const positionMethod = normalizePositionMethod(new FormData(recordForm).get("positionMethod"));
+    showToast(
+      positionMethod === "totalStation"
+        ? getTotalStationInputError() || "トータルステーションの入力値を確認してください"
+        : "平面位置の入力値を確認してください"
+    );
     return false;
   }
   const kuwakuValue = kuwakuValueForSelect(getRecordKuwaku(draftRecord));
@@ -14618,6 +14623,45 @@ function parseTotalStationPeg(valueRaw) {
   return { block, no };
 }
 
+function parseTotalStationNumber(valueRaw) {
+  const normalized = value(valueRaw)
+    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[，、]/g, ".")
+    .replace(/[＋]/g, "+")
+    .replace(/[−ー―]/g, "-");
+  if (!normalized) {
+    return null;
+  }
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getTotalStationInputError() {
+  if (!recordForm) {
+    return "入力情報を取得できませんでした";
+  }
+  const data = new FormData(recordForm);
+  const grid = currentInputKuwakuParts();
+  if (!parseTotalStationPeg(data.get("tsPeg"))) {
+    return "杭情報を「I-C-5」の形式で入力してください";
+  }
+  if (!/^[A-Z]+$/.test(grid.block) || !/^-?\d+$/.test(grid.no)) {
+    return "先に区画（グリッド）の英字と番号を入力してください";
+  }
+  const requiredNumbers = [
+    ["設置位置の南北距離", data.get("tsSetupNsCm")],
+    ["設置位置の東西距離", data.get("tsSetupEwCm")],
+    ["x 南北", data.get("tsXNorthM")],
+    ["y 東西", data.get("tsYEastM")],
+  ];
+  for (const [label, raw] of requiredNumbers) {
+    if (parseTotalStationNumber(raw) == null) {
+      return `${label}を数値で入力してください`;
+    }
+  }
+  return "";
+}
+
 function calculateTotalStationPosition() {
   if (!recordForm || normalizePositionMethod(new FormData(recordForm).get("positionMethod")) !== "totalStation") {
     return null;
@@ -14625,17 +14669,17 @@ function calculateTotalStationPosition() {
   const data = new FormData(recordForm);
   const peg = parseTotalStationPeg(data.get("tsPeg"));
   const grid = currentInputKuwakuParts();
-  const setupNsCm = Number(value(data.get("tsSetupNsCm")));
-  const setupEwCm = Number(value(data.get("tsSetupEwCm")));
-  const setupAltitudeM = Number(value(data.get("tsSetupAltitudeM")));
-  const xNorthM = Number(value(data.get("tsXNorthM")));
-  const yEastM = Number(value(data.get("tsYEastM")));
-  const zUpM = Number(value(data.get("tsZUpM")));
+  const setupNsCm = parseTotalStationNumber(data.get("tsSetupNsCm"));
+  const setupEwCm = parseTotalStationNumber(data.get("tsSetupEwCm"));
+  const setupAltitudeM = parseTotalStationNumber(data.get("tsSetupAltitudeM"));
+  const xNorthM = parseTotalStationNumber(data.get("tsXNorthM"));
+  const yEastM = parseTotalStationNumber(data.get("tsYEastM"));
+  const zUpM = parseTotalStationNumber(data.get("tsZUpM"));
   if (
     !peg ||
     !/^[A-Z]+$/.test(grid.block) ||
     !/^-?\d+$/.test(grid.no) ||
-    ![setupNsCm, setupEwCm, setupAltitudeM, xNorthM, yEastM, zUpM].every(Number.isFinite)
+    [setupNsCm, setupEwCm, xNorthM, yEastM].some((number) => number == null)
   ) {
     return null;
   }
@@ -14648,7 +14692,7 @@ function calculateTotalStationPosition() {
   return {
     xPlanCm,
     yPlanCm,
-    altitudeM: setupAltitudeM + zUpM,
+    altitudeM: setupAltitudeM != null && zUpM != null ? setupAltitudeM + zUpM : null,
   };
 }
 
@@ -14657,7 +14701,7 @@ function applyTotalStationPosition() {
   const resultEl = document.getElementById("total-station-result");
   if (!result) {
     if (resultEl) {
-      resultEl.textContent = "杭情報、設置位置、xyzをすべて入力すると自動計算します。";
+      resultEl.textContent = getTotalStationInputError() || "入力値を確認してください。";
       resultEl.classList.remove("total-station-result-ok");
     }
     return;
@@ -14668,16 +14712,20 @@ function applyTotalStationPosition() {
   recordForm.elements.ewCm.value = formatLengthInputValue(result.xPlanCm);
   const altitudeToggle = recordForm.elements.altitudeInputEnabled;
   const altitudeField = recordForm.elements.altitudeDirectM;
-  if (altitudeToggle instanceof HTMLInputElement) {
-    altitudeToggle.checked = true;
-  }
-  if (altitudeField instanceof HTMLInputElement) {
-    altitudeField.value = String(Number(result.altitudeM.toFixed(4)));
+  if (result.altitudeM != null) {
+    if (altitudeToggle instanceof HTMLInputElement) {
+      altitudeToggle.checked = true;
+    }
+    if (altitudeField instanceof HTMLInputElement) {
+      altitudeField.value = String(Number(result.altitudeM.toFixed(4)));
+    }
   }
   syncDirectionTabsFromForm();
   syncAltitudeDirectInputUi();
   if (resultEl) {
-    resultEl.textContent = `計算結果：西から ${formatLengthInputValue(result.xPlanCm)} cm、北から ${formatLengthInputValue(result.yPlanCm)} cm、標高 ${Number(result.altitudeM.toFixed(4))} m`;
+    const altitudeText =
+      result.altitudeM == null ? "" : `、標高 ${Number(result.altitudeM.toFixed(4))} m`;
+    resultEl.textContent = `計算結果：西から ${formatLengthInputValue(result.xPlanCm)} cm、北から ${formatLengthInputValue(result.yPlanCm)} cm${altitudeText}`;
     resultEl.classList.add("total-station-result-ok");
   }
 }
