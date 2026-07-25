@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>【試行版】第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260725-ts-trial1" />
+    <link rel="stylesheet" href="./styles.css?v=20260725-ts-trial2" />
   </head>
   <body>
     <header class="app-header">
@@ -235,28 +235,43 @@
               </div>
             </fieldset>
 
+            <fieldset class="inline-fieldset compact-position-fieldset">
+              <legend>平面位置（中心）[東から・西から]<span class="required">*</span></legend>
+              <div class="dir-tabs" role="tablist" aria-label="東西方向">
+                <button class="dir-tab active" data-group="ew" data-value="東から" type="button">東から</button>
+                <button class="dir-tab" data-group="ew" data-value="西から" type="button">西から</button>
+              </div>
+              <input id="ew-dir-input" name="ewDir" type="hidden" value="東から" />
+              <div class="inline-cm-row compact-cm-row">
+                <input name="ewCm" type="text" />
+                <span>cm<span class="required">*</span></span>
+              </div>
+            </fieldset>
+            </div>
+
             <fieldset id="total-station-section" class="inline-fieldset span-3 total-station-section hidden">
               <legend>トータルステーション設置位置</legend>
               <div class="ts-peg-row">
-                <label>杭情報
+                <label class="ts-peg-field">杭情報
                   <input name="tsPeg" type="text" placeholder="例：I-C-5" />
                 </label>
-                <span class="ts-sentence">杭から</span>
-                <label><span>南北</span>
+                <span class="ts-sentence">杭から、</span>
+                <label class="ts-inline-field">
+                  <span>南北</span>
                   <select name="tsSetupNsDir"><option value="北">北</option><option value="南">南</option></select>
-                </label>
-                <label><span>へ</span>
+                  <span>へ</span>
                   <input name="tsSetupNsCm" type="text" inputmode="decimal" />
-                  <span>cm</span>
+                  <span>cm、</span>
                 </label>
-                <label><span>東西</span>
+                <label class="ts-inline-field">
+                  <span>東西</span>
                   <select name="tsSetupEwDir"><option value="東">東</option><option value="西">西</option></select>
-                </label>
-                <label><span>へ</span>
+                  <span>へ</span>
                   <input name="tsSetupEwCm" type="text" inputmode="decimal" />
-                  <span>cm</span>
+                  <span>cm、</span>
                 </label>
-                <label><span>標高</span>
+                <label class="ts-inline-field">
+                  <span>標高</span>
                   <input name="tsSetupAltitudeM" type="text" inputmode="decimal" />
                   <span>m</span>
                 </label>
@@ -274,20 +289,6 @@
               </div>
               <p id="total-station-result" class="hint-text" aria-live="polite">設置位置と xyz を入力すると、区画内の平面位置と標高を自動計算します。</p>
             </fieldset>
-
-            <fieldset class="inline-fieldset compact-position-fieldset">
-              <legend>平面位置（中心）[東から・西から]<span class="required">*</span></legend>
-              <div class="dir-tabs" role="tablist" aria-label="東西方向">
-                <button class="dir-tab active" data-group="ew" data-value="東から" type="button">東から</button>
-                <button class="dir-tab" data-group="ew" data-value="西から" type="button">西から</button>
-              </div>
-              <input id="ew-dir-input" name="ewDir" type="hidden" value="東から" />
-              <div class="inline-cm-row compact-cm-row">
-                <input name="ewCm" type="text" />
-                <span>cm<span class="required">*</span></span>
-              </div>
-            </fieldset>
-            </div>
 
             <fieldset class="inline-fieldset span-3">
               <legend>平面位置（大きなもの・画像利用）</legend>
@@ -1038,6 +1039,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260725-ts-trial1"></script>
+    <script src="./app.js?v=20260725-ts-trial2"></script>
   </body>
 </html>

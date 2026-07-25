@@ -2698,11 +2698,23 @@ th.sortable-header.sort-desc::after {
   align-items: center;
   gap: 7px;
   font-weight: 700;
+  width: auto;
+  min-width: max-content;
+  white-space: nowrap;
+}
+.position-method-options input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 0;
 }
 .grid-position-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.grid-position-fields.hidden {
+  display: none;
 }
 .total-station-section {
   border-color: #0f766e;
@@ -2723,6 +2735,23 @@ th.sortable-header.sort-desc::after {
   display: grid;
   gap: 5px;
 }
+.ts-peg-row .ts-inline-field {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  white-space: nowrap;
+}
+.ts-inline-field select {
+  width: 4.5rem;
+}
+.ts-inline-field input {
+  width: 6.5rem;
+}
+.ts-peg-field {
+  width: 10rem;
+}
 .ts-peg-row label > span,
 .ts-observation-row label > span {
   display: inline-flex;
@@ -2734,7 +2763,8 @@ th.sortable-header.sort-desc::after {
   width: 8.5rem;
 }
 .ts-sentence {
-  padding-bottom: 11px;
+  padding-bottom: 10px;
+  white-space: nowrap;
 }
 .total-station-result-ok {
   color: #0f766e;
@@ -2747,5 +2777,15 @@ th.sortable-header.sort-desc::after {
   .ts-peg-row,
   .ts-observation-row {
     align-items: stretch;
+  }
+  .position-method-options label {
+    min-width: 100%;
+    white-space: normal;
+  }
+  .ts-peg-row .ts-inline-field {
+    flex-wrap: wrap;
+  }
+  .ts-sentence {
+    padding-bottom: 0;
   }
 }
