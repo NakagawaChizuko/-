@@ -9671,7 +9671,6 @@ function handleViewerControlPointerUp() {
 function handleViewerPointerMove(event) {
   if (isTouchLikePointerEvent(event)) {
     updateViewerTouchLongPressByMove(event);
-    hideViewerTooltip();
     return;
   }
   var picked = pickViewerDataAtEvent(event);
@@ -9727,6 +9726,7 @@ function handleViewerPointerDown(event) {
   if (!isTouchLikePointerEvent(event)) {
     return;
   }
+  hideViewerTooltip();
   cancelViewerTouchLongPress();
   viewerTouchLongPressState.pointerId = Number.isFinite(Number(event.pointerId)) ? event.pointerId : null;
   viewerTouchLongPressState.startX = Number(event.clientX) || 0;
@@ -9778,10 +9778,11 @@ function handleViewerPointerEnd(event) {
   }
 }
 function handleViewerPointerLeave(event) {
-  hideViewerTooltip();
   if (isTouchLikePointerEvent(event)) {
     cancelViewerTouchLongPress();
+    return;
   }
+  hideViewerTooltip();
 }
 function cancelViewerTouchLongPress() {
   if (viewerTouchLongPressState.timer) {
