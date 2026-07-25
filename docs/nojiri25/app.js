@@ -7474,10 +7474,15 @@ function renderPositionPreviewModalContent() {
   var savedDrawables = state.records.filter(function (record) {
     return kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue && value(record.id) !== value(draftRecord.id);
   }).map(function (record) {
-    return buildPlanDrawable(record);
+    var drawable = buildPlanDrawable(record);
+    return drawable ? _objectSpread(_objectSpread({}, drawable), {}, {
+      color: "#9ca3af",
+      labelColor: "#6b7280"
+    }) : null;
   }).filter(Boolean);
   var currentDrawable = _objectSpread(_objectSpread({}, currentDrawableRaw), {}, {
     color: "#dc2626",
+    labelColor: "#dc2626",
     label: value(draftRecord.specimenNo) || "入力中"
   });
   var drawables = [].concat(_toConsumableArray(savedDrawables), [currentDrawable]);
@@ -10433,7 +10438,7 @@ function renderPlanDrawableSvg(drawable) {
       hotspotSvg = hotspotPoints || hotspotSvg;
     }
   }
-  return "\n      <g\n        class=\"plan-point-group\"\n        data-id=\"".concat(escapeHtml(value(drawable.id) || ""), "\"\n        data-kuwaku=\"").concat(escapeHtml(value(drawable.kuwaku) || ""), "\"\n        data-label=\"").concat(escapeHtml(drawable.label || ""), "\"\n        data-name-memo=\"").concat(escapeHtml(drawable.nameMemo || ""), "\"\n        data-unit=\"").concat(escapeHtml(drawable.unit || ""), "\"\n        data-detail=\"").concat(escapeHtml(drawable.detail || ""), "\"\n        data-x=\"").concat(drawable.x, "\"\n        data-y=\"").concat(drawable.y, "\"\n        tabindex=\"0\"\n        role=\"button\"\n        aria-label=\"").concat(escapeHtml(ariaLabel), "\"\n      >\n        ").concat(shapeSvg, "\n        ").concat(hotspotSvg, "\n        <text x=\"").concat(labelX, "\" y=\"").concat(labelY, "\">").concat(escapeHtml(drawable.label || ""), "</text>\n      </g>\n    ");
+  return "\n      <g\n        class=\"plan-point-group\"\n        data-id=\"".concat(escapeHtml(value(drawable.id) || ""), "\"\n        data-kuwaku=\"").concat(escapeHtml(value(drawable.kuwaku) || ""), "\"\n        data-label=\"").concat(escapeHtml(drawable.label || ""), "\"\n        data-name-memo=\"").concat(escapeHtml(drawable.nameMemo || ""), "\"\n        data-unit=\"").concat(escapeHtml(drawable.unit || ""), "\"\n        data-detail=\"").concat(escapeHtml(drawable.detail || ""), "\"\n        data-x=\"").concat(drawable.x, "\"\n        data-y=\"").concat(drawable.y, "\"\n        tabindex=\"0\"\n        role=\"button\"\n        aria-label=\"").concat(escapeHtml(ariaLabel), "\"\n      >\n        ").concat(shapeSvg, "\n        ").concat(hotspotSvg, "\n        <text x=\"").concat(labelX, "\" y=\"").concat(labelY, "\"").concat(drawable.labelColor ? " style=\"fill:".concat(escapeHtml(drawable.labelColor), ";\"") : "", ">").concat(escapeHtml(drawable.label || ""), "</text>\n      </g>\n    ");
 }
 function parseHexColor(colorRaw) {
   var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "#6b7280";
