@@ -1014,6 +1014,7 @@ function bindEvents() {
           recorder: value(siteSnapshot?.recorder),
         };
     const recordTeamState = normalizeTeamState(recordSiteSnapshot.team, recordSiteSnapshot.teamOther);
+    const positionMethod = normalizePositionMethod(formData.get("positionMethod"));
     const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
     const planMultiPoints = planSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
     const rawLargeShapeType = value(formData.get("largeShapeType"));
@@ -1059,7 +1060,7 @@ function bindEvents() {
       specimenNo,
       category: categoryFromPrefix(specimenPrefix),
       analysisType,
-      levelHeight: recordSiteSnapshot.levelHeight,
+      levelHeight: positionMethod === "totalStation" ? "" : recordSiteSnapshot.levelHeight,
       date: recordSiteSnapshot.date,
       team: recordTeamState.team,
       teamOther: recordTeamState.teamOther,
@@ -1069,8 +1070,8 @@ function bindEvents() {
       unit: compactNoSpaceValue(formData.get("unit")),
       discoverer: value(formData.get("discoverer")),
       identifier: value(formData.get("identifier")),
-      levelUpperCm: value(formData.get("levelUpperCm")),
-      levelLowerCm: value(formData.get("levelLowerCm")),
+      levelUpperCm: positionMethod === "totalStation" ? "" : value(formData.get("levelUpperCm")),
+      levelLowerCm: positionMethod === "totalStation" ? "" : value(formData.get("levelLowerCm")),
       altitudeInputEnabled,
       altitudeDirectM,
       occurrenceSection: normalizeNeedFlag(value(formData.get("occurrenceSection"))),
@@ -1084,7 +1085,7 @@ function bindEvents() {
       nsCm: value(formData.get("nsCm")),
       ewDir: normalizeEwDir(value(formData.get("ewDir"))),
       ewCm: value(formData.get("ewCm")),
-      positionMethod: normalizePositionMethod(formData.get("positionMethod")),
+      positionMethod,
       tsPeg: value(formData.get("tsPeg")),
       tsSetupNsDir: value(formData.get("tsSetupNsDir")),
       tsSetupNsCm: value(formData.get("tsSetupNsCm")),
@@ -13525,17 +13526,20 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     return "入力情報を取得できませんでした";
   }
 
+  const positionMethod = normalizePositionMethod(recordFormData.get("positionMethod"));
   const siteRequiredFields = [
     ["区画（グリッド）名の1番目", siteSnapshot.kuwakuHeadA],
     ["区画（グリッド）名の2番目", siteSnapshot.kuwakuHeadB],
     ["区画（グリッド）の英字", siteSnapshot.kuwakuBlock],
     ["区画（グリッド）の番号", siteSnapshot.kuwakuNo],
-    ["レベル高", siteSnapshot.levelHeight],
     ["日付", siteSnapshot.date],
     ["発掘班", siteSnapshot.team],
     ["班長", siteSnapshot.teamLead],
     ["記載係", siteSnapshot.recorder],
   ];
+  if (positionMethod !== "totalStation") {
+    siteRequiredFields.splice(4, 0, ["レベル高", siteSnapshot.levelHeight]);
+  }
   for (const [label, fieldValue] of siteRequiredFields) {
     if (!value(fieldValue)) {
       return `${label}を入力してください`;
@@ -13553,8 +13557,6 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     ["簡易記載（専門班の指示による）", recordFormData.get("simpleRecordFlag")],
     ["発見者氏名", recordFormData.get("discoverer")],
     ["判定者氏名", recordFormData.get("identifier")],
-    ["レベル読値（上面）", recordFormData.get("levelUpperCm")],
-    ["レベル読値（下底）", recordFormData.get("levelLowerCm")],
     ["産出状況断面", recordFormData.get("occurrenceSection")],
     ["産状スケッチ", recordFormData.get("occurrenceSketch")],
     ["平面位置（北から/南から）", recordFormData.get("nsDir")],
@@ -13567,6 +13569,17 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     ["地層中の位置（上/下）", recordFormData.get("layerRelative")],
     ["地層中の位置（cm）", recordFormData.get("layerFromCm")],
   ];
+  if (positionMethod !== "totalStation") {
+    recordRequiredFields.splice(6, 0,
+      ["レベル読値（上面）", recordFormData.get("levelUpperCm")],
+      ["レベル読値（下底）", recordFormData.get("levelLowerCm")]
+    );
+  } else {
+    const tsError = getTotalStationInputError(true);
+    if (tsError) {
+      return tsError;
+    }
+  }
   for (const [label, fieldValue] of recordRequiredFields) {
     if (!value(fieldValue)) {
       return `${label}を入力してください`;
@@ -13645,11 +13658,16 @@ function getMissingRequiredKeys(record) {
   if (!value(record.identifier)) {
     missing.add("identifier");
   }
-  if (!value(record.levelUpperCm)) {
-    missing.add("levelUpperCm");
-  }
-  if (!value(record.levelLowerCm)) {
-    missing.add("levelLowerCm");
+  const positionMethod = normalizePositionMethod(record.positionMethod);
+  if (positionMethod !== "totalStation") {
+    if (!value(record.levelUpperCm)) {
+      missing.add("levelUpperCm");
+    }
+    if (!value(record.levelLowerCm)) {
+      missing.add("levelLowerCm");
+    }
+  } else if (!value(record.altitudeDirectM)) {
+    missing.add("altitudeDirectM");
   }
   if (!value(record.occurrenceSection)) {
     missing.add("occurrenceSection");
@@ -14636,7 +14654,7 @@ function parseTotalStationNumber(valueRaw) {
   return Number.isFinite(number) ? number : null;
 }
 
-function getTotalStationInputError() {
+function getTotalStationInputError(requireAltitude = false) {
   if (!recordForm) {
     return "入力情報を取得できませんでした";
   }
@@ -14657,6 +14675,14 @@ function getTotalStationInputError() {
   for (const [label, raw] of requiredNumbers) {
     if (parseTotalStationNumber(raw) == null) {
       return `${label}を数値で入力してください`;
+    }
+  }
+  if (requireAltitude) {
+    if (parseTotalStationNumber(data.get("tsSetupAltitudeM")) == null) {
+      return "トータルステーション設置位置の標高を数値で入力してください";
+    }
+    if (parseTotalStationNumber(data.get("tsZUpM")) == null) {
+      return "z 高度を数値で入力してください";
     }
   }
   return "";
@@ -14737,6 +14763,8 @@ function syncPositionMeasurementUi() {
   const method = normalizePositionMethod(new FormData(recordForm).get("positionMethod"));
   document.getElementById("grid-position-fields")?.classList.toggle("hidden", method !== "grid");
   document.getElementById("total-station-section")?.classList.toggle("hidden", method !== "totalStation");
+  document.getElementById("level-reading-section")?.classList.toggle("hidden", method === "totalStation");
+  siteForm?.querySelector(".site-level")?.classList.toggle("hidden", method === "totalStation");
   if (method === "totalStation") {
     applyTotalStationPosition();
   }

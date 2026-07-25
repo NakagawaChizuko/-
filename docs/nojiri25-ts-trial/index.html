@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>【試行版】第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260725-ts-trial3" />
+    <link rel="stylesheet" href="./styles.css?v=20260725-ts-trial4" />
   </head>
   <body>
     <header class="app-header">
@@ -171,7 +171,14 @@
                 <input name="identifier" type="text" />
               </label>
             </div>
-            <fieldset class="inline-fieldset span-2">
+            <fieldset class="inline-fieldset span-3 position-method-fieldset">
+              <legend>平面位置の測定<span class="required">*</span></legend>
+              <div class="position-method-options">
+                <label><input name="positionMethod" type="radio" value="grid" checked /> グリッド辺からの距離</label>
+                <label><input name="positionMethod" type="radio" value="totalStation" /> トータルステーション</label>
+              </div>
+            </fieldset>
+            <fieldset id="level-reading-section" class="inline-fieldset span-2">
               <legend>レベル読値<span class="required">*</span></legend>
               <div class="level-read-grid">
                 <label class="level-read-item"><span class="label-title">（上面）<span class="required">*</span></span>
@@ -211,14 +218,6 @@
                 <button class="dir-tab" data-group="occurrenceSketch" data-value="否" type="button">否</button>
               </div>
               <input id="occurrence-sketch-input" name="occurrenceSketch" type="hidden" value="要" />
-            </fieldset>
-
-            <fieldset class="inline-fieldset span-3 position-method-fieldset">
-              <legend>平面位置の測定<span class="required">*</span></legend>
-              <div class="position-method-options">
-                <label><input name="positionMethod" type="radio" value="grid" checked /> グリッド辺からの距離</label>
-                <label><input name="positionMethod" type="radio" value="totalStation" /> トータルステーション</label>
-              </div>
             </fieldset>
 
             <div id="grid-position-fields" class="grid-position-fields span-3">
@@ -1039,6 +1038,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260725-ts-trial3"></script>
+    <script src="./app.js?v=20260725-ts-trial4"></script>
   </body>
 </html>
