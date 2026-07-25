@@ -2371,7 +2371,7 @@ function buildTeamRosterAssignmentMap(rows) {
           });
         }
         var target = assignmentMap.get(key);
-        if (/班長/.test(roleText)) {
+        if (isRosterTeamLeadForDay(roleText, block.day)) {
           target.teamLeads.add(name);
         }
         if (/記載/.test(roleText)) {
@@ -2419,6 +2419,24 @@ function rowHasAttendanceMark(row, startCol, endCol) {
   }
   return false;
 }
+function isRosterTeamLeadForDay(roleTextRaw, day) {
+  var roleText = value(roleTextRaw);
+  if (!/班長/.test(roleText)) {
+    return false;
+  }
+  var qualifierMatch = roleText.match(/班長[（(]([^）)]+)[）)]/);
+  if (!qualifierMatch) {
+    return true;
+  }
+  return qualifierMatch[1].split(/[、,，]/).some(function (partRaw) {
+    var part = value(partRaw).replace(/[〜～]/g, "-");
+    var rangeMatch = part.match(/^(\d{1,2})-(\d{1,2})$/);
+    if (rangeMatch) {
+      return day >= Number(rangeMatch[1]) && day <= Number(rangeMatch[2]);
+    }
+    return Number(part) === day;
+  });
+}
 function normalizeRosterTeam(teamRaw) {
   var text = value(teamRaw);
   if (!text) {
@@ -2439,7 +2457,15 @@ function applyTeamRosterAutofill() {
   }
   var team = value((_siteForm$elements$te = siteForm.elements.team) === null || _siteForm$elements$te === void 0 ? void 0 : _siteForm$elements$te.value);
   var date = value((_siteForm$elements$da = siteForm.elements.date) === null || _siteForm$elements$da === void 0 ? void 0 : _siteForm$elements$da.value);
-  if (!teamRosterLoaded || !team || !date || team === OTHER_TEAM_NAME) {
+  if (!teamRosterLoaded) {
+    setTeamRosterStatus("名簿を読込中…");
+    return;
+  }
+  if (!team || team === OTHER_TEAM_NAME) {
+    return;
+  }
+  if (!date) {
+    setTeamRosterStatus("先に日付を選択してください");
     return;
   }
   var day = extractDayFromIsoDate(date);
@@ -2449,6 +2475,7 @@ function applyTeamRosterAutofill() {
   var key = "".concat(day, "-").concat(normalizeRosterTeam(team));
   var assignment = teamRosterAssignmentMap.get(key);
   if (!assignment) {
+    setTeamRosterStatus("この日付・発掘班の名簿データがありません");
     return;
   }
   var leads = Array.from(assignment.teamLeads).join(", ");
@@ -2459,6 +2486,7 @@ function applyTeamRosterAutofill() {
   if (siteForm.elements.recorder) {
     siteForm.elements.recorder.value = recorders;
   }
+  setTeamRosterStatus("".concat(day, "日・").concat(team, "班の名簿を反映しました"));
 }
 function extractDayFromIsoDate(dateRaw) {
   var text = value(dateRaw);
