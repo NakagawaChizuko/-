@@ -253,9 +253,10 @@ var LEGACY_LAYER_NAME_ALIASES = {
 };
 var PRESET_TEAMS = ["1", "2", "3", "4", "その他"];
 var OTHER_TEAM_NAME = "その他";
-var DEFAULT_KUWAKU_HEAD_A = "24";
+var DEFAULT_KUWAKU_HEAD_A = "25";
 var DEFAULT_KUWAKU_HEAD_B = "Ⅰ";
 var DEFAULT_KUWAKU = "".concat(DEFAULT_KUWAKU_HEAD_A, "-").concat(DEFAULT_KUWAKU_HEAD_B, "--");
+var DEFAULT_LAYER_NAME = "2.立が鼻砂部層";
 var ALL_GRIDS_VALUE = "__KUWAKU_ALL__";
 var EMPTY_KUWAKU_VALUE = "__KUWAKU_EMPTY__";
 var PLAN_SIZE_CM = 400;
@@ -3841,7 +3842,7 @@ function syncLargeShapeSectionFromForm() {
   }
 }
 function activateLayerTab(layerRaw) {
-  var layer = PRESET_LAYER_NAMES.includes(value(layerRaw)) ? value(layerRaw) : PRESET_LAYER_NAMES[0];
+  var layer = PRESET_LAYER_NAMES.includes(value(layerRaw)) ? value(layerRaw) : DEFAULT_LAYER_NAME;
   layerNameInput.value = layer;
   layerTabButtons.forEach(function (button) {
     button.classList.toggle("active", button.dataset.layer === layer);
@@ -3855,7 +3856,7 @@ function activateLayerTab(layerRaw) {
 function setLayerFromValue(layerRaw) {
   var layerValue = normalizeLayerName(value(layerRaw));
   if (!layerValue) {
-    activateLayerTab(PRESET_LAYER_NAMES[0]);
+    activateLayerTab(DEFAULT_LAYER_NAME);
     return;
   }
   if (PRESET_LAYER_NAMES.includes(layerValue) && layerValue !== OTHER_LAYER_NAME) {
@@ -3867,7 +3868,7 @@ function setLayerFromValue(layerRaw) {
   layerOtherInput.value = otherText;
 }
 function getSelectedLayerName() {
-  var selected = value(layerNameInput.value) || PRESET_LAYER_NAMES[0];
+  var selected = value(layerNameInput.value) || DEFAULT_LAYER_NAME;
   if (selected !== OTHER_LAYER_NAME) {
     return selected;
   }
@@ -4467,7 +4468,7 @@ function resetRecordForm(_ref9) {
   }
   clearImageCornerCmFields();
   setDefaultImageCornerDirections();
-  setLayerFromValue(PRESET_LAYER_NAMES[0]);
+  setLayerFromValue(DEFAULT_LAYER_NAME);
   syncCustomLargeImageStatus();
   nsDirInput.value = "北から";
   ewDirInput.value = "東から";
@@ -5061,7 +5062,7 @@ function insertRowFromList(recordId) {
     customLargeImageAspect: "",
     importantFlag: "無",
     simpleRecordFlag: "-",
-    layerName: PRESET_LAYER_NAMES[0],
+    layerName: DEFAULT_LAYER_NAME,
     detail: "",
     detailSub: "",
     layerFacies: "",
@@ -11113,6 +11114,12 @@ function normalizeState(candidate) {
   var kuwakuBlock = normalizeKuwakuBlock(value((_candidate$site4 = candidate.site) === null || _candidate$site4 === void 0 ? void 0 : _candidate$site4.kuwakuBlock) || kuwakuParts.block);
   var kuwakuNo = normalizeKuwakuNo(value((_candidate$site5 = candidate.site) === null || _candidate$site5 === void 0 ? void 0 : _candidate$site5.kuwakuNo) || kuwakuParts.no);
   var teamState = normalizeTeamState(value((_candidate$site6 = candidate.site) === null || _candidate$site6 === void 0 ? void 0 : _candidate$site6.team), value((_candidate$site7 = candidate.site) === null || _candidate$site7 === void 0 ? void 0 : _candidate$site7.teamOther));
+  var candidateSite = candidate.site && _typeof(candidate.site) === "object" ? candidate.site : {};
+  var hasSavedRecords = Array.isArray(candidate.records) && candidate.records.length > 0;
+  var isLegacyEmptyDefault = kuwakuHeadA === "24" && !kuwakuBlock && !kuwakuNo && !value(candidateSite.levelHeight) && !value(candidateSite.date) && !value(candidateSite.team) && !value(candidateSite.teamLead) && !value(candidateSite.recorder) && !value(candidateSite.scribe) && !hasSavedRecords;
+  if (isLegacyEmptyDefault) {
+    kuwakuHeadA = DEFAULT_KUWAKU_HEAD_A;
+  }
   safe.site = {
     kuwaku: buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo),
     kuwakuHeadA: kuwakuHeadA,
@@ -13166,7 +13173,7 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   if (!siteSnapshot) {
     return "入力情報を取得できませんでした";
   }
-  var siteRequiredFields = [["区画（グリッド）名の1番目", siteSnapshot.kuwakuHeadA], ["区画（グリッド）名の2番目", siteSnapshot.kuwakuHeadB], ["区画（グリッド）の英字", siteSnapshot.kuwakuBlock], ["区画（グリッド）の番号", siteSnapshot.kuwakuNo], ["レベル高", siteSnapshot.levelHeight], ["日付", siteSnapshot.date], ["発掘班", siteSnapshot.team], ["班長", siteSnapshot.teamLead], ["記載係", siteSnapshot.recorder]];
+  var siteRequiredFields = [["区画（グリッド）名の1番目", siteSnapshot.kuwakuHeadA], ["区画（グリッド）名の2番目", siteSnapshot.kuwakuHeadB], ["区画（グリッド）の英字", siteSnapshot.kuwakuBlock], ["区画（グリッド）の番号", siteSnapshot.kuwakuNo], ["レベル高", siteSnapshot.levelHeight], ["日付", siteSnapshot.date], ["発掘班", siteSnapshot.team], ["記載者", siteSnapshot.scribe]];
   for (var _i6 = 0, _siteRequiredFields = siteRequiredFields; _i6 < _siteRequiredFields.length; _i6++) {
     var _siteRequiredFields$_ = _slicedToArray(_siteRequiredFields[_i6], 2),
       label = _siteRequiredFields$_[0],
@@ -13229,12 +13236,6 @@ function getMissingRequiredKeys(record) {
   }
   if (!value(record.team)) {
     missing.add("team");
-  }
-  if (!value(record.teamLead)) {
-    missing.add("teamLead");
-  }
-  if (!value(record.recorder)) {
-    missing.add("recorder");
   }
   var specimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
   if (!value(specimen.serial)) {
