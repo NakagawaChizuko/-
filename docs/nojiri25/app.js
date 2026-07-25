@@ -9701,10 +9701,25 @@ function pickViewerDataAtClient(clientXRaw, clientYRaw) {
   viewer3d.pointer.set(x, y);
   viewer3d.raycaster.setFromCamera(viewer3d.pointer, viewer3d.camera);
   var intersects = viewer3d.raycaster.intersectObjects(viewer3d.pickMeshes, false);
-  if (!intersects.length) {
-    return null;
+  if (intersects.length) {
+    return ((_intersects$0$object = intersects[0].object) === null || _intersects$0$object === void 0 ? void 0 : _intersects$0$object.userData) || null;
   }
-  return ((_intersects$0$object = intersects[0].object) === null || _intersects$0$object === void 0 ? void 0 : _intersects$0$object.userData) || null;
+  var nearest = null;
+  var nearestDistance = 32;
+  viewer3d.pickMeshes.forEach(function (pickMesh) {
+    var screenPoint = pickMesh.getWorldPosition(new THREE.Vector3()).project(viewer3d.camera);
+    if (!Number.isFinite(screenPoint.x) || !Number.isFinite(screenPoint.y) || screenPoint.z < -1 || screenPoint.z > 1) {
+      return;
+    }
+    var screenX = rect.left + (screenPoint.x + 1) * rect.width / 2;
+    var screenY = rect.top + (1 - screenPoint.y) * rect.height / 2;
+    var distance = Math.hypot(clientX - screenX, clientY - screenY);
+    if (distance <= nearestDistance) {
+      nearestDistance = distance;
+      nearest = pickMesh.userData || null;
+    }
+  });
+  return nearest;
 }
 function handleViewerPointerDown(event) {
   if (!isTouchLikePointerEvent(event)) {
