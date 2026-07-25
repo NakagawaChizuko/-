@@ -8514,6 +8514,7 @@ function ensureViewerInitialized() {
     viewerCanvasWrap.addEventListener("pointerleave", handleViewerPointerLeave);
     viewerCanvasWrap.addEventListener("contextmenu", handleViewerContextMenu);
     if ((_viewer3d$renderer = viewer3d.renderer) !== null && _viewer3d$renderer !== void 0 && _viewer3d$renderer.domElement) {
+      viewer3d.renderer.domElement.addEventListener("mousemove", handleViewerPointerMove);
       viewer3d.renderer.domElement.addEventListener("pointerdown", handleViewerControlPointerDown);
       viewer3d.renderer.domElement.addEventListener("pointerup", handleViewerControlPointerUp);
       viewer3d.renderer.domElement.addEventListener("pointercancel", handleViewerControlPointerUp);
@@ -8762,7 +8763,7 @@ function renderViewerScene(shapes, metrics) {
       z: shape.z
     }];
     pickTargets.forEach(function (targetPoint) {
-      var pickMesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 10), new THREE.MeshBasicMaterial({
+      var pickMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 12), new THREE.MeshBasicMaterial({
         transparent: true,
         opacity: 0.001,
         depthWrite: false
