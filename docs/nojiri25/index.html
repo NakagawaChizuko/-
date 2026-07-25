@@ -12287,6 +12287,8 @@ function ensureViewerInitialized() {
     if ((_viewer3d$renderer = viewer3d.renderer) !== null && _viewer3d$renderer !== void 0 && _viewer3d$renderer.domElement) {
       viewer3d.renderer.domElement.addEventListener("mousemove", handleViewerPointerMove);
       viewer3d.renderer.domElement.addEventListener("pointerdown", handleViewerControlPointerDown);
+      viewer3d.renderer.domElement.addEventListener("pointerup", handleViewerPointerEnd);
+      viewer3d.renderer.domElement.addEventListener("pointercancel", handleViewerPointerEnd);
       viewer3d.renderer.domElement.addEventListener("pointerup", handleViewerControlPointerUp);
       viewer3d.renderer.domElement.addEventListener("pointercancel", handleViewerControlPointerUp);
     }
