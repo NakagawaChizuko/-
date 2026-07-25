@@ -1,4 +1,4 @@
-var CACHE_NAME = "kaseki25-pwa-v15";
+var CACHE_NAME = "kaseki25-pwa-v16";
 var REQUIRED_ASSETS = [
   "./",
   "./index.html",

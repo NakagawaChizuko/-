@@ -8507,6 +8507,9 @@ function ensureViewerInitialized() {
     viewer3d.pointer = new THREE.Vector2();
     viewer3d.available = true;
     viewer3d.initialized = true;
+    if (viewerTooltip && viewerTooltip.parentElement !== document.body) {
+      document.body.appendChild(viewerTooltip);
+    }
     viewerCanvasWrap.addEventListener("pointermove", handleViewerPointerMove);
     viewerCanvasWrap.addEventListener("pointerdown", handleViewerPointerDown);
     viewerCanvasWrap.addEventListener("pointerup", handleViewerPointerEnd);
@@ -9790,11 +9793,10 @@ function showViewerTooltip(event, data) {
   var altitudeText = data.altitudeEstimated ? "".concat(altitudeTextBase, "\uFF08\u4EEE\uFF09") : altitudeTextBase;
   viewerTooltip.innerHTML = "\n    <div><strong>\u6A19\u672C\u756A\u53F7:</strong> ".concat(escapeHtml(value(data.label) || "-"), "</div>\n    <div><strong>\u540D\u79F0:</strong> ").concat(escapeHtml(value(data.nameMemo) || "-"), "</div>\n    <div><strong>\u30E6\u30CB\u30C3\u30C8:</strong> ").concat(escapeHtml(value(data.unit) || "-"), "</div>\n    <div><strong>\u30B5\u30D6\u30E6\u30CB\u30C3\u30C8:</strong> ").concat(escapeHtml(value(data.detail) || "-"), "</div>\n    <div><strong>\u533A\u753B:</strong> ").concat(escapeHtml(value(data.kuwaku) || "-"), "</div>\n    <div><strong>\u6A19\u9AD8(m):</strong> ").concat(escapeHtml(altitudeText), "</div>\n  ");
   viewerTooltip.hidden = false;
-  var rect = viewerCanvasWrap.getBoundingClientRect();
-  var maxX = Math.max(8, rect.width - 240);
-  var maxY = Math.max(8, rect.height - 132);
-  var x = clamp(event.clientX - rect.left + 14, 8, maxX);
-  var y = clamp(event.clientY - rect.top + 12, 8, maxY);
+  var maxX = Math.max(8, window.innerWidth - viewerTooltip.offsetWidth - 8);
+  var maxY = Math.max(8, window.innerHeight - viewerTooltip.offsetHeight - 8);
+  var x = clamp(event.clientX + 14, 8, maxX);
+  var y = clamp(event.clientY + 12, 8, maxY);
   viewerTooltip.style.left = "".concat(x, "px");
   viewerTooltip.style.top = "".concat(y, "px");
 }
