@@ -1,4 +1,4 @@
-var LEGACY_CACHE_NAME = "kaseki25-legacy-redirect-v5";
+var LEGACY_CACHE_NAME = "kaseki25-legacy-redirect-v6";
 var LEGACY_INDEX = "./index.html";
 
 self.addEventListener("install", function (event) {
@@ -14,7 +14,7 @@ self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(keys.map(function (key) {
-        if (/^kaseki25-pwa-v[1-8]$/.test(key) || /^kaseki25-legacy-redirect-v[1-4]$/.test(key)) {
+        if (/^kaseki25-pwa-v[1-8]$/.test(key) || /^kaseki25-legacy-redirect-v[1-5]$/.test(key)) {
           return caches.delete(key);
         }
         return null;

@@ -3351,7 +3351,7 @@ th.sortable-header.sort-desc::after {
             </label>
           </div>
           <div id="plan-map-legend" class="plan-map-legend"></div>
-          <p class="muted hover-edit-note">ホバーが出たところで右クリック（スマホは長押し）をすると編集ボタンが出ます。</p>
+          <p class="muted hover-edit-note">マウスはホバー、スマホは短くタップすると情報が出ます。右クリック（スマホは長押し）で編集ボタンが出ます。</p>
           <div id="plan-map-wrap"></div>
         </section>
       </section>
@@ -3406,7 +3406,7 @@ th.sortable-header.sort-desc::after {
           <div class="viewer-help muted" aria-label="3Dビューアー操作方法">
             <p><strong>3Dビューアー操作方法</strong></p>
             <p>マウス: 左ドラッグ=視点回転 / Shift+左ドラッグ=視点の平行移動 / ホイール=拡大・縮小 / 右クリック=編集メニュー</p>
-            <p>タッチ: 1本指ドラッグ=視点回転 / 2本指ピンチ=拡大・縮小 / 2本指ドラッグ=平行移動 / 長押し=編集メニュー</p>
+            <p>タッチ: 標本をタップ=情報表示 / 1本指ドラッグ=視点回転 / 2本指ピンチ=拡大・縮小 / 2本指ドラッグ=平行移動 / 長押し=編集メニュー</p>
           </div>
         </section>
       </section>
@@ -13515,7 +13515,14 @@ function handleViewerPointerEnd(event) {
   if (Number(event.pointerId) !== Number(viewerTouchLongPressState.pointerId)) {
     return;
   }
+  var wasLongPress = viewerTouchLongPressState.triggered;
+  var picked = wasLongPress ? null : pickViewerDataAtEvent(event);
   cancelViewerTouchLongPress();
+  if (picked) {
+    showViewerTooltip(event, picked);
+  } else if (!wasLongPress) {
+    hideViewerTooltip();
+  }
 }
 function handleViewerPointerLeave(event) {
   hideViewerTooltip();

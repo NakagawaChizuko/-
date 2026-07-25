@@ -9747,7 +9747,14 @@ function handleViewerPointerEnd(event) {
   if (Number(event.pointerId) !== Number(viewerTouchLongPressState.pointerId)) {
     return;
   }
+  var wasLongPress = viewerTouchLongPressState.triggered;
+  var picked = wasLongPress ? null : pickViewerDataAtEvent(event);
   cancelViewerTouchLongPress();
+  if (picked) {
+    showViewerTooltip(event, picked);
+  } else if (!wasLongPress) {
+    hideViewerTooltip();
+  }
 }
 function handleViewerPointerLeave(event) {
   hideViewerTooltip();
