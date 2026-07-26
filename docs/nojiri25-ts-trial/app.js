@@ -108,9 +108,9 @@ const REQUIRED_FIELD_LABELS = {
   positionMethod: "平面位置の測定方法",
   tsPeg: "TS設置位置の基準杭",
   tsSetupNsDir: "TS設置位置（南北方向）",
-  tsSetupNsCm: "TS設置位置（南北距離）",
+  tsSetupNsM: "TS設置位置（南北距離m）",
   tsSetupEwDir: "TS設置位置（東西方向）",
-  tsSetupEwCm: "TS設置位置（東西距離）",
+  tsSetupEwM: "TS設置位置（東西距離m）",
   tsSetupAltitudeM: "TS設置位置（標高）",
   tsXNorthM: "TS観測x（北正）",
   tsYEastM: "TS観測y（東正）",
@@ -1088,9 +1088,9 @@ function bindEvents() {
       positionMethod,
       tsPeg: value(formData.get("tsPeg")),
       tsSetupNsDir: value(formData.get("tsSetupNsDir")),
-      tsSetupNsCm: value(formData.get("tsSetupNsCm")),
+      tsSetupNsM: value(formData.get("tsSetupNsM")),
       tsSetupEwDir: value(formData.get("tsSetupEwDir")),
-      tsSetupEwCm: value(formData.get("tsSetupEwCm")),
+      tsSetupEwM: value(formData.get("tsSetupEwM")),
       tsSetupAltitudeM: value(formData.get("tsSetupAltitudeM")),
       tsXNorthM: value(formData.get("tsXNorthM")),
       tsYEastM: value(formData.get("tsYEastM")),
@@ -14630,9 +14630,9 @@ function setPositionMeasurementFields(record = {}) {
   [
     "tsPeg",
     "tsSetupNsDir",
-    "tsSetupNsCm",
+    "tsSetupNsM",
     "tsSetupEwDir",
-    "tsSetupEwCm",
+    "tsSetupEwM",
     "tsSetupAltitudeM",
     "tsXNorthM",
     "tsYEastM",
@@ -14643,6 +14643,14 @@ function setPositionMeasurementFields(record = {}) {
       field.value = value(record[name]) || field.value;
     }
   });
+  const legacyNsCm = parseTotalStationNumber(record.tsSetupNsCm);
+  const legacyEwCm = parseTotalStationNumber(record.tsSetupEwCm);
+  if (!value(record.tsSetupNsM) && legacyNsCm != null && recordForm.elements.tsSetupNsM) {
+    recordForm.elements.tsSetupNsM.value = formatLengthInputValue(legacyNsCm / 100);
+  }
+  if (!value(record.tsSetupEwM) && legacyEwCm != null && recordForm.elements.tsSetupEwM) {
+    recordForm.elements.tsSetupEwM.value = formatLengthInputValue(legacyEwCm / 100);
+  }
   syncPositionMeasurementUi();
 }
 
@@ -14692,8 +14700,8 @@ function getTotalStationInputError(requireAltitude = false) {
     return "先に区画（グリッド）の英字と番号を入力してください";
   }
   const requiredNumbers = [
-    ["設置位置の南北距離", data.get("tsSetupNsCm")],
-    ["設置位置の東西距離", data.get("tsSetupEwCm")],
+    ["設置位置の南北距離", data.get("tsSetupNsM")],
+    ["設置位置の東西距離", data.get("tsSetupEwM")],
     ["x 南北", data.get("tsXNorthM")],
     ["y 東西", data.get("tsYEastM")],
   ];
@@ -14720,8 +14728,8 @@ function calculateTotalStationPosition() {
   const data = new FormData(recordForm);
   const peg = parseTotalStationPeg(data.get("tsPeg"));
   const grid = currentInputKuwakuParts();
-  const setupNsCm = parseTotalStationNumber(data.get("tsSetupNsCm"));
-  const setupEwCm = parseTotalStationNumber(data.get("tsSetupEwCm"));
+  const setupNsM = parseTotalStationNumber(data.get("tsSetupNsM"));
+  const setupEwM = parseTotalStationNumber(data.get("tsSetupEwM"));
   const setupAltitudeM = parseTotalStationNumber(data.get("tsSetupAltitudeM"));
   const xNorthM = parseTotalStationNumber(data.get("tsXNorthM"));
   const yEastM = parseTotalStationNumber(data.get("tsYEastM"));
@@ -14730,14 +14738,14 @@ function calculateTotalStationPosition() {
     !peg ||
     !/^[A-Z]+$/.test(grid.block) ||
     !/^-?\d+$/.test(grid.no) ||
-    [setupNsCm, setupEwCm, xNorthM, yEastM].some((number) => number == null)
+    [setupNsM, setupEwM, xNorthM, yEastM].some((number) => number == null)
   ) {
     return null;
   }
   const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
   const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
-  const setupEastFromPegCm = value(data.get("tsSetupEwDir")) === "西" ? -setupEwCm : setupEwCm;
-  const setupNorthFromPegCm = value(data.get("tsSetupNsDir")) === "南" ? -setupNsCm : setupNsCm;
+  const setupEastFromPegCm = (value(data.get("tsSetupEwDir")) === "西" ? -setupEwM : setupEwM) * 100;
+  const setupNorthFromPegCm = (value(data.get("tsSetupNsDir")) === "南" ? -setupNsM : setupNsM) * 100;
   const setupX = pegX + setupEastFromPegCm;
   const setupY = pegY - setupNorthFromPegCm;
   const specimenEastFromPegCm = setupEastFromPegCm + yEastM * 100;
