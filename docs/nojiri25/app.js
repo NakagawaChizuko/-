@@ -637,6 +637,8 @@ var largeShapePanels = document.querySelectorAll(".large-shape-panel[data-large-
 var layerTabButtons = document.querySelectorAll(".layer-tab");
 var layerNameInput = document.getElementById("layer-name-input");
 var layerOtherInput = document.getElementById("layer-other-input");
+var unitInput = document.getElementById("unit-input");
+var unitTabs = document.getElementById("unit-tabs");
 var teamOtherInput = document.getElementById("team-other-input");
 var sectionDiagramCameraInput = document.getElementById("section-diagram-camera-input");
 var sectionDiagramInput = document.getElementById("section-diagram-input");
@@ -1022,6 +1024,22 @@ function bindEvents() {
       activateLayerTab(button.dataset.layer);
     });
   });
+  if (unitInput) {
+    unitInput.addEventListener("input", syncUnitTabSelection);
+  }
+  if (unitTabs) {
+    unitTabs.addEventListener("click", function (event) {
+      var button = event.target.closest(".unit-tab");
+      if (!button || !unitInput) {
+        return;
+      }
+      unitInput.value = value(button.dataset.unit);
+      unitInput.classList.remove("saved-carry-value");
+      syncUnitTabSelection();
+      updateEditMissingRequiredHighlights();
+      renderRecordTable();
+    });
+  }
   recordForm.addEventListener("submit", function (event) {
     var _activeEditRecordCont, _activeEditRecordCont2, _editSiteSnapshot, _editSiteSnapshot2, _editSiteSnapshot3, _editSiteSnapshot4, _editSiteSnapshot5, _editSiteSnapshot6, _siteSnapshot, _siteSnapshot2, _siteSnapshot3, _siteSnapshot4, _siteSnapshot5, _siteSnapshot6;
     event.preventDefault();
@@ -3880,6 +3898,40 @@ function activateLayerTab(layerRaw) {
   if (!isOther) {
     layerOtherInput.value = "";
   }
+  renderUnitTabsForLayer(layer);
+}
+function getUnitOptionsForLayer(layerRaw) {
+  var layer = value(layerRaw);
+  if (layer === "1.芙蓉湖砂シルト部層") {
+    return ["F1", "F2", "F3", "F4"];
+  }
+  if (layer === "2.立が鼻砂部層") {
+    return ["T1", "T2", "T3", "T4", "T5", "T6", "T7"];
+  }
+  if (layer === "3.海端砂シルト部層") {
+    return ["U1", "U2", "U3"];
+  }
+  return [];
+}
+function renderUnitTabsForLayer(layerRaw) {
+  if (!unitTabs) {
+    return;
+  }
+  var options = getUnitOptionsForLayer(layerRaw);
+  unitTabs.innerHTML = options.map(function (unit) {
+    return "<button class=\"unit-tab\" data-unit=\"".concat(unit, "\" type=\"button\">").concat(unit, "</button>");
+  }).join("");
+  unitTabs.classList.toggle("hidden", !options.length);
+  syncUnitTabSelection();
+}
+function syncUnitTabSelection() {
+  if (!unitTabs || !unitInput) {
+    return;
+  }
+  var selectedUnit = value(unitInput.value).toUpperCase();
+  unitTabs.querySelectorAll(".unit-tab").forEach(function (button) {
+    button.classList.toggle("active", value(button.dataset.unit).toUpperCase() === selectedUnit);
+  });
 }
 function setLayerFromValue(layerRaw) {
   var layerValue = normalizeLayerName(value(layerRaw));
@@ -3906,6 +3958,7 @@ function getSelectedLayerName() {
 function applyCarryForwardFields(saved) {
   setLayerFromValue(value(saved === null || saved === void 0 ? void 0 : saved.layerName));
   recordForm.elements.unit.value = value(saved === null || saved === void 0 ? void 0 : saved.unit);
+  syncUnitTabSelection();
   recordForm.elements.detail.value = value(saved === null || saved === void 0 ? void 0 : saved.detail);
   recordForm.elements.detailSub.value = value(saved === null || saved === void 0 ? void 0 : saved.detailSub);
   recordForm.elements.layerFacies.value = value(saved === null || saved === void 0 ? void 0 : saved.layerFacies);
