@@ -171,6 +171,22 @@
                 <input name="identifier" type="text" />
               </label>
             </div>
+            <fieldset class="inline-fieldset">
+              <legend>産出状況断面<span class="required">*</span></legend>
+              <div class="dir-tabs" role="tablist" aria-label="産出状況断面">
+                <button class="dir-tab active" data-group="occurrenceSection" data-value="要" type="button">要</button>
+                <button class="dir-tab" data-group="occurrenceSection" data-value="否" type="button">否</button>
+              </div>
+              <input id="occurrence-section-input" name="occurrenceSection" type="hidden" value="要" />
+            </fieldset>
+            <fieldset class="inline-fieldset">
+              <legend>産状スケッチ<span class="required">*</span></legend>
+              <div class="dir-tabs" role="tablist" aria-label="産状スケッチ">
+                <button class="dir-tab active" data-group="occurrenceSketch" data-value="要" type="button">要</button>
+                <button class="dir-tab" data-group="occurrenceSketch" data-value="否" type="button">否</button>
+              </div>
+              <input id="occurrence-sketch-input" name="occurrenceSketch" type="hidden" value="要" />
+            </fieldset>
             <fieldset class="inline-fieldset span-3 position-method-fieldset">
               <legend>平面位置の測定<span class="required">*</span></legend>
               <div class="position-method-options">
@@ -203,23 +219,6 @@
                 </div>
               </div>
             </fieldset>
-            <fieldset class="inline-fieldset">
-              <legend>産出状況断面<span class="required">*</span></legend>
-              <div class="dir-tabs" role="tablist" aria-label="産出状況断面">
-                <button class="dir-tab active" data-group="occurrenceSection" data-value="要" type="button">要</button>
-                <button class="dir-tab" data-group="occurrenceSection" data-value="否" type="button">否</button>
-              </div>
-              <input id="occurrence-section-input" name="occurrenceSection" type="hidden" value="要" />
-            </fieldset>
-            <fieldset class="inline-fieldset">
-              <legend>産状スケッチ<span class="required">*</span></legend>
-              <div class="dir-tabs" role="tablist" aria-label="産状スケッチ">
-                <button class="dir-tab active" data-group="occurrenceSketch" data-value="要" type="button">要</button>
-                <button class="dir-tab" data-group="occurrenceSketch" data-value="否" type="button">否</button>
-              </div>
-              <input id="occurrence-sketch-input" name="occurrenceSketch" type="hidden" value="要" />
-            </fieldset>
-
             <div id="grid-position-fields" class="grid-position-fields span-3">
             <fieldset class="inline-fieldset compact-position-fieldset">
               <legend>平面位置（中心）[北から・南から]<span class="required">*</span></legend>
@@ -283,20 +282,21 @@
                   <span>m</span>
                 </label>
               </div>
-              <fieldset class="ts-specimen-position">
-                <legend>化石・遺物の位置</legend>
-                <div class="ts-observation-row">
-                  <label>x 南北（TS設置点から北が正）
-                    <span><input name="tsXNorthM" type="text" inputmode="decimal" /> m</span>
-                  </label>
-                  <label>y 東西（TS設置点から東が正）
-                    <span><input name="tsYEastM" type="text" inputmode="decimal" /> m</span>
-                  </label>
-                  <label>z 高度（TS設置点から上が正）
-                    <span><input name="tsZUpM" type="text" inputmode="decimal" /> m</span>
-                  </label>
-                </div>
-              </fieldset>
+            </fieldset>
+
+            <fieldset id="ts-specimen-position-section" class="inline-fieldset span-3 ts-specimen-position hidden">
+              <legend>化石・遺物の位置</legend>
+              <div class="ts-observation-row">
+                <label>x 南北（TS設置点から北が正）
+                  <span><input name="tsXNorthM" type="text" inputmode="decimal" /> m</span>
+                </label>
+                <label>y 東西（TS設置点から東が正）
+                  <span><input name="tsYEastM" type="text" inputmode="decimal" /> m</span>
+                </label>
+                <label>z 高度（TS設置点から上が正）
+                  <span><input name="tsZUpM" type="text" inputmode="decimal" /> m</span>
+                </label>
+              </div>
               <p id="total-station-result" class="hint-text" aria-live="polite">設置位置と xyz を入力すると、区画内の平面位置と標高を自動計算します。</p>
             </fieldset>
 
@@ -1049,6 +1049,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260726-ts-trial8"></script>
+    <script src="./app.js?v=20260726-ts-trial9"></script>
   </body>
 </html>

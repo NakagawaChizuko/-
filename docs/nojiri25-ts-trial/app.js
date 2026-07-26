@@ -14811,6 +14811,7 @@ function syncPositionMeasurementUi() {
   const method = normalizePositionMethod(new FormData(recordForm).get("positionMethod"));
   document.getElementById("grid-position-fields")?.classList.toggle("hidden", method !== "grid");
   document.getElementById("total-station-section")?.classList.toggle("hidden", method !== "totalStation");
+  document.getElementById("ts-specimen-position-section")?.classList.toggle("hidden", method !== "totalStation");
   document.getElementById("level-reading-section")?.classList.toggle("hidden", method === "totalStation");
   siteForm?.querySelector(".site-level")?.classList.toggle("hidden", method === "totalStation");
   if (method === "totalStation") {
@@ -14820,13 +14821,20 @@ function syncPositionMeasurementUi() {
 
 if (recordForm) {
   recordForm.addEventListener("change", (event) => {
-    if (event.target instanceof Element && (event.target.matches('[name="positionMethod"]') || event.target.closest("#total-station-section"))) {
+    if (
+      event.target instanceof Element &&
+      (event.target.matches('[name="positionMethod"]') ||
+        event.target.closest("#total-station-section, #ts-specimen-position-section"))
+    ) {
       syncPositionMeasurementUi();
       applyTotalStationPosition();
     }
   });
   recordForm.addEventListener("input", (event) => {
-    if (event.target instanceof Element && event.target.closest("#total-station-section")) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("#total-station-section, #ts-specimen-position-section")
+    ) {
       applyTotalStationPosition();
     }
   });
