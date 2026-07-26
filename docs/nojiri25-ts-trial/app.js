@@ -1,6 +1,7 @@
 const STORAGE_KEY = "nojiri-kaseki-mobile-v1";
 const CLOUD_ENDPOINT_KEY = "nojiri-kaseki-cloud-endpoint-v1";
 const CLOUD_CLIENT_ID_KEY = "nojiri-kaseki-cloud-client-id-v1";
+const TOTAL_STATION_SETUP_KEY = "nojiri-total-station-setup-v1";
 const DEFAULT_CLOUD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw70bPigsRo6HrTzSqUl0--N0Bsno2ybgdfJmtpmmMbQYPqKw-Z9ssOnt5PsGtMT1WSWg/exec";
 const CLOUD_PULL_INTERVAL_MS = 20000;
 const CLOUD_SAVE_DEBOUNCE_MS = 900;
@@ -4049,6 +4050,7 @@ function resetRecordForm({ showMessage }) {
 
   nsDirInput.value = "北から";
   ewDirInput.value = "東から";
+  restoreSavedTotalStationSetup();
   syncDirectionTabsFromForm();
   syncAltitudeDirectInputUi({ clearWhenDisabled: true });
 
@@ -14687,6 +14689,78 @@ function parseTotalStationNumber(valueRaw) {
   return Number.isFinite(number) ? number : null;
 }
 
+function readTotalStationSetupFromForm() {
+  if (!recordForm) {
+    return null;
+  }
+  const data = new FormData(recordForm);
+  return {
+    tsPeg: value(data.get("tsPeg")).toUpperCase(),
+    tsSetupNsDir: value(data.get("tsSetupNsDir")) === "南" ? "南" : "北",
+    tsSetupNsM: value(data.get("tsSetupNsM")),
+    tsSetupEwDir: value(data.get("tsSetupEwDir")) === "西" ? "西" : "東",
+    tsSetupEwM: value(data.get("tsSetupEwM")),
+    tsSetupAltitudeM: value(data.get("tsSetupAltitudeM")),
+  };
+}
+
+function restoreSavedTotalStationSetup() {
+  if (!recordForm) {
+    return false;
+  }
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(TOTAL_STATION_SETUP_KEY) || "null");
+  } catch (_error) {
+    return false;
+  }
+  if (!saved || typeof saved !== "object") {
+    return false;
+  }
+  ["tsPeg", "tsSetupNsDir", "tsSetupNsM", "tsSetupEwDir", "tsSetupEwM", "tsSetupAltitudeM"].forEach((name) => {
+    const field = recordForm.elements[name];
+    if (field instanceof HTMLInputElement) {
+      field.value = value(saved[name]) || field.value;
+    }
+  });
+  syncDirectionTabsFromForm();
+  const status = document.getElementById("ts-setup-save-status");
+  if (status) {
+    status.textContent = `保存済み：${value(saved.tsPeg).toUpperCase()}`;
+  }
+  return true;
+}
+
+function saveTotalStationSetup() {
+  const setup = readTotalStationSetupFromForm();
+  if (!setup || !parseTotalStationPeg(setup.tsPeg)) {
+    showToast("杭情報を「I-C-5」の形式で入力してください");
+    return;
+  }
+  const requiredNumbers = [
+    ["設置位置の南北距離", setup.tsSetupNsM],
+    ["設置位置の東西距離", setup.tsSetupEwM],
+    ["設置位置の標高", setup.tsSetupAltitudeM],
+  ];
+  for (const [label, raw] of requiredNumbers) {
+    if (parseTotalStationNumber(raw) == null) {
+      showToast(`${label}を数値で入力してください`);
+      return;
+    }
+  }
+  try {
+    localStorage.setItem(TOTAL_STATION_SETUP_KEY, JSON.stringify(setup));
+  } catch (_error) {
+    showToast("トータルステーション設置位置を保存できませんでした");
+    return;
+  }
+  const status = document.getElementById("ts-setup-save-status");
+  if (status) {
+    status.textContent = `保存済み：${setup.tsPeg}`;
+  }
+  showToast("トータルステーション設置位置を保存しました");
+}
+
 function getTotalStationInputError(requireAltitude = false) {
   if (!recordForm) {
     return "入力情報を取得できませんでした";
@@ -14820,6 +14894,7 @@ function syncPositionMeasurementUi() {
 }
 
 if (recordForm) {
+  document.getElementById("ts-setup-save-btn")?.addEventListener("click", saveTotalStationSetup);
   recordForm.addEventListener("change", (event) => {
     if (
       event.target instanceof Element &&

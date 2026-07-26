@@ -2787,6 +2787,15 @@ th.sortable-header.sort-desc::after {
   padding-bottom: 10px;
   white-space: nowrap;
 }
+.ts-setup-save-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.ts-setup-save-row .hint-text {
+  margin: 0;
+}
 .total-station-result-ok {
   color: #0f766e;
   font-weight: 700;
