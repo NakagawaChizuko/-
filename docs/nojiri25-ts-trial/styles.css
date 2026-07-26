@@ -2728,7 +2728,19 @@ th.sortable-header.sort-desc::after {
   gap: 10px 14px;
 }
 .ts-observation-row {
-  margin-top: 14px;
+  margin-top: 0;
+}
+.ts-specimen-position {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #99c8c2;
+  border-radius: 10px;
+  background: #ffffff;
+}
+.ts-specimen-position legend {
+  padding: 0 7px;
+  color: #0f5f59;
+  font-weight: 700;
 }
 .ts-peg-row label,
 .ts-observation-row label {
@@ -2745,6 +2757,15 @@ th.sortable-header.sort-desc::after {
 }
 .ts-inline-field select {
   width: 4.5rem;
+}
+.ts-direction-tabs {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.ts-direction-tabs .dir-tab {
+  min-width: 48px;
+  padding: 7px 12px;
 }
 .ts-inline-field input {
   width: 6.5rem;

@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>【試行版】第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260725-ts-trial4" />
+    <link rel="stylesheet" href="./styles.css?v=20260726-ts-trial7" />
   </head>
   <body>
     <header class="app-header">
@@ -257,14 +257,22 @@
                 <span class="ts-sentence">杭から、</span>
                 <label class="ts-inline-field">
                   <span>南北</span>
-                  <select name="tsSetupNsDir"><option value="北">北</option><option value="南">南</option></select>
+                  <span class="dir-tabs ts-direction-tabs" role="tablist" aria-label="TS設置位置の南北方向">
+                    <button class="dir-tab active" data-group="tsSetupNsDir" data-value="北" type="button">北</button>
+                    <button class="dir-tab" data-group="tsSetupNsDir" data-value="南" type="button">南</button>
+                  </span>
+                  <input id="ts-setup-ns-dir-input" name="tsSetupNsDir" type="hidden" value="北" />
                   <span>へ</span>
                   <input name="tsSetupNsCm" type="text" inputmode="decimal" />
                   <span>cm、</span>
                 </label>
                 <label class="ts-inline-field">
                   <span>東西</span>
-                  <select name="tsSetupEwDir"><option value="東">東</option><option value="西">西</option></select>
+                  <span class="dir-tabs ts-direction-tabs" role="tablist" aria-label="TS設置位置の東西方向">
+                    <button class="dir-tab active" data-group="tsSetupEwDir" data-value="東" type="button">東</button>
+                    <button class="dir-tab" data-group="tsSetupEwDir" data-value="西" type="button">西</button>
+                  </span>
+                  <input id="ts-setup-ew-dir-input" name="tsSetupEwDir" type="hidden" value="東" />
                   <span>へ</span>
                   <input name="tsSetupEwCm" type="text" inputmode="decimal" />
                   <span>cm、</span>
@@ -275,17 +283,20 @@
                   <span>m</span>
                 </label>
               </div>
-              <div class="ts-observation-row">
-                <label>x 南北（北が正）
-                  <span><input name="tsXNorthM" type="text" inputmode="decimal" /> m</span>
-                </label>
-                <label>y 東西（東が正）
-                  <span><input name="tsYEastM" type="text" inputmode="decimal" /> m</span>
-                </label>
-                <label>z 高度（上が正）
-                  <span><input name="tsZUpM" type="text" inputmode="decimal" /> m</span>
-                </label>
-              </div>
+              <fieldset class="ts-specimen-position">
+                <legend>化石・遺物の位置</legend>
+                <div class="ts-observation-row">
+                  <label>x 南北（TS設置点から北が正）
+                    <span><input name="tsXNorthM" type="text" inputmode="decimal" /> m</span>
+                  </label>
+                  <label>y 東西（TS設置点から東が正）
+                    <span><input name="tsYEastM" type="text" inputmode="decimal" /> m</span>
+                  </label>
+                  <label>z 高度（TS設置点から上が正）
+                    <span><input name="tsZUpM" type="text" inputmode="decimal" /> m</span>
+                  </label>
+                </div>
+              </fieldset>
               <p id="total-station-result" class="hint-text" aria-live="polite">設置位置と xyz を入力すると、区画内の平面位置と標高を自動計算します。</p>
             </fieldset>
 
@@ -1038,6 +1049,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260725-ts-trial4"></script>
+    <script src="./app.js?v=20260726-ts-trial7"></script>
   </body>
 </html>

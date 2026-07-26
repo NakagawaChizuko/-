@@ -2609,6 +2609,9 @@ function syncAnalysisTypeInput(prefixRaw) {
 function activateDirectionTab(group, valueRaw) {
   setDirectionGroupValue(group, valueRaw);
   syncDirectionTabsFromForm();
+  if (group === "tsSetupNsDir" || group === "tsSetupEwDir") {
+    applyTotalStationPosition();
+  }
 }
 
 function syncDirectionTabsFromForm() {
@@ -2622,6 +2625,8 @@ function syncDirectionTabsFromForm() {
   setDirectionGroupValue("simpleRecordFlag", simpleRecordFlagInput?.value);
   setDirectionGroupValue("occurrenceSection", occurrenceSectionInput?.value);
   setDirectionGroupValue("occurrenceSketch", occurrenceSketchInput?.value);
+  setDirectionGroupValue("tsSetupNsDir", recordForm?.elements?.tsSetupNsDir?.value);
+  setDirectionGroupValue("tsSetupEwDir", recordForm?.elements?.tsSetupEwDir?.value);
   setDirectionGroupValue("layerRelative", layerRelativeInput?.value);
   setDirectionGroupValue("planSizeMode", planSizeModeInput?.value);
   setDirectionGroupValue("largeShapeType", largeShapeTypeInput?.value);
@@ -2678,6 +2683,14 @@ function setDirectionGroupValue(group, valueRaw) {
     occurrenceSketchInput.value = normalized;
     return;
   }
+  if (group === "tsSetupNsDir" && recordForm?.elements?.tsSetupNsDir) {
+    recordForm.elements.tsSetupNsDir.value = normalized;
+    return;
+  }
+  if (group === "tsSetupEwDir" && recordForm?.elements?.tsSetupEwDir) {
+    recordForm.elements.tsSetupEwDir.value = normalized;
+    return;
+  }
   if (group === "layerRelative" && layerRelativeInput) {
     layerRelativeInput.value = normalized;
     return;
@@ -2729,6 +2742,12 @@ function getDirectionGroupValue(group) {
   }
   if (group === "occurrenceSketch") {
     return normalizeDirectionValue(group, occurrenceSketchInput?.value);
+  }
+  if (group === "tsSetupNsDir") {
+    return normalizeDirectionValue(group, recordForm?.elements?.tsSetupNsDir?.value);
+  }
+  if (group === "tsSetupEwDir") {
+    return normalizeDirectionValue(group, recordForm?.elements?.tsSetupEwDir?.value);
   }
   if (group === "layerRelative") {
     return normalizeDirectionValue(group, layerRelativeInput?.value);
@@ -14111,6 +14130,12 @@ function normalizeDirectionValue(group, valueRaw) {
   if (group === "occurrenceSection" || group === "occurrenceSketch") {
     return normalizeNeedFlag(valueRaw);
   }
+  if (group === "tsSetupNsDir") {
+    return value(valueRaw) === "南" ? "南" : "北";
+  }
+  if (group === "tsSetupEwDir") {
+    return value(valueRaw) === "西" ? "西" : "東";
+  }
   if (group === "layerRelative") {
     return normalizeLayerRelative(valueRaw);
   }
@@ -14711,11 +14736,18 @@ function calculateTotalStationPosition() {
   }
   const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
   const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
-  const setupX = pegX + (value(data.get("tsSetupEwDir")) === "西" ? -setupEwCm : setupEwCm);
-  const setupY = pegY + (value(data.get("tsSetupNsDir")) === "北" ? -setupNsCm : setupNsCm);
+  const setupEastFromPegCm = value(data.get("tsSetupEwDir")) === "西" ? -setupEwCm : setupEwCm;
+  const setupNorthFromPegCm = value(data.get("tsSetupNsDir")) === "南" ? -setupNsCm : setupNsCm;
+  const setupX = pegX + setupEastFromPegCm;
+  const setupY = pegY - setupNorthFromPegCm;
+  const specimenEastFromPegCm = setupEastFromPegCm + yEastM * 100;
+  const specimenNorthFromPegCm = setupNorthFromPegCm + xNorthM * 100;
   const xPlanCm = setupX + yEastM * 100;
   const yPlanCm = setupY - xNorthM * 100;
   return {
+    pegLabel: value(data.get("tsPeg")).toUpperCase(),
+    specimenEastFromPegCm,
+    specimenNorthFromPegCm,
     xPlanCm,
     yPlanCm,
     altitudeM: setupAltitudeM != null && zUpM != null ? setupAltitudeM + zUpM : null,
@@ -14751,7 +14783,15 @@ function applyTotalStationPosition() {
   if (resultEl) {
     const altitudeText =
       result.altitudeM == null ? "" : `、標高 ${Number(result.altitudeM.toFixed(4))} m`;
-    resultEl.textContent = `計算結果：西から ${formatLengthInputValue(result.xPlanCm)} cm、北から ${formatLengthInputValue(result.yPlanCm)} cm${altitudeText}`;
+    const eastWestText =
+      result.specimenEastFromPegCm < 0
+        ? `西に ${formatLengthInputValue(Math.abs(result.specimenEastFromPegCm))} cm`
+        : `東に ${formatLengthInputValue(result.specimenEastFromPegCm)} cm`;
+    const northSouthText =
+      result.specimenNorthFromPegCm < 0
+        ? `南に ${formatLengthInputValue(Math.abs(result.specimenNorthFromPegCm))} cm`
+        : `北に ${formatLengthInputValue(result.specimenNorthFromPegCm)} cm`;
+    resultEl.textContent = `計算結果：${result.pegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
     resultEl.classList.add("total-station-result-ok");
   }
 }
