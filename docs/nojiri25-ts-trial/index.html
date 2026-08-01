@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>【試行版】第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260801-ts-trial11" />
+    <link rel="stylesheet" href="./styles.css?v=20260801-ts-trial12" />
   </head>
   <body>
     <header class="app-header">
@@ -251,18 +251,9 @@
               <legend>トータルステーション設定</legend>
               <p class="hint-text">x＝南北（北が正）、y＝東西（東が正）、z＝標高。すべてm単位で入力します。</p>
               <div class="ts-setup-grid">
-                <strong>設置点</strong>
-                <label>x <input name="tsStationXNorthM" type="text" inputmode="decimal" /> m</label>
-                <label>y <input name="tsStationYEastM" type="text" inputmode="decimal" /> m</label>
-                <label>標高 <input name="tsStationAltitudeM" type="text" inputmode="decimal" /> m</label>
-                <strong>後視点（基準点）</strong>
-                <label>杭名称 <input name="tsBacksightPeg" type="text" placeholder="例：I-C-5" /></label>
-                <label>x <input name="tsBacksightXNorthM" type="text" inputmode="decimal" /> m</label>
-                <label>y <input name="tsBacksightYEastM" type="text" inputmode="decimal" /> m</label>
-                <label>標高 <input name="tsBacksightAltitudeM" type="text" inputmode="decimal" /> m</label>
-                <strong>高さ</strong>
-                <label>機械高 <input name="tsInstrumentHeightM" type="text" inputmode="decimal" /> m</label>
-                <label>目標高 <input name="tsTargetHeightM" type="text" inputmode="decimal" /> m</label>
+                <div class="ts-setup-row"><strong>設置点</strong><label>x <input name="tsStationXNorthM" type="text" inputmode="decimal" /> m</label><label>y <input name="tsStationYEastM" type="text" inputmode="decimal" /> m</label><label>標高 <input name="tsStationAltitudeM" type="text" inputmode="decimal" /> m</label></div>
+                <div class="ts-setup-row"><strong>後視点（基準点）</strong><label>杭名称 <input name="tsBacksightPeg" type="text" placeholder="例：I-C-5" /></label><label>x <input name="tsBacksightXNorthM" type="text" inputmode="decimal" /> m</label><label>y <input name="tsBacksightYEastM" type="text" inputmode="decimal" /> m</label><label>標高 <input name="tsBacksightAltitudeM" type="text" inputmode="decimal" /> m</label></div>
+                <div class="ts-setup-row"><strong>高さ</strong><label>機械高 <input name="tsInstrumentHeightM" type="text" inputmode="decimal" /> m</label><label>目標高 <input name="tsTargetHeightM" type="text" inputmode="decimal" /> m</label></div>
               </div>
               <div class="ts-setup-save-row">
                 <button id="ts-setup-save-btn" type="button">設置位置を保存</button>
@@ -1038,6 +1029,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260801-ts-trial11"></script>
+    <script src="./app.js?v=20260801-ts-trial12"></script>
   </body>
 </html>

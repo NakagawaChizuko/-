@@ -2798,17 +2798,18 @@ th.sortable-header.sort-desc::after {
 }
 .ts-setup-grid {
   display: grid;
-  grid-template-columns: 10rem repeat(4, minmax(9rem, 1fr));
-  gap: 10px 14px;
-  align-items: end;
+  gap: 14px;
 }
-.ts-setup-grid strong { align-self: center; color: #0f5f59; }
+.ts-setup-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.ts-setup-grid strong { width: 11rem; align-self: center; color: #0f5f59; }
 .ts-setup-grid label,
 .ts-polar-fields > label { display: grid; gap: 5px; }
 .ts-setup-grid input,
 .ts-polar-fields input { width: 7.5rem; }
 .ts-observation-methods { margin-bottom: 12px; }
 .ts-polar-fields { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: end; }
+.ts-observation-row.hidden,
+.ts-polar-fields.hidden { display: none; }
 .ts-dms-field { display: flex; flex-wrap: wrap; gap: 7px; align-items: end; padding: 9px; border: 1px solid #a7d5d1; border-radius: 8px; }
 .ts-dms-field strong { width: 100%; }
 .ts-dms-field .hint-text { width: 100%; margin: 0; }
@@ -2836,7 +2837,8 @@ th.sortable-header.sort-desc::after {
   .ts-peg-row .ts-inline-field {
     flex-wrap: wrap;
   }
-  .ts-setup-grid { grid-template-columns: 1fr; }
+  .ts-setup-row { display: grid; grid-template-columns: 1fr; }
+  .ts-setup-grid strong { width: auto; }
   .ts-sentence {
     padding-bottom: 0;
   }
