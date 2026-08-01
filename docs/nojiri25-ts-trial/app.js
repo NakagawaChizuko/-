@@ -525,6 +525,8 @@ const largeShapePanels = document.querySelectorAll(".large-shape-panel[data-larg
 const layerTabButtons = document.querySelectorAll(".layer-tab");
 const layerNameInput = document.getElementById("layer-name-input");
 const layerOtherInput = document.getElementById("layer-other-input");
+const unitInput = document.getElementById("unit-input");
+const unitTabs = document.getElementById("unit-tabs");
 const teamOtherInput = document.getElementById("team-other-input");
 
 const sectionDiagramCameraInput = document.getElementById("section-diagram-camera-input");
@@ -891,6 +893,21 @@ function bindEvents() {
       activateLayerTab(button.dataset.layer);
     });
   });
+
+  if (unitInput) {
+    unitInput.addEventListener("input", syncUnitTabSelection);
+  }
+  if (unitTabs) {
+    unitTabs.addEventListener("click", (event) => {
+      const button = event.target.closest(".unit-tab");
+      if (!button || !unitInput) return;
+      unitInput.value = value(button.dataset.unit);
+      unitInput.classList.remove("saved-carry-value");
+      syncUnitTabSelection();
+      updateEditMissingRequiredHighlights();
+      renderRecordTable();
+    });
+  }
 
   recordForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -3439,6 +3456,33 @@ function activateLayerTab(layerRaw) {
   if (!isOther) {
     layerOtherInput.value = "";
   }
+  renderUnitTabsForLayer(layer);
+}
+
+function getUnitOptionsForLayer(layerRaw) {
+  const layer = value(layerRaw);
+  if (layer === "1.芙蓉湖砂シルト部層") return ["F1", "F2", "F3", "F4"];
+  if (layer === "2.立が鼻砂部層") return ["T1", "T2", "T3", "T4", "T5", "T6", "T7"];
+  if (layer === "3.海端砂シルト部層") return ["U1", "U2", "U3"];
+  return [];
+}
+
+function renderUnitTabsForLayer(layerRaw) {
+  if (!unitTabs) return;
+  const options = getUnitOptionsForLayer(layerRaw);
+  unitTabs.innerHTML = options
+    .map((unit) => `<button class="unit-tab" data-unit="${unit}" type="button">${unit}</button>`)
+    .join("");
+  unitTabs.classList.toggle("hidden", !options.length);
+  syncUnitTabSelection();
+}
+
+function syncUnitTabSelection() {
+  if (!unitTabs || !unitInput) return;
+  const selectedUnit = value(unitInput.value).toUpperCase();
+  unitTabs.querySelectorAll(".unit-tab").forEach((button) => {
+    button.classList.toggle("active", value(button.dataset.unit).toUpperCase() === selectedUnit);
+  });
 }
 
 function setLayerFromValue(layerRaw) {
@@ -3470,6 +3514,7 @@ function getSelectedLayerName() {
 function applyCarryForwardFields(saved) {
   setLayerFromValue(value(saved?.layerName));
   recordForm.elements.unit.value = value(saved?.unit);
+  syncUnitTabSelection();
   recordForm.elements.detail.value = value(saved?.detail);
   recordForm.elements.detailSub.value = value(saved?.detailSub);
   recordForm.elements.layerFacies.value = value(saved?.layerFacies);

@@ -2132,6 +2132,26 @@ textarea {
   display: none;
 }
 
+.unit-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.unit-tab {
+  min-width: 42px;
+  padding: 5px 9px;
+  border-color: #9fb3c8;
+  background: #f4f8fb;
+  color: #203043;
+  font-size: 0.82rem;
+}
+.unit-tab.active {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #fff;
+}
+
 input.saved-carry-value,
 textarea.saved-carry-value,
 select.saved-carry-value {

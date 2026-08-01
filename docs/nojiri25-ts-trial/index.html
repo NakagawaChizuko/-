@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>【試行版】第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260801-ts-trial12" />
+    <link rel="stylesheet" href="./styles.css?v=20260801-ts-trial13" />
   </head>
   <body>
     <header class="app-header">
@@ -486,7 +486,8 @@
             </fieldset>
             <div class="unit-detail-inline span-3">
               <label class="compact-input-group"><span class="label-title">ユニット<span class="required">*</span></span>
-                <input name="unit" type="text" placeholder="T2, T3, T4　など" />
+                <input id="unit-input" name="unit" type="text" placeholder="タブで選択、または直接入力" />
+                <span id="unit-tabs" class="unit-tabs" role="tablist" aria-label="ユニット候補"></span>
               </label>
               <label class="compact-input-group">サブユニット
                 <input name="detail" type="text" placeholder="a, b, c, d, など" />
@@ -1029,6 +1030,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260801-ts-trial12"></script>
+    <script src="./app.js?v=20260801-ts-trial13"></script>
   </body>
 </html>
