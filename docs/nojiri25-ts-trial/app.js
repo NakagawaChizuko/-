@@ -2,7 +2,7 @@ const STORAGE_KEY = "nojiri-kaseki-mobile-v1";
 const CLOUD_ENDPOINT_KEY = "nojiri-kaseki-cloud-endpoint-v1";
 const CLOUD_CLIENT_ID_KEY = "nojiri-kaseki-cloud-client-id-v1";
 const TOTAL_STATION_SETUP_KEY = "nojiri-total-station-setup-v1";
-const DEFAULT_CLOUD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw70bPigsRo6HrTzSqUl0--N0Bsno2ybgdfJmtpmmMbQYPqKw-Z9ssOnt5PsGtMT1WSWg/exec";
+const DEFAULT_CLOUD_ENDPOINT = "";
 const CLOUD_PULL_INTERVAL_MS = 20000;
 const CLOUD_SAVE_DEBOUNCE_MS = 900;
 const CLOUD_AUTO_PULL_ENABLED = false;
@@ -6289,7 +6289,7 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
       return `
         <label>
           <span class="label-title">区画（グリッド）</span>
-          <input name="kuwaku" type="text" value="${escapeHtml(getRecordKuwaku(record))}" placeholder="例: 24-Ⅰ-C-4" />
+          <input name="kuwaku" type="text" value="${escapeHtml(getRecordKuwaku(record))}" placeholder="例: 25-Ⅰ-C-4" />
         </label>
       `;
     case "team":
@@ -6599,7 +6599,7 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     const parsed = parseKuwaku(formData.get("kuwaku"));
     const nextKuwaku = buildKuwaku(parsed.headA, parsed.headB, parsed.block, parsed.no);
     if (!parsed.block || !parsed.no || !nextKuwaku) {
-      return { ok: false, message: "区画（例: 24-Ⅰ-C-4）を入力してください" };
+      return { ok: false, message: "区画（例: 25-Ⅰ-C-4）を入力してください" };
     }
     const duplicate = findDuplicateRecordByKuwakuAndSpecimen(nextKuwaku, record.specimenNo, record.id);
     if (duplicate) {
