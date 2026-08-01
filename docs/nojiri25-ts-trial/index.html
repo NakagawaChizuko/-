@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>【試行版】第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
-    <link rel="stylesheet" href="./styles.css?v=20260726-ts-trial10" />
+    <link rel="stylesheet" href="./styles.css?v=20260801-ts-trial11" />
   </head>
   <body>
     <header class="app-header">
@@ -248,39 +248,21 @@
             </div>
 
             <fieldset id="total-station-section" class="inline-fieldset span-3 total-station-section hidden">
-              <legend>トータルステーション設置位置</legend>
-              <div class="ts-peg-row">
-                <label class="ts-peg-field">杭情報
-                  <input name="tsPeg" type="text" placeholder="例：I-C-5" />
-                </label>
-                <span class="ts-sentence">杭から、</span>
-                <label class="ts-inline-field">
-                  <span>南北</span>
-                  <span class="dir-tabs ts-direction-tabs" role="tablist" aria-label="TS設置位置の南北方向">
-                    <button class="dir-tab active" data-group="tsSetupNsDir" data-value="北" type="button">北</button>
-                    <button class="dir-tab" data-group="tsSetupNsDir" data-value="南" type="button">南</button>
-                  </span>
-                  <input id="ts-setup-ns-dir-input" name="tsSetupNsDir" type="hidden" value="北" />
-                  <span>へ</span>
-                  <input name="tsSetupNsM" type="text" inputmode="decimal" />
-                  <span>m、</span>
-                </label>
-                <label class="ts-inline-field">
-                  <span>東西</span>
-                  <span class="dir-tabs ts-direction-tabs" role="tablist" aria-label="TS設置位置の東西方向">
-                    <button class="dir-tab active" data-group="tsSetupEwDir" data-value="東" type="button">東</button>
-                    <button class="dir-tab" data-group="tsSetupEwDir" data-value="西" type="button">西</button>
-                  </span>
-                  <input id="ts-setup-ew-dir-input" name="tsSetupEwDir" type="hidden" value="東" />
-                  <span>へ</span>
-                  <input name="tsSetupEwM" type="text" inputmode="decimal" />
-                  <span>m、</span>
-                </label>
-                <label class="ts-inline-field">
-                  <span>標高</span>
-                  <input name="tsSetupAltitudeM" type="text" inputmode="decimal" />
-                  <span>m</span>
-                </label>
+              <legend>トータルステーション設定</legend>
+              <p class="hint-text">x＝南北（北が正）、y＝東西（東が正）、z＝標高。すべてm単位で入力します。</p>
+              <div class="ts-setup-grid">
+                <strong>設置点</strong>
+                <label>x <input name="tsStationXNorthM" type="text" inputmode="decimal" /> m</label>
+                <label>y <input name="tsStationYEastM" type="text" inputmode="decimal" /> m</label>
+                <label>標高 <input name="tsStationAltitudeM" type="text" inputmode="decimal" /> m</label>
+                <strong>後視点（基準点）</strong>
+                <label>杭名称 <input name="tsBacksightPeg" type="text" placeholder="例：I-C-5" /></label>
+                <label>x <input name="tsBacksightXNorthM" type="text" inputmode="decimal" /> m</label>
+                <label>y <input name="tsBacksightYEastM" type="text" inputmode="decimal" /> m</label>
+                <label>標高 <input name="tsBacksightAltitudeM" type="text" inputmode="decimal" /> m</label>
+                <strong>高さ</strong>
+                <label>機械高 <input name="tsInstrumentHeightM" type="text" inputmode="decimal" /> m</label>
+                <label>目標高 <input name="tsTargetHeightM" type="text" inputmode="decimal" /> m</label>
               </div>
               <div class="ts-setup-save-row">
                 <button id="ts-setup-save-btn" type="button">設置位置を保存</button>
@@ -290,16 +272,19 @@
 
             <fieldset id="ts-specimen-position-section" class="inline-fieldset span-3 ts-specimen-position hidden">
               <legend>化石・遺物の位置</legend>
-              <div class="ts-observation-row">
-                <label>x 南北（TS設置点から北が正）
-                  <span><input name="tsXNorthM" type="text" inputmode="decimal" /> m</span>
-                </label>
-                <label>y 東西（TS設置点から東が正）
-                  <span><input name="tsYEastM" type="text" inputmode="decimal" /> m</span>
-                </label>
-                <label>z 高度（TS設置点から上が正）
-                  <span><input name="tsZUpM" type="text" inputmode="decimal" /> m</span>
-                </label>
+              <div class="position-method-options ts-observation-methods">
+                <label><input name="tsObservationMode" type="radio" value="coordinate" checked /> 座標（x・y・z）</label>
+                <label><input name="tsObservationMode" type="radio" value="polar" /> 距離・傾斜・方向角</label>
+              </div>
+              <div id="ts-coordinate-fields" class="ts-observation-row">
+                <label>x 南北（北が正）<span><input name="tsPointXNorthM" type="text" inputmode="decimal" /> m</span></label>
+                <label>y 東西（東が正）<span><input name="tsPointYEastM" type="text" inputmode="decimal" /> m</span></label>
+                <label>z 標高<span><input name="tsPointAltitudeM" type="text" inputmode="decimal" /> m</span></label>
+              </div>
+              <div id="ts-polar-fields" class="ts-polar-fields hidden">
+                <label>斜距離 <span><input name="tsSlopeDistanceM" type="text" inputmode="decimal" /> m</span></label>
+                <div class="ts-dms-field"><strong>傾斜</strong><span class="hint-text">水平0°、上向き＋・下向き−</span><label><input name="tsInclinationDeg" type="text" inputmode="decimal" /> °</label><label><input name="tsInclinationMin" type="text" inputmode="numeric" value="0" /> ′</label><label><input name="tsInclinationSec" type="text" inputmode="decimal" value="0" /> ″</label></div>
+                <div class="ts-dms-field"><strong>方向角</strong><span class="hint-text">後視点方向を0°として時計回り</span><label><input name="tsDirectionDeg" type="text" inputmode="numeric" /> °</label><label><input name="tsDirectionMin" type="text" inputmode="numeric" value="0" /> ′</label><label><input name="tsDirectionSec" type="text" inputmode="decimal" value="0" /> ″</label></div>
               </div>
               <p id="total-station-result" class="hint-text" aria-live="polite">設置位置と xyz を入力すると、区画内の平面位置と標高を自動計算します。</p>
             </fieldset>
@@ -1053,6 +1038,6 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260726-ts-trial10"></script>
+    <script src="./app.js?v=20260801-ts-trial11"></script>
   </body>
 </html>

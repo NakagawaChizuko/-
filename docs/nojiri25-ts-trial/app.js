@@ -107,15 +107,26 @@ const REQUIRED_FIELD_LABELS = {
   ewCm: "平面位置（東から/西からの距離）",
   multiPoints: "平面位置（複数点）",
   positionMethod: "平面位置の測定方法",
-  tsPeg: "TS設置位置の基準杭",
-  tsSetupNsDir: "TS設置位置（南北方向）",
-  tsSetupNsM: "TS設置位置（南北距離m）",
-  tsSetupEwDir: "TS設置位置（東西方向）",
-  tsSetupEwM: "TS設置位置（東西距離m）",
-  tsSetupAltitudeM: "TS設置位置（標高）",
-  tsXNorthM: "TS観測x（北正）",
-  tsYEastM: "TS観測y（東正）",
-  tsZUpM: "TS観測z（上正）",
+  tsStationXNorthM: "TS設置点x（北正）",
+  tsStationYEastM: "TS設置点y（東正）",
+  tsStationAltitudeM: "TS設置点標高",
+  tsBacksightPeg: "TS後視点杭名称",
+  tsBacksightXNorthM: "TS後視点x（北正）",
+  tsBacksightYEastM: "TS後視点y（東正）",
+  tsBacksightAltitudeM: "TS後視点標高",
+  tsInstrumentHeightM: "TS機械高",
+  tsTargetHeightM: "TS目標高",
+  tsObservationMode: "TS標本位置入力方法",
+  tsPointXNorthM: "TS標本x（北正）",
+  tsPointYEastM: "TS標本y（東正）",
+  tsPointAltitudeM: "TS標本z標高",
+  tsSlopeDistanceM: "TS斜距離",
+  tsInclinationDeg: "TS傾斜度",
+  tsInclinationMin: "TS傾斜分",
+  tsInclinationSec: "TS傾斜秒",
+  tsDirectionDeg: "TS方向角度",
+  tsDirectionMin: "TS方向角分",
+  tsDirectionSec: "TS方向角秒",
   largeShapeType: "大きなもの形状",
   largeAxisDirection: "長軸・長辺・長半径方向（例:N30W）",
   largeAxisPlungeDeg: "プランジ角（度）",
@@ -1087,15 +1098,26 @@ function bindEvents() {
       ewDir: normalizeEwDir(value(formData.get("ewDir"))),
       ewCm: value(formData.get("ewCm")),
       positionMethod,
-      tsPeg: value(formData.get("tsPeg")),
-      tsSetupNsDir: value(formData.get("tsSetupNsDir")),
-      tsSetupNsM: value(formData.get("tsSetupNsM")),
-      tsSetupEwDir: value(formData.get("tsSetupEwDir")),
-      tsSetupEwM: value(formData.get("tsSetupEwM")),
-      tsSetupAltitudeM: value(formData.get("tsSetupAltitudeM")),
-      tsXNorthM: value(formData.get("tsXNorthM")),
-      tsYEastM: value(formData.get("tsYEastM")),
-      tsZUpM: value(formData.get("tsZUpM")),
+      tsStationXNorthM: value(formData.get("tsStationXNorthM")),
+      tsStationYEastM: value(formData.get("tsStationYEastM")),
+      tsStationAltitudeM: value(formData.get("tsStationAltitudeM")),
+      tsBacksightPeg: value(formData.get("tsBacksightPeg")),
+      tsBacksightXNorthM: value(formData.get("tsBacksightXNorthM")),
+      tsBacksightYEastM: value(formData.get("tsBacksightYEastM")),
+      tsBacksightAltitudeM: value(formData.get("tsBacksightAltitudeM")),
+      tsInstrumentHeightM: value(formData.get("tsInstrumentHeightM")),
+      tsTargetHeightM: value(formData.get("tsTargetHeightM")),
+      tsObservationMode: value(formData.get("tsObservationMode")) === "polar" ? "polar" : "coordinate",
+      tsPointXNorthM: value(formData.get("tsPointXNorthM")),
+      tsPointYEastM: value(formData.get("tsPointYEastM")),
+      tsPointAltitudeM: value(formData.get("tsPointAltitudeM")),
+      tsSlopeDistanceM: value(formData.get("tsSlopeDistanceM")),
+      tsInclinationDeg: value(formData.get("tsInclinationDeg")),
+      tsInclinationMin: value(formData.get("tsInclinationMin")),
+      tsInclinationSec: value(formData.get("tsInclinationSec")),
+      tsDirectionDeg: value(formData.get("tsDirectionDeg")),
+      tsDirectionMin: value(formData.get("tsDirectionMin")),
+      tsDirectionSec: value(formData.get("tsDirectionSec")),
       multiPoints: planMultiPoints,
       planSizeMode,
       largeShapeType,
@@ -7284,6 +7306,7 @@ function renderPlanOutput() {
       ? detailRecords
       : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedPlanDetailSub);
   const drawables = detailSubRecords.map((record) => buildPlanDrawable(record)).filter(Boolean);
+  const stationMarkers = collectTotalStationPlanMarkers(detailSubRecords);
   const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
   const categoryLabelForMeta =
     selectedPlanCategory === EXPORT_CATEGORY_ALL_VALUE
@@ -7319,9 +7342,10 @@ function renderPlanOutput() {
     .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
+  const stationSvg = renderTotalStationPlanMarkersSvg(stationMarkers);
   const cornerLabels = buildPlanCornerLabels(selectedPlanKuwaku);
   const cornerLabelsSvg = buildPlanCornerLabelsSvg(cornerLabels);
-  const viewBox = computePlanSvgViewBox(drawables);
+  const viewBox = computePlanSvgViewBox([...drawables, ...stationMarkers]);
 
   planMapWrap.innerHTML = `
     ${mapMetaHtml}
@@ -7335,6 +7359,7 @@ function renderPlanOutput() {
         ${verticalGrid}
         ${horizontalGrid}
         ${cornerLabelsSvg}
+        ${stationSvg}
         ${pointsSvg}
       </svg>
       <div class="plan-map-tooltip" hidden></div>
@@ -9907,6 +9932,36 @@ function buildPlanDrawableMeta(record) {
   };
 }
 
+function buildTotalStationPlanMarker(record) {
+  if (normalizePositionMethod(record?.positionMethod) !== "totalStation") return null;
+  const peg = parseTotalStationPeg(record?.tsBacksightPeg);
+  const grid = parseKuwaku(getRecordKuwaku(record));
+  const stationX = parseTotalStationNumber(record?.tsStationXNorthM);
+  const stationY = parseTotalStationNumber(record?.tsStationYEastM);
+  const backX = parseTotalStationNumber(record?.tsBacksightXNorthM);
+  const backY = parseTotalStationNumber(record?.tsBacksightYEastM);
+  if (!peg || !grid.block || !grid.no || [stationX, stationY, backX, backY].some((number) => number == null)) return null;
+  return {
+    x: (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM + (stationY - backY) * 100,
+    y: (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM - (stationX - backX) * 100,
+  };
+}
+
+function collectTotalStationPlanMarkers(records) {
+  const unique = new Map();
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    const marker = buildTotalStationPlanMarker(record);
+    if (!marker) return;
+    const key = `${marker.x.toFixed(3)}:${marker.y.toFixed(3)}`;
+    if (!unique.has(key)) unique.set(key, marker);
+  });
+  return [...unique.values()];
+}
+
+function renderTotalStationPlanMarkersSvg(markers) {
+  return markers.map((marker) => `<g class="plan-total-station" aria-label="トータルステーション設置点"><circle cx="${marker.x}" cy="${marker.y}" r="8" /><line x1="${marker.x - 11}" y1="${marker.y}" x2="${marker.x + 11}" y2="${marker.y}" /><line x1="${marker.x}" y1="${marker.y - 11}" x2="${marker.x}" y2="${marker.y + 11}" /><text x="${marker.x + 12}" y="${marker.y - 10}">TS</text></g>`).join("");
+}
+
 function convertPositionToPlanCoords(nsDirRaw, nsCmRaw, ewDirRaw, ewCmRaw) {
   const nsCm = parseDistanceToCm(nsCmRaw);
   const ewCm = parseDistanceToCm(ewCmRaw);
@@ -11353,6 +11408,27 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     nsCm: value(item.nsCm),
     ewDir: normalizeEwDir(value(item.ewDir)),
     ewCm: value(item.ewCm),
+    positionMethod: normalizePositionMethod(item.positionMethod),
+    tsStationXNorthM: value(item.tsStationXNorthM),
+    tsStationYEastM: value(item.tsStationYEastM),
+    tsStationAltitudeM: value(item.tsStationAltitudeM),
+    tsBacksightPeg: value(item.tsBacksightPeg),
+    tsBacksightXNorthM: value(item.tsBacksightXNorthM),
+    tsBacksightYEastM: value(item.tsBacksightYEastM),
+    tsBacksightAltitudeM: value(item.tsBacksightAltitudeM),
+    tsInstrumentHeightM: value(item.tsInstrumentHeightM),
+    tsTargetHeightM: value(item.tsTargetHeightM),
+    tsObservationMode: value(item.tsObservationMode) === "polar" ? "polar" : "coordinate",
+    tsPointXNorthM: value(item.tsPointXNorthM),
+    tsPointYEastM: value(item.tsPointYEastM),
+    tsPointAltitudeM: value(item.tsPointAltitudeM),
+    tsSlopeDistanceM: value(item.tsSlopeDistanceM),
+    tsInclinationDeg: value(item.tsInclinationDeg),
+    tsInclinationMin: value(item.tsInclinationMin),
+    tsInclinationSec: value(item.tsInclinationSec),
+    tsDirectionDeg: value(item.tsDirectionDeg),
+    tsDirectionMin: value(item.tsDirectionMin),
+    tsDirectionSec: value(item.tsDirectionSec),
     multiPoints: normalizePlanMultiPoints(item.multiPoints),
     planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)),
     largeShapeType: normalizedLargeShapeType,
@@ -14630,29 +14706,20 @@ function setPositionMeasurementFields(record = {}) {
     radio.checked = true;
   }
   [
-    "tsPeg",
-    "tsSetupNsDir",
-    "tsSetupNsM",
-    "tsSetupEwDir",
-    "tsSetupEwM",
-    "tsSetupAltitudeM",
-    "tsXNorthM",
-    "tsYEastM",
-    "tsZUpM",
+    "tsStationXNorthM", "tsStationYEastM", "tsStationAltitudeM",
+    "tsBacksightPeg", "tsBacksightXNorthM", "tsBacksightYEastM", "tsBacksightAltitudeM",
+    "tsInstrumentHeightM", "tsTargetHeightM", "tsPointXNorthM", "tsPointYEastM", "tsPointAltitudeM",
+    "tsSlopeDistanceM", "tsInclinationDeg", "tsInclinationMin", "tsInclinationSec",
+    "tsDirectionDeg", "tsDirectionMin", "tsDirectionSec",
   ].forEach((name) => {
     const field = recordForm.elements[name];
     if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
       field.value = value(record[name]) || field.value;
     }
   });
-  const legacyNsCm = parseTotalStationNumber(record.tsSetupNsCm);
-  const legacyEwCm = parseTotalStationNumber(record.tsSetupEwCm);
-  if (!value(record.tsSetupNsM) && legacyNsCm != null && recordForm.elements.tsSetupNsM) {
-    recordForm.elements.tsSetupNsM.value = formatLengthInputValue(legacyNsCm / 100);
-  }
-  if (!value(record.tsSetupEwM) && legacyEwCm != null && recordForm.elements.tsSetupEwM) {
-    recordForm.elements.tsSetupEwM.value = formatLengthInputValue(legacyEwCm / 100);
-  }
+  const observationMode = value(record.tsObservationMode) === "polar" ? "polar" : "coordinate";
+  const observationRadio = recordForm.querySelector(`input[name="tsObservationMode"][value="${observationMode}"]`);
+  if (observationRadio instanceof HTMLInputElement) observationRadio.checked = true;
   syncPositionMeasurementUi();
 }
 
@@ -14695,12 +14762,15 @@ function readTotalStationSetupFromForm() {
   }
   const data = new FormData(recordForm);
   return {
-    tsPeg: value(data.get("tsPeg")).toUpperCase(),
-    tsSetupNsDir: value(data.get("tsSetupNsDir")) === "南" ? "南" : "北",
-    tsSetupNsM: value(data.get("tsSetupNsM")),
-    tsSetupEwDir: value(data.get("tsSetupEwDir")) === "西" ? "西" : "東",
-    tsSetupEwM: value(data.get("tsSetupEwM")),
-    tsSetupAltitudeM: value(data.get("tsSetupAltitudeM")),
+    tsStationXNorthM: value(data.get("tsStationXNorthM")),
+    tsStationYEastM: value(data.get("tsStationYEastM")),
+    tsStationAltitudeM: value(data.get("tsStationAltitudeM")),
+    tsBacksightPeg: value(data.get("tsBacksightPeg")).toUpperCase(),
+    tsBacksightXNorthM: value(data.get("tsBacksightXNorthM")),
+    tsBacksightYEastM: value(data.get("tsBacksightYEastM")),
+    tsBacksightAltitudeM: value(data.get("tsBacksightAltitudeM")),
+    tsInstrumentHeightM: value(data.get("tsInstrumentHeightM")),
+    tsTargetHeightM: value(data.get("tsTargetHeightM")),
   };
 }
 
@@ -14717,30 +14787,34 @@ function restoreSavedTotalStationSetup() {
   if (!saved || typeof saved !== "object") {
     return false;
   }
-  ["tsPeg", "tsSetupNsDir", "tsSetupNsM", "tsSetupEwDir", "tsSetupEwM", "tsSetupAltitudeM"].forEach((name) => {
+  if (!value(saved.tsStationXNorthM) || !value(saved.tsBacksightPeg)) {
+    return false;
+  }
+  ["tsStationXNorthM", "tsStationYEastM", "tsStationAltitudeM", "tsBacksightPeg",
+    "tsBacksightXNorthM", "tsBacksightYEastM", "tsBacksightAltitudeM", "tsInstrumentHeightM", "tsTargetHeightM"].forEach((name) => {
     const field = recordForm.elements[name];
     if (field instanceof HTMLInputElement) {
       field.value = value(saved[name]) || field.value;
     }
   });
-  syncDirectionTabsFromForm();
   const status = document.getElementById("ts-setup-save-status");
   if (status) {
-    status.textContent = `保存済み：${value(saved.tsPeg).toUpperCase()}`;
+    status.textContent = `保存済み：後視点 ${value(saved.tsBacksightPeg).toUpperCase()}`;
   }
   return true;
 }
 
 function saveTotalStationSetup() {
   const setup = readTotalStationSetupFromForm();
-  if (!setup || !parseTotalStationPeg(setup.tsPeg)) {
-    showToast("杭情報を「I-C-5」の形式で入力してください");
+  if (!setup || !parseTotalStationPeg(setup.tsBacksightPeg)) {
+    showToast("後視点の杭名称を「I-C-5」の形式で入力してください");
     return;
   }
   const requiredNumbers = [
-    ["設置位置の南北距離", setup.tsSetupNsM],
-    ["設置位置の東西距離", setup.tsSetupEwM],
-    ["設置位置の標高", setup.tsSetupAltitudeM],
+    ["設置点x", setup.tsStationXNorthM], ["設置点y", setup.tsStationYEastM],
+    ["設置点標高", setup.tsStationAltitudeM], ["後視点x", setup.tsBacksightXNorthM],
+    ["後視点y", setup.tsBacksightYEastM], ["後視点標高", setup.tsBacksightAltitudeM],
+    ["機械高", setup.tsInstrumentHeightM], ["目標高", setup.tsTargetHeightM],
   ];
   for (const [label, raw] of requiredNumbers) {
     if (parseTotalStationNumber(raw) == null) {
@@ -14756,7 +14830,7 @@ function saveTotalStationSetup() {
   }
   const status = document.getElementById("ts-setup-save-status");
   if (status) {
-    status.textContent = `保存済み：${setup.tsPeg}`;
+    status.textContent = `保存済み：後視点 ${setup.tsBacksightPeg}`;
   }
   showToast("トータルステーション設置位置を保存しました");
 }
@@ -14767,32 +14841,40 @@ function getTotalStationInputError(requireAltitude = false) {
   }
   const data = new FormData(recordForm);
   const grid = currentInputKuwakuParts();
-  if (!parseTotalStationPeg(data.get("tsPeg"))) {
-    return "杭情報を「I-C-5」の形式で入力してください";
+  if (!parseTotalStationPeg(data.get("tsBacksightPeg"))) {
+    return "後視点の杭名称を「I-C-5」の形式で入力してください";
   }
   if (!/^[A-Z]+$/.test(grid.block) || !/^-?\d+$/.test(grid.no)) {
     return "先に区画（グリッド）の英字と番号を入力してください";
   }
   const requiredNumbers = [
-    ["設置位置の南北距離", data.get("tsSetupNsM")],
-    ["設置位置の東西距離", data.get("tsSetupEwM")],
-    ["x 南北", data.get("tsXNorthM")],
-    ["y 東西", data.get("tsYEastM")],
+    ["設置点x", data.get("tsStationXNorthM")], ["設置点y", data.get("tsStationYEastM")],
+    ["設置点標高", data.get("tsStationAltitudeM")], ["後視点x", data.get("tsBacksightXNorthM")],
+    ["後視点y", data.get("tsBacksightYEastM")], ["後視点標高", data.get("tsBacksightAltitudeM")],
+    ["機械高", data.get("tsInstrumentHeightM")], ["目標高", data.get("tsTargetHeightM")],
   ];
   for (const [label, raw] of requiredNumbers) {
     if (parseTotalStationNumber(raw) == null) {
       return `${label}を数値で入力してください`;
     }
   }
-  if (requireAltitude) {
-    if (parseTotalStationNumber(data.get("tsSetupAltitudeM")) == null) {
-      return "トータルステーション設置位置の標高を数値で入力してください";
-    }
-    if (parseTotalStationNumber(data.get("tsZUpM")) == null) {
-      return "z 高度を数値で入力してください";
-    }
+  const mode = value(data.get("tsObservationMode")) === "polar" ? "polar" : "coordinate";
+  const observationFields = mode === "coordinate"
+    ? [["標本x", data.get("tsPointXNorthM")], ["標本y", data.get("tsPointYEastM")], ["標本z", data.get("tsPointAltitudeM")]]
+    : [["斜距離", data.get("tsSlopeDistanceM")], ["傾斜度", data.get("tsInclinationDeg")], ["傾斜分", data.get("tsInclinationMin")], ["傾斜秒", data.get("tsInclinationSec")], ["方向角度", data.get("tsDirectionDeg")], ["方向角分", data.get("tsDirectionMin")], ["方向角秒", data.get("tsDirectionSec")]];
+  for (const [label, raw] of observationFields) {
+    if (parseTotalStationNumber(raw) == null) return `${label}を数値で入力してください`;
   }
   return "";
+}
+
+function dmsToDegrees(degRaw, minRaw, secRaw) {
+  const deg = parseTotalStationNumber(degRaw);
+  const min = parseTotalStationNumber(minRaw);
+  const sec = parseTotalStationNumber(secRaw);
+  if ([deg, min, sec].some((number) => number == null) || min < 0 || min >= 60 || sec < 0 || sec >= 60) return null;
+  const sign = deg < 0 || /^\s*-/.test(value(degRaw)) ? -1 : 1;
+  return sign * (Math.abs(deg) + min / 60 + sec / 3600);
 }
 
 function calculateTotalStationPosition() {
@@ -14800,39 +14882,50 @@ function calculateTotalStationPosition() {
     return null;
   }
   const data = new FormData(recordForm);
-  const peg = parseTotalStationPeg(data.get("tsPeg"));
+  const peg = parseTotalStationPeg(data.get("tsBacksightPeg"));
   const grid = currentInputKuwakuParts();
-  const setupNsM = parseTotalStationNumber(data.get("tsSetupNsM"));
-  const setupEwM = parseTotalStationNumber(data.get("tsSetupEwM"));
-  const setupAltitudeM = parseTotalStationNumber(data.get("tsSetupAltitudeM"));
-  const xNorthM = parseTotalStationNumber(data.get("tsXNorthM"));
-  const yEastM = parseTotalStationNumber(data.get("tsYEastM"));
-  const zUpM = parseTotalStationNumber(data.get("tsZUpM"));
-  if (
-    !peg ||
-    !/^[A-Z]+$/.test(grid.block) ||
-    !/^-?\d+$/.test(grid.no) ||
-    [setupNsM, setupEwM, xNorthM, yEastM].some((number) => number == null)
-  ) {
-    return null;
+  const stationX = parseTotalStationNumber(data.get("tsStationXNorthM"));
+  const stationY = parseTotalStationNumber(data.get("tsStationYEastM"));
+  const stationZ = parseTotalStationNumber(data.get("tsStationAltitudeM"));
+  const backX = parseTotalStationNumber(data.get("tsBacksightXNorthM"));
+  const backY = parseTotalStationNumber(data.get("tsBacksightYEastM"));
+  const instrumentHeight = parseTotalStationNumber(data.get("tsInstrumentHeightM"));
+  const targetHeight = parseTotalStationNumber(data.get("tsTargetHeightM"));
+  if (!peg || !/^[A-Z]+$/.test(grid.block) || !/^-?\d+$/.test(grid.no) || [stationX, stationY, stationZ, backX, backY, instrumentHeight, targetHeight].some((number) => number == null)) return null;
+  const mode = value(data.get("tsObservationMode")) === "polar" ? "polar" : "coordinate";
+  let pointX = parseTotalStationNumber(data.get("tsPointXNorthM"));
+  let pointY = parseTotalStationNumber(data.get("tsPointYEastM"));
+  let pointZ = parseTotalStationNumber(data.get("tsPointAltitudeM"));
+  if (mode === "polar") {
+    const distance = parseTotalStationNumber(data.get("tsSlopeDistanceM"));
+    const inclination = dmsToDegrees(data.get("tsInclinationDeg"), data.get("tsInclinationMin"), data.get("tsInclinationSec"));
+    const direction = dmsToDegrees(data.get("tsDirectionDeg"), data.get("tsDirectionMin"), data.get("tsDirectionSec"));
+    if ([distance, inclination, direction].some((number) => number == null) || distance < 0 || (stationX === backX && stationY === backY)) return null;
+    const inclinationRad = inclination * Math.PI / 180;
+    const baseAzimuth = Math.atan2(backY - stationY, backX - stationX);
+    const azimuth = baseAzimuth + direction * Math.PI / 180;
+    const horizontal = distance * Math.cos(inclinationRad);
+    pointX = stationX + horizontal * Math.cos(azimuth);
+    pointY = stationY + horizontal * Math.sin(azimuth);
+    pointZ = stationZ + instrumentHeight + distance * Math.sin(inclinationRad) - targetHeight;
   }
+  if ([pointX, pointY, pointZ].some((number) => number == null)) return null;
   const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
   const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
-  const setupEastFromPegCm = (value(data.get("tsSetupEwDir")) === "西" ? -setupEwM : setupEwM) * 100;
-  const setupNorthFromPegCm = (value(data.get("tsSetupNsDir")) === "南" ? -setupNsM : setupNsM) * 100;
-  const setupX = pegX + setupEastFromPegCm;
-  const setupY = pegY - setupNorthFromPegCm;
-  const specimenEastFromPegCm = setupEastFromPegCm + yEastM * 100;
-  const specimenNorthFromPegCm = setupNorthFromPegCm + xNorthM * 100;
-  const xPlanCm = setupX + yEastM * 100;
-  const yPlanCm = setupY - xNorthM * 100;
+  const specimenEastFromPegCm = (pointY - backY) * 100;
+  const specimenNorthFromPegCm = (pointX - backX) * 100;
+  const stationPlanX = pegX + (stationY - backY) * 100;
+  const stationPlanY = pegY - (stationX - backX) * 100;
+  const xPlanCm = pegX + specimenEastFromPegCm;
+  const yPlanCm = pegY - specimenNorthFromPegCm;
   return {
-    pegLabel: value(data.get("tsPeg")).toUpperCase(),
+    pegLabel: value(data.get("tsBacksightPeg")).toUpperCase(),
     specimenEastFromPegCm,
     specimenNorthFromPegCm,
     xPlanCm,
     yPlanCm,
-    altitudeM: setupAltitudeM != null && zUpM != null ? setupAltitudeM + zUpM : null,
+    stationPlanX, stationPlanY, pointX, pointY,
+    altitudeM: pointZ,
   };
 }
 
@@ -14873,7 +14966,7 @@ function applyTotalStationPosition() {
       result.specimenNorthFromPegCm < 0
         ? `南に ${formatLengthInputValue(Math.abs(result.specimenNorthFromPegCm))} cm`
         : `北に ${formatLengthInputValue(result.specimenNorthFromPegCm)} cm`;
-    resultEl.textContent = `計算結果：${result.pegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
+    resultEl.textContent = `計算結果：x ${Number(result.pointX.toFixed(4))} m、y ${Number(result.pointY.toFixed(4))} m、z ${Number(result.altitudeM.toFixed(4))} m／${result.pegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
     resultEl.classList.add("total-station-result-ok");
   }
 }
@@ -14886,6 +14979,9 @@ function syncPositionMeasurementUi() {
   document.getElementById("grid-position-fields")?.classList.toggle("hidden", method !== "grid");
   document.getElementById("total-station-section")?.classList.toggle("hidden", method !== "totalStation");
   document.getElementById("ts-specimen-position-section")?.classList.toggle("hidden", method !== "totalStation");
+  const observationMode = value(new FormData(recordForm).get("tsObservationMode")) === "polar" ? "polar" : "coordinate";
+  document.getElementById("ts-coordinate-fields")?.classList.toggle("hidden", observationMode !== "coordinate");
+  document.getElementById("ts-polar-fields")?.classList.toggle("hidden", observationMode !== "polar");
   document.getElementById("level-reading-section")?.classList.toggle("hidden", method === "totalStation");
   siteForm?.querySelector(".site-level")?.classList.toggle("hidden", method === "totalStation");
   if (method === "totalStation") {

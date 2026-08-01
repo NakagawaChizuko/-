@@ -2796,6 +2796,27 @@ th.sortable-header.sort-desc::after {
 .ts-setup-save-row .hint-text {
   margin: 0;
 }
+.ts-setup-grid {
+  display: grid;
+  grid-template-columns: 10rem repeat(4, minmax(9rem, 1fr));
+  gap: 10px 14px;
+  align-items: end;
+}
+.ts-setup-grid strong { align-self: center; color: #0f5f59; }
+.ts-setup-grid label,
+.ts-polar-fields > label { display: grid; gap: 5px; }
+.ts-setup-grid input,
+.ts-polar-fields input { width: 7.5rem; }
+.ts-observation-methods { margin-bottom: 12px; }
+.ts-polar-fields { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: end; }
+.ts-dms-field { display: flex; flex-wrap: wrap; gap: 7px; align-items: end; padding: 9px; border: 1px solid #a7d5d1; border-radius: 8px; }
+.ts-dms-field strong { width: 100%; }
+.ts-dms-field .hint-text { width: 100%; margin: 0; }
+.ts-dms-field label { display: inline-flex; align-items: center; gap: 4px; }
+.ts-dms-field input { width: 5rem; }
+.plan-total-station circle { fill: #fff; stroke: #111827; stroke-width: 3; }
+.plan-total-station line { stroke: #111827; stroke-width: 2; }
+.plan-total-station text { fill: #111827; font-size: 13px; font-weight: 800; }
 .total-station-result-ok {
   color: #0f766e;
   font-weight: 700;
@@ -2815,6 +2836,7 @@ th.sortable-header.sort-desc::after {
   .ts-peg-row .ts-inline-field {
     flex-wrap: wrap;
   }
+  .ts-setup-grid { grid-template-columns: 1fr; }
   .ts-sentence {
     padding-bottom: 0;
   }
