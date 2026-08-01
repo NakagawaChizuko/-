@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-ts-trial-v2";
+const CACHE_NAME = "kaseki25-ts-trial-v3";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js",

@@ -188,6 +188,7 @@ const PRESET_LAYER_NAMES = [
   "4.その他",
 ];
 const OTHER_LAYER_NAME = "4.その他";
+const DEFAULT_LAYER_NAME = "2.立が鼻砂部層";
 const LEGACY_LAYER_NAME_ALIASES = {
   "2.立が花砂部層": "2.立が鼻砂部層",
 };
@@ -3563,7 +3564,7 @@ function syncLargeShapeSectionFromForm() {
 }
 
 function activateLayerTab(layerRaw) {
-  const layer = PRESET_LAYER_NAMES.includes(value(layerRaw)) ? value(layerRaw) : PRESET_LAYER_NAMES[0];
+  const layer = PRESET_LAYER_NAMES.includes(value(layerRaw)) ? value(layerRaw) : DEFAULT_LAYER_NAME;
   layerNameInput.value = layer;
   layerTabButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.layer === layer);
@@ -3606,7 +3607,7 @@ function syncUnitTabSelection() {
 function setLayerFromValue(layerRaw) {
   const layerValue = normalizeLayerName(value(layerRaw));
   if (!layerValue) {
-    activateLayerTab(PRESET_LAYER_NAMES[0]);
+    activateLayerTab(DEFAULT_LAYER_NAME);
     return;
   }
   if (PRESET_LAYER_NAMES.includes(layerValue) && layerValue !== OTHER_LAYER_NAME) {
@@ -3620,7 +3621,7 @@ function setLayerFromValue(layerRaw) {
 }
 
 function getSelectedLayerName() {
-  const selected = value(layerNameInput.value) || PRESET_LAYER_NAMES[0];
+  const selected = value(layerNameInput.value) || DEFAULT_LAYER_NAME;
   if (selected !== OTHER_LAYER_NAME) {
     return selected;
   }
@@ -4230,7 +4231,7 @@ function resetRecordForm({ showMessage }) {
   }
   clearImageCornerCmFields();
   setDefaultImageCornerDirections();
-  setLayerFromValue(PRESET_LAYER_NAMES[0]);
+  setLayerFromValue(DEFAULT_LAYER_NAME);
   syncCustomLargeImageStatus();
 
   nsDirInput.value = "北から";
@@ -4860,7 +4861,7 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     customLargeImageAspect: "",
     importantFlag: "無",
     simpleRecordFlag: "-",
-    layerName: PRESET_LAYER_NAMES[0],
+    layerName: DEFAULT_LAYER_NAME,
     detail: "",
     detailSub: "",
     layerFacies: "",
@@ -7698,11 +7699,15 @@ function renderPositionPreviewModalContent() {
   const kuwakuValue = kuwakuValueForSelect(getRecordKuwaku(draftRecord));
   const savedDrawables = state.records
     .filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue && value(record.id) !== value(draftRecord.id))
-    .map((record) => buildPlanDrawable(record))
+    .map((record) => {
+      const drawable = buildPlanDrawable(record);
+      return drawable ? { ...drawable, color: "#9ca3af", labelColor: "#6b7280" } : null;
+    })
     .filter(Boolean);
   const currentDrawable = {
     ...currentDrawableRaw,
     color: "#dc2626",
+    labelColor: "#dc2626",
     label: value(draftRecord.specimenNo) || "入力中",
   };
   const drawables = [...savedDrawables, currentDrawable];
@@ -10457,7 +10462,14 @@ function buildPlanDrawable(record) {
   if (planSizeMode === "複数点") {
     const multiPoints = collectPlanMultiPointCoords(record);
     const fallbackCenter = convertPositionToPlanCoords(record?.nsDir, record?.nsCm, record?.ewDir, record?.ewCm);
-    const points = multiPoints.length ? multiPoints : fallbackCenter ? [fallbackCenter] : [];
+    const points = [];
+    const seenPointKeys = new Set();
+    [fallbackCenter, ...multiPoints].filter(Boolean).forEach((point) => {
+      const pointKey = `${point.x.toFixed(4)}|${point.y.toFixed(4)}`;
+      if (seenPointKeys.has(pointKey)) return;
+      seenPointKeys.add(pointKey);
+      points.push(point);
+    });
     if (!points.length) {
       return null;
     }
@@ -10692,7 +10704,7 @@ function renderPlanDrawableSvg(drawable, index = 0) {
       >
         ${shapeSvg}
         ${hotspotSvg}
-        <text x="${labelX}" y="${labelY}">${escapeHtml(drawable.label || "")}</text>
+        <text x="${labelX}" y="${labelY}"${drawable.labelColor ? ` style="fill:${escapeHtml(drawable.labelColor)};"` : ""}>${escapeHtml(drawable.label || "")}</text>
       </g>
     `;
 }
@@ -11486,20 +11498,8 @@ function normalizeState(candidate) {
   const kuwakuBlock = normalizeKuwakuBlock(value(candidate.site?.kuwakuBlock) || kuwakuParts.block);
   const kuwakuNo = normalizeKuwakuNo(value(candidate.site?.kuwakuNo) || kuwakuParts.no);
   const teamState = normalizeTeamState(value(candidate.site?.team), value(candidate.site?.teamOther));
-  const candidateSite = candidate.site && typeof candidate.site === "object" ? candidate.site : {};
-  const hasSavedRecords = Array.isArray(candidate.records) && candidate.records.length > 0;
-  const isLegacyEmptyDefault =
-    kuwakuHeadA === "24" &&
-    !kuwakuBlock &&
-    !kuwakuNo &&
-    !value(candidateSite.levelHeight) &&
-    !value(candidateSite.date) &&
-    !value(candidateSite.team) &&
-    !value(candidateSite.teamLead) &&
-    !value(candidateSite.recorder) &&
-    !value(candidateSite.scribe) &&
-    !hasSavedRecords;
-  if (isLegacyEmptyDefault) kuwakuHeadA = DEFAULT_KUWAKU_HEAD_A;
+  // この試行版は第25次専用。旧試行版が端末内に保存した先頭値「24」も自動的に「25」へ移行する。
+  if (kuwakuHeadA === "24") kuwakuHeadA = DEFAULT_KUWAKU_HEAD_A;
 
   safe.site = {
     kuwaku: buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo),
