@@ -6,6 +6,12 @@ const DEFAULT_CLOUD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw70bPig
 const CLOUD_PULL_INTERVAL_MS = 20000;
 const CLOUD_SAVE_DEBOUNCE_MS = 900;
 const CLOUD_AUTO_PULL_ENABLED = false;
+const TEAM_ROSTER_FILE_NAME = "第25次班長記載名簿.xlsx";
+const TEAM_ROSTER_DAY_COL_START = 10;
+const TEAM_ROSTER_DAY_COL_END = 41;
+const TEAM_ROSTER_TEAM_COL = 45;
+const TEAM_ROSTER_ROLE_COL = 49;
+const TEAM_ROSTER_NAME_COL = 3;
 const DEFAULT_SPECIMEN_PREFIX = "m";
 const SPECIMEN_CATEGORY_MAP = {
   m: "哺乳類",
@@ -84,6 +90,7 @@ const REQUIRED_FIELD_LABELS = {
   teamOther: "発掘班（その他）",
   teamLead: "班長",
   recorder: "記載係",
+  scribe: "記載者",
   specimenSerial: "標本番号",
   analysisType: "分析用試料の区分",
   nameMemo: "化石・遺物名称",
@@ -186,7 +193,7 @@ const LEGACY_LAYER_NAME_ALIASES = {
 };
 const PRESET_TEAMS = ["1", "2", "3", "4", "その他"];
 const OTHER_TEAM_NAME = "その他";
-const DEFAULT_KUWAKU_HEAD_A = "24";
+const DEFAULT_KUWAKU_HEAD_A = "25";
 const DEFAULT_KUWAKU_HEAD_B = "Ⅰ";
 const DEFAULT_KUWAKU = `${DEFAULT_KUWAKU_HEAD_A}-${DEFAULT_KUWAKU_HEAD_B}--`;
 const ALL_GRIDS_VALUE = "__KUWAKU_ALL__";
@@ -287,6 +294,7 @@ const createInitialState = () => ({
     teamOther: "",
     teamLead: "",
     recorder: "",
+    scribe: "",
     updatedAt: "",
   },
   records: [],
@@ -302,6 +310,8 @@ function createInitialOutputColumnVisibilityMap() {
 
 let stateNeedsRewriteAfterLoad = false;
 let state = loadState();
+let teamRosterAssignmentMap = new Map();
+let teamRosterLoaded = false;
 let editingRecordId = null;
 let activeEditRecordContext = null;
 let currentSectionDiagrams = [];
@@ -396,6 +406,7 @@ const editTeamInput = document.getElementById("edit-team");
 const editTeamOtherInput = document.getElementById("edit-team-other");
 const editTeamLeadInput = document.getElementById("edit-team-lead");
 const editRecorderInput = document.getElementById("edit-recorder");
+const rosterStatusEl = document.getElementById("roster-status");
 const recordIdInput = document.getElementById("record-id-input");
 const recordSubmitBtn = document.getElementById("record-submit-btn");
 const recordCopyToInputBtn = document.getElementById("record-copy-to-input-btn");
@@ -561,6 +572,7 @@ const cellEditMeta = document.getElementById("cell-edit-meta");
 const cellEditFields = document.getElementById("cell-edit-fields");
 const cellEditCloseBtn = document.getElementById("cell-edit-close-btn");
 const cellEditCancelBtn = document.getElementById("cell-edit-cancel-btn");
+const cellEditSaveBtn = document.getElementById("cell-edit-save-btn");
 let hoverEditMenuEl = null;
 let hoverEditMenuRecordId = "";
 let hoverEditMenuKuwaku = "";
@@ -614,6 +626,7 @@ function initialize() {
   renderRecordTable();
   renderOutputs();
   void loadLargeShapeImageManifest();
+  void loadTeamRosterFromDefaultFile();
   void bootstrapCloudSync();
 }
 
@@ -680,10 +693,12 @@ function bindEvents() {
     });
   }
   if (cellEditForm) {
-    cellEditForm.addEventListener("submit", (event) => {
+    const handleCellEditSave = (event) => {
       event.preventDefault();
       saveOutputCellEditFromModal();
-    });
+    };
+    cellEditForm.addEventListener("submit", handleCellEditSave);
+    cellEditSaveBtn?.addEventListener("click", handleCellEditSave);
   }
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") {
@@ -800,6 +815,7 @@ function bindEvents() {
       teamOther: teamState.teamOther,
       teamLead: value(formData.get("teamLead")),
       recorder: value(formData.get("recorder")),
+      scribe: value(formData.get("scribe")),
       updatedAt: nowIso(),
     };
     selectedPlanKuwaku = kuwakuValueForSelect(nextSiteKuwaku);
@@ -810,6 +826,10 @@ function bindEvents() {
 
   siteForm.elements.team.addEventListener("change", () => {
     syncTeamOtherInput(siteForm.elements.team.value);
+    applyTeamRosterAutofill();
+  });
+  siteForm.elements.date.addEventListener("change", () => {
+    applyTeamRosterAutofill();
   });
   ["kuwakuHeadA", "kuwakuHeadB", "kuwakuBlock", "kuwakuNo"].forEach((name) => {
     const input = siteForm.elements[name];
@@ -2124,6 +2144,104 @@ function hydrateSiteForm() {
   syncTeamOtherInput(siteForm.elements.team.value);
   siteForm.elements.teamLead.value = state.site.teamLead || "";
   siteForm.elements.recorder.value = state.site.recorder || "";
+  if (siteForm.elements.scribe) {
+    siteForm.elements.scribe.value = state.site.scribe || "";
+  }
+}
+
+async function loadTeamRosterFromDefaultFile() {
+  setTeamRosterStatus("名簿を読込中…");
+  try {
+    const rows = Array.isArray(window.__TEAM_ROSTER_ROWS__) ? window.__TEAM_ROSTER_ROWS__ : [];
+    teamRosterAssignmentMap = buildTeamRosterAssignmentMap(rows);
+    if (!teamRosterAssignmentMap.size) throw new Error("roster empty");
+    teamRosterLoaded = true;
+    setTeamRosterStatus("名簿を自動読込しました");
+    applyTeamRosterAutofill();
+  } catch (_error) {
+    setTeamRosterStatus(`名簿の自動読込に失敗: ${TEAM_ROSTER_FILE_NAME}`);
+  }
+}
+
+function buildTeamRosterAssignmentMap(rows) {
+  const assignmentMap = new Map();
+  if (!Array.isArray(rows) || rows.length === 0) return assignmentMap;
+  const headerRow = Array.isArray(rows[0]) ? rows[0] : [];
+  const dayBlocks = buildRosterDayBlocks(headerRow);
+  for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = Array.isArray(rows[rowIndex]) ? rows[rowIndex] : [];
+    const name = value(row[TEAM_ROSTER_NAME_COL - 1]);
+    const team = normalizeRosterTeam(row[TEAM_ROSTER_TEAM_COL - 1]);
+    const roleText = value(row[TEAM_ROSTER_ROLE_COL - 1]);
+    if (!name || !team || !roleText) continue;
+    for (const block of dayBlocks) {
+      if (!rowHasAttendanceMark(row, block.startCol, block.endCol)) continue;
+      const key = `${block.day}-${team}`;
+      if (!assignmentMap.has(key)) assignmentMap.set(key, { teamLeads: new Set(), recorders: new Set() });
+      const target = assignmentMap.get(key);
+      if (/班長/.test(roleText)) target.teamLeads.add(name);
+      if (/記載/.test(roleText)) target.recorders.add(name);
+    }
+  }
+  return assignmentMap;
+}
+
+function buildRosterDayBlocks(headerRow) {
+  const blocks = [];
+  let current = null;
+  for (let col = TEAM_ROSTER_DAY_COL_START; col <= TEAM_ROSTER_DAY_COL_END; col += 1) {
+    const match = value(headerRow[col - 1]).match(/(\d{1,2})日/);
+    if (match) {
+      if (current) {
+        current.endCol = col - 1;
+        blocks.push(current);
+      }
+      current = { day: Number(match[1]), startCol: col, endCol: col };
+    }
+  }
+  if (current) {
+    current.endCol = TEAM_ROSTER_DAY_COL_END;
+    blocks.push(current);
+  }
+  return blocks;
+}
+
+function rowHasAttendanceMark(row, startCol, endCol) {
+  for (let col = startCol; col <= endCol; col += 1) {
+    const mark = value(row[col - 1]).replace(/\s+/g, "");
+    if (mark === "○" || mark === "◯") return true;
+  }
+  return false;
+}
+
+function normalizeRosterTeam(teamRaw) {
+  const text = value(teamRaw);
+  if (!text) return "";
+  return text.replace(/[^\d]/g, "") || text;
+}
+
+function setTeamRosterStatus(text) {
+  if (rosterStatusEl) rosterStatusEl.textContent = text;
+}
+
+function applyTeamRosterAutofill() {
+  if (!siteForm?.elements) return;
+  const team = value(siteForm.elements.team?.value);
+  const date = value(siteForm.elements.date?.value);
+  if (!teamRosterLoaded || !team || !date || team === OTHER_TEAM_NAME) return;
+  const day = extractDayFromIsoDate(date);
+  if (!day) return;
+  const assignment = teamRosterAssignmentMap.get(`${day}-${normalizeRosterTeam(team)}`);
+  if (!assignment) return;
+  if (siteForm.elements.teamLead) siteForm.elements.teamLead.value = Array.from(assignment.teamLeads).join(", ");
+  if (siteForm.elements.recorder) siteForm.elements.recorder.value = Array.from(assignment.recorders).join(", ");
+}
+
+function extractDayFromIsoDate(dateRaw) {
+  const match = value(dateRaw).match(/^\d{4}-\d{2}-(\d{2})$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  return Number.isFinite(day) ? day : null;
 }
 
 function activateSpecimenPrefix(prefixRaw) {
@@ -6214,6 +6332,10 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
             ${buildOutputCellEditPrefixOptionsHtml(specimenPrefix)}
           </select>
         </label>
+        <label>
+          <span class="label-title">標本番号</span>
+          <input name="specimenNo" type="text" value="${escapeHtml(parsedSpecimen.specimenNo)}" placeholder="例: ${specimenPrefix}-1" data-cell-edit-specimen-no />
+        </label>
         <label data-cell-edit-analysis-row class="${analysisHiddenClass}">
           <span class="label-title">分析用試料の区分</span>
           <select name="analysisType">
@@ -6384,9 +6506,20 @@ function bindOutputCellEditDynamicFields(editKey) {
   if (editKey === "category") {
     const prefixSelect = cellEditFields.querySelector("[data-cell-edit-prefix-select]");
     const analysisRow = cellEditFields.querySelector("[data-cell-edit-analysis-row]");
+    const specimenNoInput = cellEditFields.querySelector("[data-cell-edit-specimen-no]");
     if (prefixSelect instanceof HTMLSelectElement && analysisRow instanceof HTMLElement) {
       const toggle = () => {
-        analysisRow.classList.toggle("hidden", normalizeSpecimenPrefix(prefixSelect.value) !== "a");
+        const prefix = normalizeSpecimenPrefix(prefixSelect.value);
+        analysisRow.classList.toggle("hidden", prefix !== "a");
+        if (specimenNoInput instanceof HTMLInputElement) {
+          const parsed = parseSpecimenNo(specimenNoInput.value, prefix, "");
+          let serial = compactNoSpaceValue(parsed.serial);
+          if (!serial || normalizeSpecimenPrefix(parsed.prefix) !== prefix) {
+            serial = findSmallestUnusedSpecimenSerialForActiveEdit(prefix);
+          }
+          specimenNoInput.value = buildSpecimenNo(prefix, serial);
+          specimenNoInput.placeholder = `例: ${prefix}-${serial || "1"}`;
+        }
       };
       prefixSelect.addEventListener("change", toggle);
       toggle();
@@ -6427,7 +6560,7 @@ function saveOutputCellEditFromModal() {
     showToast("対象データが見つかりません（一覧を再表示してから再度編集してください）");
     return;
   }
-  const formData = new FormData(cellEditForm);
+  const formData = createOutputCellEditFormData();
   const result = applyOutputCellEditToRecord(record, activeOutputCellEdit.editKey, formData);
   if (!result.ok) {
     if (result.message) {
@@ -6443,8 +6576,23 @@ function saveOutputCellEditFromModal() {
   closeOutputCellEditModal();
 }
 
+function createOutputCellEditFormData() {
+  const values = {};
+  cellEditFields?.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) || field.disabled) return;
+    const name = value(field.name);
+    if (!name) return;
+    if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) {
+      if (field.checked) values[name] = field.value;
+      return;
+    }
+    values[name] = field.value;
+  });
+  return { get: (name) => (Object.prototype.hasOwnProperty.call(values, name) ? values[name] : null) };
+}
+
 function applyOutputCellEditToRecord(record, editKey, formData) {
-  if (!(record && formData instanceof FormData)) {
+  if (!(record && formData && typeof formData.get === "function")) {
     return { ok: false, message: "編集データを取得できませんでした" };
   }
   if (editKey === "kuwaku") {
@@ -6491,10 +6639,15 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
   }
   if (editKey === "category") {
     const nextPrefix = normalizeSpecimenPrefix(formData.get("specimenPrefix"));
-    const currentSpecimen = parseSpecimenNo(record.specimenNo, record.specimenPrefix, record.specimenSerial);
-    const nextSerial = compactNoSpaceValue(currentSpecimen.serial || record.specimenSerial);
+    const currentSpecimen = parseSpecimenNo(formData.get("specimenNo"), nextPrefix, "");
+    const nextSerial = compactNoSpaceValue(currentSpecimen.serial) || findSmallestUnusedSpecimenSerial(getRecordKuwaku(record), nextPrefix, record.id);
     if (!nextSerial) {
-      return { ok: false, message: "先に標本番号セルで番号を設定してください" };
+      record.specimenPrefix = nextPrefix;
+      record.specimenSerial = "";
+      record.specimenNo = "";
+      record.category = categoryFromPrefix(nextPrefix);
+      record.analysisType = nextPrefix === "a" ? normalizeAnalysisType(formData.get("analysisType")) : "";
+      return { ok: true };
     }
     const nextSpecimenNo = buildSpecimenNo(nextPrefix, nextSerial);
     const duplicate = findDuplicateRecordByKuwakuAndSpecimen(getRecordKuwaku(record), nextSpecimenNo, record.id);
@@ -6565,6 +6718,33 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     return { ok: true };
   }
   return { ok: false, message: "このセルは直接編集に対応していません" };
+}
+
+function findSmallestUnusedSpecimenSerialForActiveEdit(prefixRaw) {
+  if (!activeOutputCellEdit) return "1";
+  const record = findRecordByEditContext(
+    activeOutputCellEdit.recordId,
+    activeOutputCellEdit.recordIndex,
+    activeOutputCellEdit.recordSnapshot
+  );
+  return record ? findSmallestUnusedSpecimenSerial(getRecordKuwaku(record), prefixRaw, record.id) : "1";
+}
+
+function findSmallestUnusedSpecimenSerial(kuwakuRaw, prefixRaw, excludeRecordIdRaw) {
+  const kuwaku = normalizeKuwakuText(kuwakuRaw);
+  const prefix = normalizeSpecimenPrefix(prefixRaw);
+  const excludeRecordId = value(excludeRecordIdRaw);
+  const used = new Set();
+  state.records.forEach((item) => {
+    if (!item || value(item.id) === excludeRecordId || normalizeKuwakuText(getRecordKuwaku(item)) !== kuwaku) return;
+    const specimen = parseSpecimenNo(item.specimenNo, item.specimenPrefix, item.specimenSerial);
+    if (normalizeSpecimenPrefix(specimen.prefix) !== prefix) return;
+    const serial = compactNoSpaceValue(specimen.serial);
+    if (/^\d+$/.test(serial)) used.add(Number(serial));
+  });
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return String(next);
 }
 
 function buildOutputCellEditPrefixOptionsHtml(selectedPrefixRaw) {
@@ -11301,11 +11481,25 @@ function normalizeState(candidate) {
   }
 
   const kuwakuParts = parseKuwaku(value(candidate.site?.kuwaku));
-  const kuwakuHeadA = normalizeKuwakuHeadA(value(candidate.site?.kuwakuHeadA) || kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A);
+  let kuwakuHeadA = normalizeKuwakuHeadA(value(candidate.site?.kuwakuHeadA) || kuwakuParts.headA || DEFAULT_KUWAKU_HEAD_A);
   const kuwakuHeadB = normalizeKuwakuHeadB(value(candidate.site?.kuwakuHeadB) || kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B);
   const kuwakuBlock = normalizeKuwakuBlock(value(candidate.site?.kuwakuBlock) || kuwakuParts.block);
   const kuwakuNo = normalizeKuwakuNo(value(candidate.site?.kuwakuNo) || kuwakuParts.no);
   const teamState = normalizeTeamState(value(candidate.site?.team), value(candidate.site?.teamOther));
+  const candidateSite = candidate.site && typeof candidate.site === "object" ? candidate.site : {};
+  const hasSavedRecords = Array.isArray(candidate.records) && candidate.records.length > 0;
+  const isLegacyEmptyDefault =
+    kuwakuHeadA === "24" &&
+    !kuwakuBlock &&
+    !kuwakuNo &&
+    !value(candidateSite.levelHeight) &&
+    !value(candidateSite.date) &&
+    !value(candidateSite.team) &&
+    !value(candidateSite.teamLead) &&
+    !value(candidateSite.recorder) &&
+    !value(candidateSite.scribe) &&
+    !hasSavedRecords;
+  if (isLegacyEmptyDefault) kuwakuHeadA = DEFAULT_KUWAKU_HEAD_A;
 
   safe.site = {
     kuwaku: buildKuwaku(kuwakuHeadA, kuwakuHeadB, kuwakuBlock, kuwakuNo),
@@ -11319,6 +11513,7 @@ function normalizeState(candidate) {
     teamOther: teamState.teamOther,
     teamLead: value(candidate.site?.teamLead),
     recorder: value(candidate.site?.recorder),
+    scribe: value(candidate.site?.scribe),
   };
 
   if (Array.isArray(candidate.records)) {
@@ -12207,7 +12402,8 @@ function hasAnyStateData(candidateState) {
       value(site.date) ||
       value(site.team) ||
       value(site.teamLead) ||
-      value(site.recorder)
+      value(site.recorder) ||
+      value(site.scribe)
   );
 }
 
@@ -12282,6 +12478,7 @@ function mergeSiteForCloud(remoteSiteRaw, localSiteRaw) {
     teamOther: value(primary.teamOther) || value(secondary.teamOther),
     teamLead: value(primary.teamLead) || value(secondary.teamLead),
     recorder: value(primary.recorder) || value(secondary.recorder),
+    scribe: value(primary.scribe) || value(secondary.scribe),
     updatedAt: mergedUpdatedAt || value(primary.updatedAt) || value(secondary.updatedAt),
   };
 }
@@ -13676,8 +13873,7 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     ["区画（グリッド）の番号", siteSnapshot.kuwakuNo],
     ["日付", siteSnapshot.date],
     ["発掘班", siteSnapshot.team],
-    ["班長", siteSnapshot.teamLead],
-    ["記載係", siteSnapshot.recorder],
+    ["記載者", siteSnapshot.scribe],
   ];
   if (positionMethod !== "totalStation") {
     siteRequiredFields.splice(4, 0, ["レベル高", siteSnapshot.levelHeight]);
@@ -15055,4 +15251,10 @@ if (recordForm) {
     }
   });
   syncPositionMeasurementUi();
+}
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
 }

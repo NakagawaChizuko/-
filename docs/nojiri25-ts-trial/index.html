@@ -41,9 +41,9 @@
         <form id="site-form" class="panel">
           <h2>区画（グリッド）情報（<span class="required-note">*は必須項目です</span>）</h2>
           <div class="grid cols-3">
-            <label class="site-kuwaku"><span class="label-title">区画（グリッド）名<span class="required">*</span>　　　　例：（24 - Ⅰ - C - 4 )</span>
+            <label class="site-kuwaku"><span class="label-title">区画（グリッド）名<span class="required">*</span>　　　　例：（25 - Ⅰ - C - 4 )</span>
               <div class="kuwaku-input">
-                <input name="kuwakuHeadA" type="text" value="24" />
+                <input name="kuwakuHeadA" type="text" value="25" />
                 <span class="sep">-</span>
                 <input name="kuwakuHeadB" type="text" value="Ⅰ" />
                 <span class="sep">-</span>
@@ -74,12 +74,19 @@
                 <input id="team-other-input" name="teamOther" type="text" class="hidden" placeholder="その他の班名を入力" />
               </div>
             </label>
-            <label class="site-lead large-input"><span class="label-title">班長<span class="required">*</span></span>
+            <label class="site-lead large-input"><span class="label-title">班長</span>
               <input name="teamLead" type="text" />
             </label>
-            <label class="site-recorder large-input"><span class="label-title">記載係<span class="required">*</span></span>
+            <label class="site-recorder large-input"><span class="label-title">記載係</span>
               <input name="recorder" type="text" />
             </label>
+            <label class="site-recorder large-input"><span class="label-title">記載者<span class="required">*</span></span>
+              <input name="scribe" type="text" />
+            </label>
+            <div class="site-recorder large-input">
+              <span class="label-title">班長・記載係名簿</span>
+              <span id="roster-status" class="hint-text">日付と発掘班で自動入力</span>
+            </div>
           </div>
           <div class="panel-actions">
             <button type="submit">区画（グリッド）情報を保存</button>
@@ -1030,6 +1037,7 @@
     <script src="./vendor/three.min.js"></script>
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
-    <script src="./app.js?v=20260801-ts-trial13"></script>
+    <script src="./team_roster_data.js?v=20260802-ts-trial1"></script>
+    <script src="./app.js?v=20260802-ts-trial1"></script>
   </body>
 </html>
