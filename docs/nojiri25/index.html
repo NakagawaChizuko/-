@@ -250,7 +250,7 @@
 
             <fieldset id="total-station-section" class="inline-fieldset span-3 total-station-section hidden">
               <legend>トータルステーション設定</legend>
-              <p class="hint-text">x＝南北（北が正）、y＝東西（東が正）、z＝標高。すべてm単位で入力します。</p>
+              <p class="hint-text">x＝南北（南が正）、y＝東西（西が正）、z＝標高。すべてm単位で入力します。</p>
               <div class="ts-setup-grid">
                 <div class="ts-setup-row"><strong>設置点</strong><label>x <input name="tsStationXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsStationYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsStationAltitudeM" type="text" inputmode="decimal" /> m</label></div>
                 <div class="ts-setup-row"><strong>後視点（基準点）</strong><label>杭名称 <input name="tsBacksightPeg" type="text" placeholder="例：I-C-5" /></label><label>x <input name="tsBacksightXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsBacksightYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsBacksightAltitudeM" type="text" inputmode="decimal" /> m</label></div>
@@ -269,8 +269,8 @@
                 <label><input name="tsObservationMode" type="radio" value="polar" /> 距離・傾斜・方向角</label>
               </div>
               <div id="ts-coordinate-fields" class="ts-observation-row">
-                <label>x 南北（北が正）<span><input name="tsPointXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</span></label>
-                <label>y 東西（東が正）<span><input name="tsPointYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</span></label>
+                <label>x 南北（南が正）<span><input name="tsPointXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</span></label>
+                <label>y 東西（西が正）<span><input name="tsPointYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</span></label>
                 <label>z 標高<span><input name="tsPointAltitudeM" type="text" inputmode="decimal" /> m</span></label>
               </div>
               <div id="ts-polar-fields" class="ts-polar-fields hidden">
@@ -1032,6 +1032,6 @@
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
-    <script src="./app.js?v=20260805-ts-public3"></script>
+    <script src="./app.js?v=20260805-ts-public4"></script>
   </body>
 </html>

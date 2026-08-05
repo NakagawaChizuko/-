@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v23-list-plan-preview";
+const CACHE_NAME = "kaseki25-pwa-v24-ts-south-west-positive";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js",

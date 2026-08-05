@@ -114,18 +114,18 @@ const REQUIRED_FIELD_LABELS = {
   ewCm: "平面位置（東から/西からの距離）",
   multiPoints: "平面位置（複数点）",
   positionMethod: "平面位置の測定方法",
-  tsStationXNorthM: "TS設置点x（北正）",
-  tsStationYEastM: "TS設置点y（東正）",
+  tsStationXNorthM: "TS設置点x（南正）",
+  tsStationYEastM: "TS設置点y（西正）",
   tsStationAltitudeM: "TS設置点標高",
   tsBacksightPeg: "TS後視点杭名称",
-  tsBacksightXNorthM: "TS後視点x（北正）",
-  tsBacksightYEastM: "TS後視点y（東正）",
+  tsBacksightXNorthM: "TS後視点x（南正）",
+  tsBacksightYEastM: "TS後視点y（西正）",
   tsBacksightAltitudeM: "TS後視点標高",
   tsInstrumentHeightM: "TS機械高",
   tsTargetHeightM: "TS目標高",
   tsObservationMode: "TS標本位置入力方法",
-  tsPointXNorthM: "TS標本x（北正）",
-  tsPointYEastM: "TS標本y（東正）",
+  tsPointXNorthM: "TS標本x（南正）",
+  tsPointYEastM: "TS標本y（西正）",
   tsPointAltitudeM: "TS標本z標高",
   tsSlopeDistanceM: "TS斜距離",
   tsInclinationDeg: "TS傾斜度",
@@ -1137,6 +1137,7 @@ function bindEvents() {
       ewDir: normalizeEwDir(value(formData.get("ewDir"))),
       ewCm: value(formData.get("ewCm")),
       positionMethod,
+      tsCoordinateConvention: positionMethod === "totalStation" ? "southWestPositive" : "",
       tsStationXNorthM: value(formData.get("tsStationXNorthM")),
       tsStationYEastM: value(formData.get("tsStationYEastM")),
       tsStationAltitudeM: value(formData.get("tsStationAltitudeM")),
@@ -10192,9 +10193,12 @@ function buildTotalStationPlanMarker(record) {
   const backX = parseTotalStationNumber(record?.tsBacksightXNorthM);
   const backY = parseTotalStationNumber(record?.tsBacksightYEastM);
   if (!peg || !grid.block || !grid.no || [stationX, stationY, backX, backY].some((number) => number == null)) return null;
+  const isSouthWestPositive = value(record?.tsCoordinateConvention) === "southWestPositive";
+  const eastOffsetM = (stationY - backY) * (isSouthWestPositive ? -1 : 1);
+  const southOffsetM = (stationX - backX) * (isSouthWestPositive ? 1 : -1);
   return {
-    x: (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM + (stationY - backY) * 100,
-    y: (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM - (stationX - backX) * 100,
+    x: (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM + eastOffsetM * 100,
+    y: (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM + southOffsetM * 100,
   };
 }
 
@@ -11671,6 +11675,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     ewDir: normalizeEwDir(value(item.ewDir)),
     ewCm: value(item.ewCm),
     positionMethod: normalizePositionMethod(item.positionMethod),
+    tsCoordinateConvention: value(item.tsCoordinateConvention),
     tsStationXNorthM: value(item.tsStationXNorthM),
     tsStationYEastM: value(item.tsStationYEastM),
     tsStationAltitudeM: value(item.tsStationAltitudeM),
@@ -14984,7 +14989,13 @@ function setPositionMeasurementFields(record = {}) {
   ].forEach((name) => {
     const field = recordForm.elements[name];
     if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
-      field.value = value(record[name]) || field.value;
+      const isLegacyCoordinateField = !value(record.tsCoordinateConvention) && [
+        "tsStationXNorthM", "tsStationYEastM", "tsBacksightXNorthM", "tsBacksightYEastM",
+        "tsPointXNorthM", "tsPointYEastM",
+      ].includes(name);
+      const rawValue = value(record[name]);
+      const numericValue = isLegacyCoordinateField ? parseTotalStationNumber(rawValue) : null;
+      field.value = numericValue == null ? rawValue || field.value : String(-numericValue);
     }
   });
   const observationMode = value(record.tsObservationMode) === "polar" ? "polar" : "coordinate";
@@ -15032,6 +15043,7 @@ function readTotalStationSetupFromForm() {
   }
   const data = new FormData(recordForm);
   return {
+    tsCoordinateConvention: "southWestPositive",
     tsStationXNorthM: value(data.get("tsStationXNorthM")),
     tsStationYEastM: value(data.get("tsStationYEastM")),
     tsStationAltitudeM: value(data.get("tsStationAltitudeM")),
@@ -15064,7 +15076,12 @@ function restoreSavedTotalStationSetup() {
     "tsBacksightXNorthM", "tsBacksightYEastM", "tsBacksightAltitudeM", "tsInstrumentHeightM", "tsTargetHeightM"].forEach((name) => {
     const field = recordForm.elements[name];
     if (field instanceof HTMLInputElement) {
-      field.value = value(saved[name]) || field.value;
+      const isLegacyCoordinateField = !value(saved.tsCoordinateConvention) && [
+        "tsStationXNorthM", "tsStationYEastM", "tsBacksightXNorthM", "tsBacksightYEastM",
+      ].includes(name);
+      const rawValue = value(saved[name]);
+      const numericValue = isLegacyCoordinateField ? parseTotalStationNumber(rawValue) : null;
+      field.value = numericValue == null ? rawValue || field.value : String(-numericValue);
     }
   });
   const status = document.getElementById("ts-setup-save-status");
@@ -15182,10 +15199,10 @@ function calculateTotalStationPosition() {
   if ([pointX, pointY, pointZ].some((number) => number == null)) return null;
   const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
   const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
-  const specimenEastFromPegCm = (pointY - backY) * 100;
-  const specimenNorthFromPegCm = (pointX - backX) * 100;
-  const stationPlanX = pegX + (stationY - backY) * 100;
-  const stationPlanY = pegY - (stationX - backX) * 100;
+  const specimenEastFromPegCm = -(pointY - backY) * 100;
+  const specimenNorthFromPegCm = -(pointX - backX) * 100;
+  const stationPlanX = pegX - (stationY - backY) * 100;
+  const stationPlanY = pegY + (stationX - backX) * 100;
   const xPlanCm = pegX + specimenEastFromPegCm;
   const yPlanCm = pegY - specimenNorthFromPegCm;
   return {
