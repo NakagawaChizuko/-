@@ -3049,6 +3049,11 @@ function isTotalStationMeasurementSelected() {
   return Boolean(recordForm) && normalizePositionMethod(new FormData(recordForm).get("positionMethod")) === "totalStation";
 }
 
+function isTotalStationPolarMeasurementSelected() {
+  if (!isTotalStationMeasurementSelected()) return false;
+  return value(new FormData(recordForm).get("tsObservationMode")) === "polar";
+}
+
 function gridReferenceNameForKuwaku(kuwakuRaw) {
   const parts = parseKuwaku(kuwakuLabelForSelect(kuwakuRaw));
   return normalizeTotalStationPointName(`${value(parts.headB)}-${value(parts.block)}-${value(parts.no)}`);
@@ -3129,7 +3134,49 @@ function convertTotalStationMultiPointToPlanCoords(record, point) {
   return { x: pegX - west * 100, y: pegY + south * 100, z };
 }
 
+function convertTotalStationPolarMultiPointToPlanCoords(record, point) {
+  const stationX = parseTotalStationNumber(record?.tsStationXNorthM);
+  const stationY = parseTotalStationNumber(record?.tsStationYEastM);
+  const stationZ = parseTotalStationNumber(record?.tsStationAltitudeM);
+  const backX = parseTotalStationNumber(record?.tsBacksightXNorthM);
+  const backY = parseTotalStationNumber(record?.tsBacksightYEastM);
+  const instrumentHeight = parseTotalStationNumber(record?.tsInstrumentHeightM);
+  const targetHeight = parseTotalStationNumber(record?.tsTargetHeightM);
+  const distance = parseTotalStationNumber(point?.slopeDistanceM);
+  const inclination = dmsToDegrees(point?.inclinationDeg, point?.inclinationMin, point?.inclinationSec);
+  const direction = dmsToDegrees(point?.directionDeg, point?.directionMin, point?.directionSec);
+  if ([stationX, stationY, stationZ, backX, backY, instrumentHeight, targetHeight, distance, inclination, direction].some((number) => number == null)) return null;
+  if (distance < 0 || (stationX === backX && stationY === backY)) return null;
+  const inclinationRad = inclination * Math.PI / 180;
+  const baseAzimuth = Math.atan2(backY - stationY, backX - stationX);
+  const azimuth = baseAzimuth + direction * Math.PI / 180;
+  const horizontal = distance * Math.cos(inclinationRad);
+  const pointX = stationX + horizontal * Math.cos(azimuth);
+  const pointY = stationY + horizontal * Math.sin(azimuth);
+  const z = stationZ + instrumentHeight + distance * Math.sin(inclinationRad) - targetHeight;
+  const gridReference = findTotalStationGridReferencePoint(gridReferenceNameForKuwaku(getRecordKuwaku(record)));
+  if (gridReference) {
+    return { x: -(pointY - gridReference.y) * 100, y: (pointX - gridReference.x) * 100, z };
+  }
+  const peg = parseTotalStationPeg(record?.tsStationPeg);
+  const grid = parseKuwaku(getRecordKuwaku(record));
+  if (!peg || !grid.block || !grid.no) return null;
+  const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
+  const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
+  return {
+    x: pegX - (pointY - stationY) * 100,
+    y: pegY + (pointX - stationX) * 100,
+    z,
+  };
+}
+
 function createDefaultPlanMultiPoint() {
+  if (isTotalStationPolarMeasurementSelected()) {
+    return {
+      slopeDistanceM: "", inclinationDeg: "", inclinationMin: "0", inclinationSec: "0",
+      directionDeg: "", directionMin: "0", directionSec: "0", coordinateMode: "stationPolar",
+    };
+  }
   return isTotalStationMeasurementSelected()
     ? { southFromStationM: "", westFromStationM: "", zAltitudeM: "", coordinateMode: "stationOffsetSouthWest" }
     : { xEastM: "", yNorthM: "", zAltitudeM: "" };
@@ -3138,6 +3185,23 @@ function createDefaultPlanMultiPoint() {
 function normalizePlanMultiPointEntry(entryRaw) {
   const entry = entryRaw && typeof entryRaw === "object" ? entryRaw : {};
   const coordinateMode = value(entry.coordinateMode);
+  if (coordinateMode === "stationPolar" || value(entry.slopeDistanceM)) {
+    const normalized = {
+      slopeDistanceM: value(entry.slopeDistanceM),
+      inclinationDeg: value(entry.inclinationDeg),
+      inclinationMin: value(entry.inclinationMin),
+      inclinationSec: value(entry.inclinationSec),
+      directionDeg: value(entry.directionDeg),
+      directionMin: value(entry.directionMin),
+      directionSec: value(entry.directionSec),
+      coordinateMode: "stationPolar",
+    };
+    if ([normalized.slopeDistanceM, normalized.inclinationDeg, normalized.inclinationMin, normalized.inclinationSec,
+      normalized.directionDeg, normalized.directionMin, normalized.directionSec].some((raw) => parseTotalStationNumber(raw) == null)) {
+      return null;
+    }
+    return normalized;
+  }
   if (coordinateMode === "stationOffsetSouthWest" || value(entry.southFromStationM) || value(entry.westFromStationM)) {
     const southFromStationM = value(entry.southFromStationM);
     const westFromStationM = value(entry.westFromStationM);
@@ -3173,9 +3237,11 @@ function normalizePlanMultiPoints(pointsRaw) {
     if (!entry) {
       return;
     }
-    const key = entry.coordinateMode === "stationOffsetSouthWest"
-      ? `ts|${entry.southFromStationM}|${entry.westFromStationM}|${entry.zAltitudeM}`
-      : `grid|${entry.xEastM}|${entry.yNorthM}|${entry.zAltitudeM}`;
+    const key = entry.coordinateMode === "stationPolar"
+      ? `polar|${entry.slopeDistanceM}|${entry.inclinationDeg}|${entry.inclinationMin}|${entry.inclinationSec}|${entry.directionDeg}|${entry.directionMin}|${entry.directionSec}`
+      : entry.coordinateMode === "stationOffsetSouthWest"
+        ? `ts|${entry.southFromStationM}|${entry.westFromStationM}|${entry.zAltitudeM}`
+        : `grid|${entry.xEastM}|${entry.yNorthM}|${entry.zAltitudeM}`;
     if (seen.has(key)) {
       return;
     }
@@ -3188,6 +3254,7 @@ function normalizePlanMultiPoints(pointsRaw) {
 function createMultiPointRowElement(pointRaw = {}) {
   const normalized = normalizePlanMultiPointEntry(pointRaw) || createDefaultPlanMultiPoint();
   const isTotalStation = isTotalStationMeasurementSelected();
+  const isPolar = isTotalStationPolarMeasurementSelected();
   const row = document.createElement("div");
   row.className = "multi-point-row";
   row.dataset.multiPointRow = "1";
@@ -3209,18 +3276,43 @@ function createMultiPointRowElement(pointRaw = {}) {
     label.append(wrap);
     return label;
   };
+  const makeDmsField = (labelText, prefix, values) => {
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    const wrap = document.createElement("div");
+    wrap.className = "multi-point-dms-input";
+    [["Deg", "°"], ["Min", "′"], ["Sec", "″"]].forEach(([suffix, unit], index) => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.inputMode = index === 1 ? "numeric" : "decimal";
+      input.dataset[`multiPoint${prefix}${suffix}`] = "1";
+      input.value = value(values[index]);
+      const unitEl = document.createElement("span");
+      unitEl.textContent = unit;
+      wrap.append(input, unitEl);
+    });
+    label.append(wrap);
+    return label;
+  };
   let firstLabel;
   let secondLabel;
-  if (isTotalStation) {
+  let thirdLabel;
+  if (isPolar) {
+    const polarPoint = normalized.coordinateMode === "stationPolar" ? normalized : createDefaultPlanMultiPoint();
+    firstLabel = makeField("斜距離", "multiPointSlopeDistanceM", polarPoint.slopeDistanceM);
+    secondLabel = makeDmsField("傾斜", "Inclination", [polarPoint.inclinationDeg, polarPoint.inclinationMin, polarPoint.inclinationSec]);
+    thirdLabel = makeDmsField("方向角", "Direction", [polarPoint.directionDeg, polarPoint.directionMin, polarPoint.directionSec]);
+  } else if (isTotalStation) {
     const offsets = getTotalStationMultiPointOffsetsForForm(normalized);
     firstLabel = makeField("設置点から南へ（南が正）", "multiPointSouthFromStationM", offsets.southFromStationM);
     secondLabel = makeField("設置点から西へ（西が正）", "multiPointWestFromStationM", offsets.westFromStationM);
+    thirdLabel = makeField("標高", "multiPointZAltitudeM", normalized.zAltitudeM);
   } else {
     const gridPoint = getGridMultiPointForForm(normalized);
     firstLabel = makeField("x 東西（東が正）", "multiPointXEastM", gridPoint.xEastM);
     secondLabel = makeField("y 南北（北が正）", "multiPointYNorthM", gridPoint.yNorthM);
+    thirdLabel = makeField("z 高度", "multiPointZAltitudeM", normalized.zAltitudeM);
   }
-  const zLabel = makeField(isTotalStation ? "標高" : "z 高度", "multiPointZAltitudeM", normalized.zAltitudeM);
 
   const removeButton = document.createElement("button");
   removeButton.type = "button";
@@ -3228,7 +3320,7 @@ function createMultiPointRowElement(pointRaw = {}) {
   removeButton.dataset.multiPointRemove = "1";
   removeButton.textContent = "削除";
 
-  row.append(firstLabel, secondLabel, zLabel, removeButton);
+  row.append(firstLabel, secondLabel, thirdLabel, removeButton);
   return row;
 }
 
@@ -3247,16 +3339,24 @@ function renderMultiPointRows(pointsRaw = []) {
 
 function syncMultiPointCoordinateModeUi() {
   const isTotalStation = isTotalStationMeasurementSelected();
+  const isPolar = isTotalStationPolarMeasurementSelected();
   const hint = document.getElementById("multi-point-hint");
   if (hint) {
-    hint.textContent = isTotalStation
-      ? "各点の設置点から南（南が正）・西（西が正）への距離と標高をm単位で入力します。"
-      : "各点の x（東西・東が正）、y（南北・北が正）、z（高度）をm単位で入力できます。";
+    hint.textContent = isPolar
+      ? "各点の斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
+      : isTotalStation
+        ? "各点の設置点から南（南が正）・西（西が正）への距離と標高をm単位で入力します。"
+        : "各点の x（東西・東が正）、y（南北・北が正）、z（高度）をm単位で入力できます。";
   }
   const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");
   if (!firstRow) return;
-  const rowsUseTotalStation = Boolean(firstRow.querySelector("[data-multi-point-south-from-station-m]"));
-  if (rowsUseTotalStation !== isTotalStation) {
+  const rowMode = firstRow.querySelector("[data-multi-point-slope-distance-m]")
+    ? "polar"
+    : firstRow.querySelector("[data-multi-point-south-from-station-m]")
+      ? "offset"
+      : "grid";
+  const targetMode = isPolar ? "polar" : isTotalStation ? "offset" : "grid";
+  if (rowMode !== targetMode) {
     const points = readMultiPointRowsFromForm();
     renderMultiPointRows(points);
   }
@@ -3282,6 +3382,19 @@ function readMultiPointRowsFromForm() {
   }
   const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
   const points = rows.map((row) => {
+    const slopeField = row.querySelector("[data-multi-point-slope-distance-m]");
+    if (slopeField) {
+      return {
+        slopeDistanceM: value(slopeField.value),
+        inclinationDeg: value(row.querySelector("[data-multi-point-inclination-deg]")?.value),
+        inclinationMin: value(row.querySelector("[data-multi-point-inclination-min]")?.value),
+        inclinationSec: value(row.querySelector("[data-multi-point-inclination-sec]")?.value),
+        directionDeg: value(row.querySelector("[data-multi-point-direction-deg]")?.value),
+        directionMin: value(row.querySelector("[data-multi-point-direction-min]")?.value),
+        directionSec: value(row.querySelector("[data-multi-point-direction-sec]")?.value),
+        coordinateMode: "stationPolar",
+      };
+    }
     const southField = row.querySelector("[data-multi-point-south-from-station-m]");
     const westField = row.querySelector("[data-multi-point-west-from-station-m]");
     if (southField || westField) {
@@ -3310,7 +3423,9 @@ function collectPlanMultiPointCoords(record) {
   const seen = new Set();
   points.forEach((point) => {
     let coord;
-    if (point.coordinateMode === "stationOffsetSouthWest") {
+    if (point.coordinateMode === "stationPolar") {
+      coord = convertTotalStationPolarMultiPointToPlanCoords(record, point);
+    } else if (point.coordinateMode === "stationOffsetSouthWest") {
       coord = convertTotalStationMultiPointToPlanCoords(record, point);
     } else {
       coord = {

@@ -1900,6 +1900,23 @@ textarea {
   font-size: 0.84rem;
 }
 
+.multi-point-dms-input {
+  display: grid;
+  grid-template-columns: minmax(48px, 72px) auto minmax(42px, 64px) auto minmax(48px, 72px) auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.multi-point-dms-input input {
+  min-width: 0;
+  width: 100%;
+}
+
+.multi-point-dms-input span {
+  color: #5b6777;
+  font-size: 0.84rem;
+}
+
 .multi-point-remove {
   padding: 5px 9px;
   font-size: 0.78rem;
