@@ -1,0 +1,10 @@
+このフォルダが、第25次 化石・遺物入力フォームの最新配布版です。
+トータルステーション入力に対応しています。
+
+フォーム本体：index.html
+公開URL：https://nakagawachizuko.github.io/-/nojiri25/
+
+注意：
+・親フォルダの docs は、GitHub Pagesでの公開に必要な名称です。
+・docs と nojiri25 のフォルダ名は変更しないでください。
+・トータルステーション記入なしの旧公開版は docs/nojiri25-no-total-station/ に保存しています。
