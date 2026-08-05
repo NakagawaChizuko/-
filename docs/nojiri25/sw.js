@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v25-ts-station-offset";
+const CACHE_NAME = "kaseki25-pwa-v26-hide-ts-marker";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js",

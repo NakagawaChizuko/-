@@ -7544,8 +7544,6 @@ function renderPlanOutput() {
       ? detailRecords
       : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedPlanDetailSub);
   const drawables = detailSubRecords.map((record) => buildPlanDrawable(record)).filter(Boolean);
-  // 設置位置は分類・層準フィルターにかかわらず、選択中グリッドのTS記録から表示する。
-  const stationMarkers = collectTotalStationPlanMarkers(kuwakuFilteredRecords);
   const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
   const categoryLabelForMeta =
     selectedPlanCategory === EXPORT_CATEGORY_ALL_VALUE
@@ -7581,10 +7579,9 @@ function renderPlanOutput() {
     .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
-  const stationSvg = renderTotalStationPlanMarkersSvg(stationMarkers);
   const cornerLabels = buildPlanCornerLabels(selectedPlanKuwaku);
   const cornerLabelsSvg = buildPlanCornerLabelsSvg(cornerLabels);
-  const viewBox = computePlanSvgViewBox([...drawables, ...stationMarkers]);
+  const viewBox = computePlanSvgViewBox(drawables);
 
   planMapWrap.innerHTML = `
     ${mapMetaHtml}
@@ -7598,7 +7595,6 @@ function renderPlanOutput() {
         ${verticalGrid}
         ${horizontalGrid}
         ${cornerLabelsSvg}
-        ${stationSvg}
         ${pointsSvg}
       </svg>
       <div class="plan-map-tooltip" hidden></div>
@@ -7728,7 +7724,6 @@ function renderPositionPreviewModalContent() {
     label: value(draftRecord.specimenNo) || "入力中",
   };
   const drawables = [...savedDrawables, currentDrawable];
-  const stationMarkers = collectTotalStationPlanMarkers([...savedRecords, draftRecord]);
   const verticalGrid = [100, 200, 300]
     .map((x) => `<line class="plan-grid-line" x1="${x}" y1="0" x2="${x}" y2="${PLAN_SIZE_CM}" />`)
     .join("");
@@ -7736,10 +7731,9 @@ function renderPositionPreviewModalContent() {
     .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
-  const stationSvg = renderTotalStationPlanMarkersSvg(stationMarkers);
   const cornerLabels = buildPlanCornerLabels(kuwakuValue);
   const cornerLabelsSvg = buildPlanCornerLabelsSvg(cornerLabels);
-  const viewBox = computePlanSvgViewBox([...drawables, ...stationMarkers]);
+  const viewBox = computePlanSvgViewBox(drawables);
   const kuwakuLabel = kuwakuValue === EMPTY_KUWAKU_VALUE ? "（未設定）" : kuwakuLabelForSelect(kuwakuValue);
   positionPreviewMeta.innerHTML = `
     <span>区画（グリッド）: ${escapeHtml(kuwakuLabel)}</span>
@@ -7756,7 +7750,6 @@ function renderPositionPreviewModalContent() {
         ${verticalGrid}
         ${horizontalGrid}
         ${cornerLabelsSvg}
-        ${stationSvg}
         ${pointsSvg}
       </svg>
     </div>
@@ -13190,12 +13183,7 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
     .map((y) => `<line class="pdf-plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanPdfDrawableSvg(drawable, index)).join("");
-  const kuwakuValue = kuwakuValueForSelect(kuwakuRaw);
-  const stationMarkers = collectTotalStationPlanMarkers(
-    state.records.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue)
-  );
-  const stationSvg = renderTotalStationPlanMarkersSvg(stationMarkers);
-  const viewBox = computePlanSvgViewBox([...drawables, ...stationMarkers]);
+  const viewBox = computePlanSvgViewBox(drawables);
   const cornerLabels = buildPlanCornerLabels(kuwakuRaw);
 
   return `
@@ -13212,7 +13200,6 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
         <rect class="pdf-plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
-        ${stationSvg}
         ${pointsSvg}
       </svg>
     </div>
