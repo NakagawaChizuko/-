@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v27-ts-south-west-offset";
+const CACHE_NAME = "kaseki25-pwa-v28-fixed-grid-view";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js",

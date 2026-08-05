@@ -10902,37 +10902,16 @@ function getPlanDrawableExtent(drawable) {
   };
 }
 
-function computePlanSvgViewBox(drawables = []) {
-  const base = {
-    minX: 0,
-    maxX: PLAN_SIZE_CM,
-    minY: 0,
-    maxY: PLAN_SIZE_CM,
-  };
-  const extents = (Array.isArray(drawables) ? drawables : [])
-    .map((drawable) => getPlanDrawableExtent(drawable))
-    .filter(Boolean);
-  if (extents.length) {
-    extents.forEach((extent) => {
-      base.minX = Math.min(base.minX, extent.minX);
-      base.maxX = Math.max(base.maxX, extent.maxX);
-      base.minY = Math.min(base.minY, extent.minY);
-      base.maxY = Math.max(base.maxY, extent.maxY);
-    });
-  }
+function computePlanSvgViewBox() {
   const leftPad = 40;
   const rightPad = 24;
   const topPad = 24;
   const bottomPad = 24;
-  const minX = Math.floor(base.minX - leftPad);
-  const minY = Math.floor(base.minY - topPad);
-  const width = Math.ceil(base.maxX + rightPad - minX);
-  const height = Math.ceil(base.maxY + bottomPad - minY);
   return {
-    minX,
-    minY,
-    width: Math.max(PLAN_SIZE_CM, width),
-    height: Math.max(PLAN_SIZE_CM, height),
+    minX: -leftPad,
+    minY: -topPad,
+    width: PLAN_SIZE_CM + leftPad + rightPad,
+    height: PLAN_SIZE_CM + topPad + bottomPad,
   };
 }
 
