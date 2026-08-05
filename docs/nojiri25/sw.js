@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v33-roman-one-grid-names";
+const CACHE_NAME = "kaseki25-pwa-v34-hide-grid-name-note";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
