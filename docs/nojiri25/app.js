@@ -577,6 +577,7 @@ const cellEditSaveBtn = document.getElementById("cell-edit-save-btn");
 let hoverEditMenuEl = null;
 let hoverEditMenuRecordId = "";
 let hoverEditMenuKuwaku = "";
+let positionPreviewRecordOverride = null;
 const TOUCH_LONG_PRESS_MS = 520;
 const TOUCH_LONG_PRESS_MOVE_THRESHOLD_PX = 16;
 const viewerTouchLongPressState = {
@@ -1354,6 +1355,14 @@ function bindEvents() {
       }
       const rowKuwaku = value(button.dataset.kuwaku);
       insertRowFromList(value(record.id) || recordId, rowKuwaku, record);
+      return;
+    }
+    if (action === "position-preview") {
+      if (!record) {
+        showToast("対象データが見つかりません");
+        return;
+      }
+      openPositionPreviewModal(record);
       return;
     }
     if (action === "delete") {
@@ -6945,6 +6954,7 @@ function renderListOutput() {
             <button type="button" data-action="edit" data-id="${record.id}" data-kuwaku="${escapeHtml(
               getRecordKuwaku(record)
             )}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">編集</button>
+            <button type="button" data-action="position-preview" data-id="${record.id}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">平面位置確認</button>
             <button class="danger" type="button" data-action="delete" data-id="${record.id}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">削除</button>
           </div>
         </td>
@@ -7683,13 +7693,15 @@ function renderPositionPreviewModalContent() {
   if (!positionPreviewMeta || !positionPreviewMap) {
     return false;
   }
-  const draftRecord = buildCurrentRecordDraftForPositionPreview();
+  const draftRecord = positionPreviewRecordOverride || buildCurrentRecordDraftForPositionPreview();
   if (!draftRecord) {
     return false;
   }
   const currentDrawableRaw = buildPlanDrawable(draftRecord);
   if (!currentDrawableRaw) {
-    const positionMethod = normalizePositionMethod(new FormData(recordForm).get("positionMethod"));
+    const positionMethod = positionPreviewRecordOverride
+      ? normalizePositionMethod(positionPreviewRecordOverride.positionMethod)
+      : normalizePositionMethod(new FormData(recordForm).get("positionMethod"));
     showToast(
       positionMethod === "totalStation"
         ? getTotalStationInputError() || "トータルステーションの入力値を確認してください"
@@ -7750,12 +7762,14 @@ function renderPositionPreviewModalContent() {
   return true;
 }
 
-function openPositionPreviewModal() {
+function openPositionPreviewModal(recordOverride = null) {
   if (!positionPreviewModal) {
     return;
   }
+  positionPreviewRecordOverride = recordOverride && typeof recordOverride === "object" ? recordOverride : null;
   const rendered = renderPositionPreviewModalContent();
   if (!rendered) {
+    positionPreviewRecordOverride = null;
     return;
   }
   positionPreviewModal.classList.remove("hidden");
@@ -7766,6 +7780,7 @@ function closePositionPreviewModal() {
     return;
   }
   positionPreviewModal.classList.add("hidden");
+  positionPreviewRecordOverride = null;
 }
 
 function getFilteredPlanRecords() {
