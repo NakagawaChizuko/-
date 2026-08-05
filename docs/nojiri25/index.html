@@ -265,20 +265,20 @@
             <fieldset id="ts-specimen-position-section" class="inline-fieldset span-3 ts-specimen-position hidden">
               <legend>化石・遺物の位置</legend>
               <div class="position-method-options ts-observation-methods">
-                <label><input name="tsObservationMode" type="radio" value="coordinate" checked /> 座標（x・y・z）</label>
+                <label><input name="tsObservationMode" type="radio" value="coordinate" checked /> 設置点からの北・西距離・標高</label>
                 <label><input name="tsObservationMode" type="radio" value="polar" /> 距離・傾斜・方向角</label>
               </div>
               <div id="ts-coordinate-fields" class="ts-observation-row">
-                <label>x 南北（南が正）<span><input name="tsPointXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</span></label>
-                <label>y 東西（西が正）<span><input name="tsPointYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</span></label>
-                <label>z 標高<span><input name="tsPointAltitudeM" type="text" inputmode="decimal" /> m</span></label>
+                <label>設置点から北へ<span><input name="tsPointXNorthM" type="text" inputmode="text" placeholder="例：1.25" /> m</span></label>
+                <label>設置点から西へ<span><input name="tsPointYEastM" type="text" inputmode="text" placeholder="例：0.50" /> m</span></label>
+                <label>標高<span><input name="tsPointAltitudeM" type="text" inputmode="decimal" /> m</span></label>
               </div>
               <div id="ts-polar-fields" class="ts-polar-fields hidden">
                 <label>斜距離 <span><input name="tsSlopeDistanceM" type="text" inputmode="decimal" /> m</span></label>
                 <div class="ts-dms-field"><strong>傾斜</strong><span class="hint-text">水平0°、上向き＋・下向き−</span><label><input name="tsInclinationDeg" type="text" inputmode="decimal" /> °</label><label><input name="tsInclinationMin" type="text" inputmode="numeric" value="0" /> ′</label><label><input name="tsInclinationSec" type="text" inputmode="decimal" value="0" /> ″</label></div>
                 <div class="ts-dms-field"><strong>方向角</strong><span class="hint-text">後視点方向を0°として時計回り</span><label><input name="tsDirectionDeg" type="text" inputmode="numeric" /> °</label><label><input name="tsDirectionMin" type="text" inputmode="numeric" value="0" /> ′</label><label><input name="tsDirectionSec" type="text" inputmode="decimal" value="0" /> ″</label></div>
               </div>
-              <p id="total-station-result" class="hint-text" aria-live="polite">設置位置と xyz を入力すると、区画内の平面位置と標高を自動計算します。</p>
+              <p id="total-station-result" class="hint-text" aria-live="polite">設置点から北・西への距離と標高を入力すると、区画内の平面位置を自動計算します。</p>
             </fieldset>
 
             <fieldset class="inline-fieldset span-3">
@@ -1032,6 +1032,6 @@
     <script src="./vendor/OrbitControls.js"></script>
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
-    <script src="./app.js?v=20260805-ts-public4"></script>
+    <script src="./app.js?v=20260805-ts-public5"></script>
   </body>
 </html>

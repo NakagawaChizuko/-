@@ -124,8 +124,8 @@ const REQUIRED_FIELD_LABELS = {
   tsInstrumentHeightM: "TS機械高",
   tsTargetHeightM: "TS目標高",
   tsObservationMode: "TS標本位置入力方法",
-  tsPointXNorthM: "TS標本x（南正）",
-  tsPointYEastM: "TS標本y（西正）",
+  tsPointXNorthM: "TS設置点から北への距離",
+  tsPointYEastM: "TS設置点から西への距離",
   tsPointAltitudeM: "TS標本z標高",
   tsSlopeDistanceM: "TS斜距離",
   tsInclinationDeg: "TS傾斜度",
@@ -1148,6 +1148,7 @@ function bindEvents() {
       tsInstrumentHeightM: value(formData.get("tsInstrumentHeightM")),
       tsTargetHeightM: value(formData.get("tsTargetHeightM")),
       tsObservationMode: value(formData.get("tsObservationMode")) === "polar" ? "polar" : "coordinate",
+      tsPointCoordinateMode: "stationOffsetNorthWest",
       tsPointXNorthM: value(formData.get("tsPointXNorthM")),
       tsPointYEastM: value(formData.get("tsPointYEastM")),
       tsPointAltitudeM: value(formData.get("tsPointAltitudeM")),
@@ -11686,6 +11687,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     tsInstrumentHeightM: value(item.tsInstrumentHeightM),
     tsTargetHeightM: value(item.tsTargetHeightM),
     tsObservationMode: value(item.tsObservationMode) === "polar" ? "polar" : "coordinate",
+    tsPointCoordinateMode: value(item.tsPointCoordinateMode),
     tsPointXNorthM: value(item.tsPointXNorthM),
     tsPointYEastM: value(item.tsPointYEastM),
     tsPointAltitudeM: value(item.tsPointAltitudeM),
@@ -14998,6 +15000,23 @@ function setPositionMeasurementFields(record = {}) {
       field.value = numericValue == null ? rawValue || field.value : String(-numericValue);
     }
   });
+  if (value(record.tsObservationMode) !== "polar" && value(record.tsPointCoordinateMode) !== "stationOffsetNorthWest") {
+    const legacyConvention = !value(record.tsCoordinateConvention);
+    const stationXRaw = parseTotalStationNumber(record.tsStationXNorthM);
+    const stationYRaw = parseTotalStationNumber(record.tsStationYEastM);
+    const pointXRaw = parseTotalStationNumber(record.tsPointXNorthM);
+    const pointYRaw = parseTotalStationNumber(record.tsPointYEastM);
+    if ([stationXRaw, stationYRaw, pointXRaw, pointYRaw].every((number) => number != null)) {
+      const stationX = legacyConvention ? -stationXRaw : stationXRaw;
+      const stationY = legacyConvention ? -stationYRaw : stationYRaw;
+      const pointX = legacyConvention ? -pointXRaw : pointXRaw;
+      const pointY = legacyConvention ? -pointYRaw : pointYRaw;
+      const northOffsetField = recordForm.elements.tsPointXNorthM;
+      const westOffsetField = recordForm.elements.tsPointYEastM;
+      if (northOffsetField instanceof HTMLInputElement) northOffsetField.value = String(stationX - pointX);
+      if (westOffsetField instanceof HTMLInputElement) westOffsetField.value = String(pointY - stationY);
+    }
+  }
   const observationMode = value(record.tsObservationMode) === "polar" ? "polar" : "coordinate";
   const observationRadio = recordForm.querySelector(`input[name="tsObservationMode"][value="${observationMode}"]`);
   if (observationRadio instanceof HTMLInputElement) observationRadio.checked = true;
@@ -15147,7 +15166,7 @@ function getTotalStationInputError(requireAltitude = false) {
   }
   const mode = value(data.get("tsObservationMode")) === "polar" ? "polar" : "coordinate";
   const observationFields = mode === "coordinate"
-    ? [["標本x", data.get("tsPointXNorthM")], ["標本y", data.get("tsPointYEastM")], ["標本z", data.get("tsPointAltitudeM")]]
+    ? [["設置点から北への距離", data.get("tsPointXNorthM")], ["設置点から西への距離", data.get("tsPointYEastM")], ["標高", data.get("tsPointAltitudeM")]]
     : [["斜距離", data.get("tsSlopeDistanceM")], ["傾斜度", data.get("tsInclinationDeg")], ["傾斜分", data.get("tsInclinationMin")], ["傾斜秒", data.get("tsInclinationSec")], ["方向角度", data.get("tsDirectionDeg")], ["方向角分", data.get("tsDirectionMin")], ["方向角秒", data.get("tsDirectionSec")]];
   for (const [label, raw] of observationFields) {
     if (parseTotalStationNumber(raw) == null) return `${label}を数値で入力してください`;
@@ -15183,7 +15202,12 @@ function calculateTotalStationPosition() {
   let pointX = parseTotalStationNumber(data.get("tsPointXNorthM"));
   let pointY = parseTotalStationNumber(data.get("tsPointYEastM"));
   let pointZ = parseTotalStationNumber(data.get("tsPointAltitudeM"));
-  if (mode === "polar") {
+  if (mode === "coordinate" && pointX != null && pointY != null) {
+    const northFromStationM = pointX;
+    const westFromStationM = pointY;
+    pointX = stationX - northFromStationM;
+    pointY = stationY + westFromStationM;
+  } else if (mode === "polar") {
     const distance = parseTotalStationNumber(data.get("tsSlopeDistanceM"));
     const inclination = dmsToDegrees(data.get("tsInclinationDeg"), data.get("tsInclinationMin"), data.get("tsInclinationSec"));
     const direction = dmsToDegrees(data.get("tsDirectionDeg"), data.get("tsDirectionMin"), data.get("tsDirectionSec"));
@@ -15205,6 +15229,8 @@ function calculateTotalStationPosition() {
   const stationPlanY = pegY + (stationX - backX) * 100;
   const xPlanCm = pegX + specimenEastFromPegCm;
   const yPlanCm = pegY - specimenNorthFromPegCm;
+  const specimenNorthFromStationM = stationX - pointX;
+  const specimenWestFromStationM = pointY - stationY;
   return {
     pegLabel: value(data.get("tsBacksightPeg")).toUpperCase(),
     specimenEastFromPegCm,
@@ -15212,6 +15238,7 @@ function calculateTotalStationPosition() {
     xPlanCm,
     yPlanCm,
     stationPlanX, stationPlanY, pointX, pointY,
+    specimenNorthFromStationM, specimenWestFromStationM,
     altitudeM: pointZ,
   };
 }
@@ -15253,7 +15280,7 @@ function applyTotalStationPosition() {
       result.specimenNorthFromPegCm < 0
         ? `南に ${formatLengthInputValue(Math.abs(result.specimenNorthFromPegCm))} cm`
         : `北に ${formatLengthInputValue(result.specimenNorthFromPegCm)} cm`;
-    resultEl.textContent = `計算結果：x ${Number(result.pointX.toFixed(4))} m、y ${Number(result.pointY.toFixed(4))} m、z ${Number(result.altitudeM.toFixed(4))} m／${result.pegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
+    resultEl.textContent = `計算結果：設置点から北に ${Number(result.specimenNorthFromStationM.toFixed(4))} m、西に ${Number(result.specimenWestFromStationM.toFixed(4))} m、標高 ${Number(result.altitudeM.toFixed(4))} m／${result.pegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
     resultEl.classList.add("total-station-result-ok");
   }
 }
