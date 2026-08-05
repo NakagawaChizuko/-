@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v21-total-station";
+const CACHE_NAME = "kaseki25-pwa-v22-total-station-marker";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js",

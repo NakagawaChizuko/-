@@ -2835,9 +2835,9 @@ th.sortable-header.sort-desc::after {
 .ts-dms-field .hint-text { width: 100%; margin: 0; }
 .ts-dms-field label { display: inline-flex; align-items: center; gap: 4px; }
 .ts-dms-field input { width: 5rem; }
-.plan-total-station circle { fill: #fff; stroke: #111827; stroke-width: 3; }
-.plan-total-station line { stroke: #111827; stroke-width: 2; }
-.plan-total-station text { fill: #111827; font-size: 13px; font-weight: 800; }
+.plan-total-station circle { fill: #dbeafe; stroke: #0067c5; stroke-width: 3; }
+.plan-total-station line { stroke: #0067c5; stroke-width: 2; }
+.plan-total-station text { fill: #0067c5; font-size: 13px; font-weight: 800; }
 .total-station-result-ok {
   color: #0f766e;
   font-weight: 700;

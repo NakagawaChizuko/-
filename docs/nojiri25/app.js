@@ -7532,7 +7532,8 @@ function renderPlanOutput() {
       ? detailRecords
       : detailRecords.filter((record) => detailSubValueForSelect(record.detailSub) === selectedPlanDetailSub);
   const drawables = detailSubRecords.map((record) => buildPlanDrawable(record)).filter(Boolean);
-  const stationMarkers = collectTotalStationPlanMarkers(detailSubRecords);
+  // 設置位置は分類・層準フィルターにかかわらず、選択中グリッドのTS記録から表示する。
+  const stationMarkers = collectTotalStationPlanMarkers(kuwakuFilteredRecords);
   const kuwakuLabelForMeta = selectedPlanKuwaku ? kuwakuLabelForSelect(selectedPlanKuwaku) : "-";
   const categoryLabelForMeta =
     selectedPlanCategory === EXPORT_CATEGORY_ALL_VALUE
@@ -7697,8 +7698,10 @@ function renderPositionPreviewModalContent() {
     return false;
   }
   const kuwakuValue = kuwakuValueForSelect(getRecordKuwaku(draftRecord));
-  const savedDrawables = state.records
-    .filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue && value(record.id) !== value(draftRecord.id))
+  const savedRecords = state.records.filter(
+    (record) => kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue && value(record.id) !== value(draftRecord.id)
+  );
+  const savedDrawables = savedRecords
     .map((record) => {
       const drawable = buildPlanDrawable(record);
       return drawable ? { ...drawable, color: "#9ca3af", labelColor: "#6b7280" } : null;
@@ -7711,6 +7714,7 @@ function renderPositionPreviewModalContent() {
     label: value(draftRecord.specimenNo) || "入力中",
   };
   const drawables = [...savedDrawables, currentDrawable];
+  const stationMarkers = collectTotalStationPlanMarkers([...savedRecords, draftRecord]);
   const verticalGrid = [100, 200, 300]
     .map((x) => `<line class="plan-grid-line" x1="${x}" y1="0" x2="${x}" y2="${PLAN_SIZE_CM}" />`)
     .join("");
@@ -7718,9 +7722,10 @@ function renderPositionPreviewModalContent() {
     .map((y) => `<line class="plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanDrawableSvg(drawable, index)).join("");
+  const stationSvg = renderTotalStationPlanMarkersSvg(stationMarkers);
   const cornerLabels = buildPlanCornerLabels(kuwakuValue);
   const cornerLabelsSvg = buildPlanCornerLabelsSvg(cornerLabels);
-  const viewBox = computePlanSvgViewBox(drawables);
+  const viewBox = computePlanSvgViewBox([...drawables, ...stationMarkers]);
   const kuwakuLabel = kuwakuValue === EMPTY_KUWAKU_VALUE ? "（未設定）" : kuwakuLabelForSelect(kuwakuValue);
   positionPreviewMeta.innerHTML = `
     <span>区画（グリッド）: ${escapeHtml(kuwakuLabel)}</span>
@@ -7737,6 +7742,7 @@ function renderPositionPreviewModalContent() {
         ${verticalGrid}
         ${horizontalGrid}
         ${cornerLabelsSvg}
+        ${stationSvg}
         ${pointsSvg}
       </svg>
     </div>
@@ -10189,7 +10195,7 @@ function collectTotalStationPlanMarkers(records) {
 }
 
 function renderTotalStationPlanMarkersSvg(markers) {
-  return markers.map((marker) => `<g class="plan-total-station" aria-label="トータルステーション設置点"><circle cx="${marker.x}" cy="${marker.y}" r="8" /><line x1="${marker.x - 11}" y1="${marker.y}" x2="${marker.x + 11}" y2="${marker.y}" /><line x1="${marker.x}" y1="${marker.y - 11}" x2="${marker.x}" y2="${marker.y + 11}" /><text x="${marker.x + 12}" y="${marker.y - 10}">TS</text></g>`).join("");
+  return markers.map((marker) => `<g class="plan-total-station" aria-label="トータルステーション設置点"><circle cx="${marker.x}" cy="${marker.y}" r="8" fill="#dbeafe" stroke="#0067c5" stroke-width="3" /><line x1="${marker.x - 11}" y1="${marker.y}" x2="${marker.x + 11}" y2="${marker.y}" stroke="#0067c5" stroke-width="2" /><line x1="${marker.x}" y1="${marker.y - 11}" x2="${marker.x}" y2="${marker.y + 11}" stroke="#0067c5" stroke-width="2" /><text x="${marker.x + 12}" y="${marker.y - 10}" fill="#0067c5" font-size="13" font-weight="800">TS</text></g>`).join("");
 }
 
 function convertPositionToPlanCoords(nsDirRaw, nsCmRaw, ewDirRaw, ewCmRaw) {
@@ -11006,13 +11012,14 @@ function incrementGridNo(noRaw, step) {
 
 function buildPlanLegendHtml() {
   const order = ["m", "b", "l", "s", "i", "g", "h", "a"];
-  return order
+  const specimenLegend = order
     .map((prefix) => {
       const color = getSpecimenPrefixColor(prefix);
       const label = SPECIMEN_CATEGORY_MAP[prefix] || "";
       return `<span class="plan-legend-item"><span class="plan-legend-dot" style="background:${color}"></span>${prefix}: ${label}</span>`;
     })
     .join("");
+  return `${specimenLegend}<span class="plan-legend-item"><span class="plan-legend-dot" style="background:#0067c5"></span>TS: トータルステーション設置位置</span>`;
 }
 
 function getSpecimenPrefixColor(prefixRaw) {
@@ -13161,6 +13168,12 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
     .map((y) => `<line class="pdf-plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
   const pointsSvg = drawables.map((drawable, index) => renderPlanPdfDrawableSvg(drawable, index)).join("");
+  const kuwakuValue = kuwakuValueForSelect(kuwakuRaw);
+  const stationMarkers = collectTotalStationPlanMarkers(
+    state.records.filter((record) => kuwakuValueForSelect(getRecordKuwaku(record)) === kuwakuValue)
+  );
+  const stationSvg = renderTotalStationPlanMarkersSvg(stationMarkers);
+  const viewBox = computePlanSvgViewBox([...drawables, ...stationMarkers]);
   const cornerLabels = buildPlanCornerLabels(kuwakuRaw);
 
   return `
@@ -13173,10 +13186,11 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
       <div class="pdf-plan-corner top-right">${escapeHtml(cornerLabels.topRight)}</div>
       <div class="pdf-plan-corner bottom-left">${escapeHtml(cornerLabels.bottomLeft)}</div>
       <div class="pdf-plan-corner bottom-right">${escapeHtml(cornerLabels.bottomRight)}</div>
-      <svg class="pdf-plan-svg" viewBox="0 0 ${PLAN_SIZE_CM} ${PLAN_SIZE_CM}" aria-label="層準別平面図" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <svg class="pdf-plan-svg" viewBox="${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}" aria-label="層準別平面図" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <rect class="pdf-plan-frame" x="0" y="0" width="${PLAN_SIZE_CM}" height="${PLAN_SIZE_CM}" />
         ${verticalGrid}
         ${horizontalGrid}
+        ${stationSvg}
         ${pointsSvg}
       </svg>
     </div>
