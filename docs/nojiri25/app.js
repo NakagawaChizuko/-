@@ -14947,7 +14947,7 @@ function normalizePositionMethod(valueRaw) {
 
 function normalizeTotalStationPointName(valueRaw) {
   const normalized = value(valueRaw)
-    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[！-～]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
     .replace(/[－—–ー―]/g, "-")
     .replace(/\s+/g, "")
     .toUpperCase();
@@ -15018,10 +15018,12 @@ function initializeTotalStationGridPointSelectors() {
   const backsightNameField = recordForm?.elements?.tsBacksightPeg;
   stationNameField?.addEventListener("input", () => {
     const normalized = normalizeTotalStationPointName(stationNameField.value);
+    if (normalized !== stationNameField.value) stationNameField.value = normalized;
     if (findTotalStationGridReferencePoint(normalized)) applyTotalStationGridReferencePoint("station", normalized);
   });
   backsightNameField?.addEventListener("input", () => {
     const normalized = normalizeTotalStationPointName(backsightNameField.value);
+    if (normalized !== backsightNameField.value) backsightNameField.value = normalized;
     if (findTotalStationGridReferencePoint(normalized)) applyTotalStationGridReferencePoint("backsight", normalized);
   });
   stationNameField?.addEventListener("change", () => {

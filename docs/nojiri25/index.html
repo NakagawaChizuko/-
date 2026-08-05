@@ -256,6 +256,7 @@
                 <div class="ts-setup-row"><strong>後視点（基準点）</strong><label>登録点から選択 <select id="ts-backsight-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsBacksightPeg" type="text" placeholder="例：I-C-5" /></label><label>x <input name="tsBacksightXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsBacksightYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsBacksightAltitudeM" type="text" inputmode="decimal" /> m</label></div>
                 <div class="ts-setup-row"><strong>高さ</strong><label>機械高 <input name="tsInstrumentHeightM" type="text" inputmode="decimal" /> m</label><label>目標高 <input name="tsTargetHeightM" type="text" inputmode="decimal" /> m</label></div>
               </div>
+              <p class="hint-text">杭（点）名称の先頭は I・Ⅰ・1 を同じものとして扱い、I・半角ハイフン・半角英数字の表記に統一します（例：1-c-５ → I-C-5）。</p>
               <p class="hint-text">設置点の杭名称を平面図の基準にします。後視点は、距離・傾斜・方向角入力の方向角0°を定める基準です。</p>
               <div class="ts-setup-save-row">
                 <button id="ts-setup-save-btn" type="button">設置位置を保存</button>
@@ -1034,6 +1035,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid1"></script>
-    <script src="./app.js?v=20260805-ts-public11"></script>
+    <script src="./app.js?v=20260805-ts-public12"></script>
   </body>
 </html>
