@@ -15016,6 +15016,14 @@ function initializeTotalStationGridPointSelectors() {
   });
   const stationNameField = recordForm?.elements?.tsStationPeg;
   const backsightNameField = recordForm?.elements?.tsBacksightPeg;
+  stationNameField?.addEventListener("input", () => {
+    const normalized = normalizeTotalStationPointName(stationNameField.value);
+    if (findTotalStationGridReferencePoint(normalized)) applyTotalStationGridReferencePoint("station", normalized);
+  });
+  backsightNameField?.addEventListener("input", () => {
+    const normalized = normalizeTotalStationPointName(backsightNameField.value);
+    if (findTotalStationGridReferencePoint(normalized)) applyTotalStationGridReferencePoint("backsight", normalized);
+  });
   stationNameField?.addEventListener("change", () => {
     const normalized = normalizeTotalStationPointName(stationNameField.value);
     stationNameField.value = normalized;
