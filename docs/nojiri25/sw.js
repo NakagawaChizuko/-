@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v28-fixed-grid-view";
+const CACHE_NAME = "kaseki25-pwa-v29-ts-station-peg";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js",
