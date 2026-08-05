@@ -567,6 +567,8 @@ const positionPreviewModal = document.getElementById("position-preview-modal");
 const positionPreviewCloseBtn = document.getElementById("position-preview-close-btn");
 const positionPreviewMeta = document.getElementById("position-preview-meta");
 const positionPreviewMap = document.getElementById("position-preview-map");
+const tsStationPointSelect = document.getElementById("ts-station-point-select");
+const tsBacksightPointSelect = document.getElementById("ts-backsight-point-select");
 const cellEditModal = document.getElementById("cell-edit-modal");
 const cellEditForm = document.getElementById("cell-edit-form");
 const cellEditTitle = document.getElementById("cell-edit-title");
@@ -617,6 +619,7 @@ initialize();
 
 function initialize() {
   bindEvents();
+  initializeTotalStationGridPointSelectors();
   renderLargeShapeImageButtons();
   if (stateNeedsRewriteAfterLoad) {
     persist();
@@ -1139,11 +1142,11 @@ function bindEvents() {
       ewCm: value(formData.get("ewCm")),
       positionMethod,
       tsCoordinateConvention: positionMethod === "totalStation" ? "southWestPositive" : "",
-      tsStationPeg: value(formData.get("tsStationPeg")),
+      tsStationPeg: normalizeTotalStationPointName(formData.get("tsStationPeg")),
       tsStationXNorthM: value(formData.get("tsStationXNorthM")),
       tsStationYEastM: value(formData.get("tsStationYEastM")),
       tsStationAltitudeM: value(formData.get("tsStationAltitudeM")),
-      tsBacksightPeg: value(formData.get("tsBacksightPeg")),
+      tsBacksightPeg: normalizeTotalStationPointName(formData.get("tsBacksightPeg")),
       tsBacksightXNorthM: value(formData.get("tsBacksightXNorthM")),
       tsBacksightYEastM: value(formData.get("tsBacksightYEastM")),
       tsBacksightAltitudeM: value(formData.get("tsBacksightAltitudeM")),
@@ -14942,6 +14945,89 @@ function normalizePositionMethod(valueRaw) {
   return value(valueRaw) === "totalStation" ? "totalStation" : "grid";
 }
 
+function normalizeTotalStationPointName(valueRaw) {
+  const normalized = value(valueRaw)
+    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[－—–ー―]/g, "-")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+  return normalized.replace(/^[1Ⅰ](?=-)/, "I");
+}
+
+function getTotalStationGridReferencePoints() {
+  const source = Array.isArray(window.NOJIRI_GRID_REFERENCE_POINTS) ? window.NOJIRI_GRID_REFERENCE_POINTS : [];
+  return source
+    .map((point) => ({
+      name: normalizeTotalStationPointName(point?.name),
+      x: Number(point?.x),
+      y: Number(point?.y),
+    }))
+    .filter((point) => point.name && Number.isFinite(point.x) && Number.isFinite(point.y));
+}
+
+function findTotalStationGridReferencePoint(nameRaw) {
+  const name = normalizeTotalStationPointName(nameRaw);
+  return getTotalStationGridReferencePoints().find((point) => point.name === name) || null;
+}
+
+function applyTotalStationGridReferencePoint(kind, nameRaw, { showMessage = false } = {}) {
+  if (!recordForm) return false;
+  const point = findTotalStationGridReferencePoint(nameRaw);
+  if (!point) return false;
+  const isStation = kind === "station";
+  const nameField = recordForm.elements[isStation ? "tsStationPeg" : "tsBacksightPeg"];
+  const xField = recordForm.elements[isStation ? "tsStationXNorthM" : "tsBacksightXNorthM"];
+  const yField = recordForm.elements[isStation ? "tsStationYEastM" : "tsBacksightYEastM"];
+  if (nameField instanceof HTMLInputElement) nameField.value = point.name;
+  if (xField instanceof HTMLInputElement) xField.value = String(point.x);
+  if (yField instanceof HTMLInputElement) yField.value = String(point.y);
+  const select = isStation ? tsStationPointSelect : tsBacksightPointSelect;
+  if (select instanceof HTMLSelectElement) select.value = point.name;
+  applyTotalStationPosition();
+  if (showMessage) showToast(`${isStation ? "設置点" : "後視点"} ${point.name} のX・Yを入力しました`);
+  return true;
+}
+
+function syncTotalStationGridPointSelectors() {
+  if (!recordForm) return;
+  const stationName = normalizeTotalStationPointName(recordForm.elements.tsStationPeg?.value);
+  const backsightName = normalizeTotalStationPointName(recordForm.elements.tsBacksightPeg?.value);
+  if (tsStationPointSelect instanceof HTMLSelectElement) {
+    tsStationPointSelect.value = findTotalStationGridReferencePoint(stationName) ? stationName : "";
+  }
+  if (tsBacksightPointSelect instanceof HTMLSelectElement) {
+    tsBacksightPointSelect.value = findTotalStationGridReferencePoint(backsightName) ? backsightName : "";
+  }
+}
+
+function initializeTotalStationGridPointSelectors() {
+  const points = getTotalStationGridReferencePoints();
+  const options = points
+    .map((point) => `<option value="${escapeHtml(point.name)}">${escapeHtml(point.name)}（X ${point.x}、Y ${point.y}）</option>`)
+    .join("");
+  [tsStationPointSelect, tsBacksightPointSelect].forEach((select) => {
+    if (select instanceof HTMLSelectElement) select.insertAdjacentHTML("beforeend", options);
+  });
+  tsStationPointSelect?.addEventListener("change", () => {
+    if (value(tsStationPointSelect.value)) applyTotalStationGridReferencePoint("station", tsStationPointSelect.value, { showMessage: true });
+  });
+  tsBacksightPointSelect?.addEventListener("change", () => {
+    if (value(tsBacksightPointSelect.value)) applyTotalStationGridReferencePoint("backsight", tsBacksightPointSelect.value, { showMessage: true });
+  });
+  const stationNameField = recordForm?.elements?.tsStationPeg;
+  const backsightNameField = recordForm?.elements?.tsBacksightPeg;
+  stationNameField?.addEventListener("change", () => {
+    const normalized = normalizeTotalStationPointName(stationNameField.value);
+    stationNameField.value = normalized;
+    if (!applyTotalStationGridReferencePoint("station", normalized)) syncTotalStationGridPointSelectors();
+  });
+  backsightNameField?.addEventListener("change", () => {
+    const normalized = normalizeTotalStationPointName(backsightNameField.value);
+    backsightNameField.value = normalized;
+    if (!applyTotalStationGridReferencePoint("backsight", normalized)) syncTotalStationGridPointSelectors();
+  });
+}
+
 function setPositionMeasurementFields(record = {}) {
   if (!recordForm) {
     return;
@@ -14970,8 +15056,15 @@ function setPositionMeasurementFields(record = {}) {
     }
   });
   const stationPegField = recordForm.elements.tsStationPeg;
+  const backsightPegField = recordForm.elements.tsBacksightPeg;
+  if (stationPegField instanceof HTMLInputElement && value(stationPegField.value)) {
+    stationPegField.value = normalizeTotalStationPointName(stationPegField.value);
+  }
+  if (backsightPegField instanceof HTMLInputElement && value(backsightPegField.value)) {
+    backsightPegField.value = normalizeTotalStationPointName(backsightPegField.value);
+  }
   if (stationPegField instanceof HTMLInputElement && !value(stationPegField.value) && value(record.tsBacksightPeg)) {
-    stationPegField.value = value(record.tsBacksightPeg).toUpperCase();
+    stationPegField.value = normalizeTotalStationPointName(record.tsBacksightPeg);
   }
   if (value(record.tsObservationMode) !== "polar" && value(record.tsPointCoordinateMode) === "stationOffsetNorthWest") {
     const formerNorthOffset = parseTotalStationNumber(record.tsPointXNorthM);
@@ -14999,6 +15092,7 @@ function setPositionMeasurementFields(record = {}) {
   const observationMode = value(record.tsObservationMode) === "polar" ? "polar" : "coordinate";
   const observationRadio = recordForm.querySelector(`input[name="tsObservationMode"][value="${observationMode}"]`);
   if (observationRadio instanceof HTMLInputElement) observationRadio.checked = true;
+  syncTotalStationGridPointSelectors();
   syncPositionMeasurementUi();
 }
 
@@ -15009,8 +15103,15 @@ function currentInputKuwakuParts() {
   return { block: block.toUpperCase(), no };
 }
 
+function currentInputGridReferenceName() {
+  const isEdit = getActiveTabId() === "edit-tab";
+  const headB = isEdit ? value(editKuwakuHeadBInput?.value) : value(siteForm?.elements?.kuwakuHeadB?.value);
+  const { block, no } = currentInputKuwakuParts();
+  return normalizeTotalStationPointName(`${headB}-${block}-${no}`);
+}
+
 function parseTotalStationPeg(valueRaw) {
-  const parts = value(valueRaw).toUpperCase().replace(/[－—–]/g, "-").split("-").map((part) => part.trim()).filter(Boolean);
+  const parts = normalizeTotalStationPointName(valueRaw).split("-").map((part) => part.trim()).filter(Boolean);
   if (parts.length < 2) {
     return null;
   }
@@ -15042,11 +15143,11 @@ function readTotalStationSetupFromForm() {
   const data = new FormData(recordForm);
   return {
     tsCoordinateConvention: "southWestPositive",
-    tsStationPeg: value(data.get("tsStationPeg")).toUpperCase(),
+    tsStationPeg: normalizeTotalStationPointName(data.get("tsStationPeg")),
     tsStationXNorthM: value(data.get("tsStationXNorthM")),
     tsStationYEastM: value(data.get("tsStationYEastM")),
     tsStationAltitudeM: value(data.get("tsStationAltitudeM")),
-    tsBacksightPeg: value(data.get("tsBacksightPeg")).toUpperCase(),
+    tsBacksightPeg: normalizeTotalStationPointName(data.get("tsBacksightPeg")),
     tsBacksightXNorthM: value(data.get("tsBacksightXNorthM")),
     tsBacksightYEastM: value(data.get("tsBacksightYEastM")),
     tsBacksightAltitudeM: value(data.get("tsBacksightAltitudeM")),
@@ -15084,24 +15185,32 @@ function restoreSavedTotalStationSetup() {
     }
   });
   const stationPegField = recordForm.elements.tsStationPeg;
+  const backsightPegField = recordForm.elements.tsBacksightPeg;
+  if (stationPegField instanceof HTMLInputElement && value(stationPegField.value)) {
+    stationPegField.value = normalizeTotalStationPointName(stationPegField.value);
+  }
+  if (backsightPegField instanceof HTMLInputElement && value(backsightPegField.value)) {
+    backsightPegField.value = normalizeTotalStationPointName(backsightPegField.value);
+  }
   if (stationPegField instanceof HTMLInputElement && !value(stationPegField.value)) {
-    stationPegField.value = value(saved.tsBacksightPeg).toUpperCase();
+    stationPegField.value = normalizeTotalStationPointName(saved.tsBacksightPeg);
   }
   const status = document.getElementById("ts-setup-save-status");
   if (status) {
     status.textContent = `保存済み：設置点 ${value(stationPegField?.value).toUpperCase()}／後視点 ${value(saved.tsBacksightPeg).toUpperCase()}`;
   }
+  syncTotalStationGridPointSelectors();
   return true;
 }
 
 function saveTotalStationSetup() {
   const setup = readTotalStationSetupFromForm();
-  if (!setup || !parseTotalStationPeg(setup.tsStationPeg)) {
-    showToast("設置点の杭名称を「I-C-5」の形式で入力してください");
+  if (!setup || !value(setup.tsStationPeg)) {
+    showToast("設置点の杭（点）名称を入力してください");
     return;
   }
-  if (!setup || !parseTotalStationPeg(setup.tsBacksightPeg)) {
-    showToast("後視点の杭名称を「I-C-5」の形式で入力してください");
+  if (!value(setup.tsBacksightPeg)) {
+    showToast("後視点の杭（点）名称を入力してください");
     return;
   }
   const requiredNumbers = [
@@ -15135,11 +15244,11 @@ function getTotalStationInputError(requireAltitude = false) {
   }
   const data = new FormData(recordForm);
   const grid = currentInputKuwakuParts();
-  if (!parseTotalStationPeg(data.get("tsStationPeg"))) {
-    return "設置点の杭名称を「I-C-5」の形式で入力してください";
+  if (!value(data.get("tsStationPeg"))) {
+    return "設置点の杭（点）名称を入力してください";
   }
-  if (!parseTotalStationPeg(data.get("tsBacksightPeg"))) {
-    return "後視点の杭名称を「I-C-5」の形式で入力してください";
+  if (!value(data.get("tsBacksightPeg"))) {
+    return "後視点の杭（点）名称を入力してください";
   }
   if (!/^[A-Z]+$/.test(grid.block) || !/^-?\d+$/.test(grid.no)) {
     return "先に区画（グリッド）の英字と番号を入力してください";
@@ -15179,7 +15288,7 @@ function calculateTotalStationPosition() {
     return null;
   }
   const data = new FormData(recordForm);
-  const stationPegRaw = value(data.get("tsStationPeg")) || value(data.get("tsBacksightPeg"));
+  const stationPegRaw = normalizeTotalStationPointName(data.get("tsStationPeg") || data.get("tsBacksightPeg"));
   const peg = parseTotalStationPeg(stationPegRaw);
   const grid = currentInputKuwakuParts();
   const stationX = parseTotalStationNumber(data.get("tsStationXNorthM"));
@@ -15189,7 +15298,7 @@ function calculateTotalStationPosition() {
   const backY = parseTotalStationNumber(data.get("tsBacksightYEastM"));
   const instrumentHeight = parseTotalStationNumber(data.get("tsInstrumentHeightM"));
   const targetHeight = parseTotalStationNumber(data.get("tsTargetHeightM"));
-  if (!peg || !/^[A-Z]+$/.test(grid.block) || !/^-?\d+$/.test(grid.no) || [stationX, stationY, stationZ, backX, backY, instrumentHeight, targetHeight].some((number) => number == null)) return null;
+  if (!stationPegRaw || !/^[A-Z]+$/.test(grid.block) || !/^-?\d+$/.test(grid.no) || [stationX, stationY, stationZ, backX, backY, instrumentHeight, targetHeight].some((number) => number == null)) return null;
   const mode = value(data.get("tsObservationMode")) === "polar" ? "polar" : "coordinate";
   let pointX = parseTotalStationNumber(data.get("tsPointXNorthM"));
   let pointY = parseTotalStationNumber(data.get("tsPointYEastM"));
@@ -15215,14 +15324,28 @@ function calculateTotalStationPosition() {
   if ([pointX, pointY, pointZ].some((number) => number == null)) return null;
   const specimenSouthFromStationM = pointX - stationX;
   const specimenWestFromStationM = pointY - stationY;
-  const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
-  const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
   const specimenEastFromPegCm = -specimenWestFromStationM * 100;
   const specimenNorthFromPegCm = -specimenSouthFromStationM * 100;
-  const stationPlanX = pegX;
-  const stationPlanY = pegY;
-  const xPlanCm = pegX + specimenEastFromPegCm;
-  const yPlanCm = pegY - specimenNorthFromPegCm;
+  const gridReference = findTotalStationGridReferencePoint(currentInputGridReferenceName());
+  let stationPlanX;
+  let stationPlanY;
+  let xPlanCm;
+  let yPlanCm;
+  if (gridReference) {
+    stationPlanX = -(stationY - gridReference.y) * 100;
+    stationPlanY = (stationX - gridReference.x) * 100;
+    xPlanCm = -(pointY - gridReference.y) * 100;
+    yPlanCm = (pointX - gridReference.x) * 100;
+  } else if (peg) {
+    const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
+    const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
+    stationPlanX = pegX;
+    stationPlanY = pegY;
+    xPlanCm = pegX + specimenEastFromPegCm;
+    yPlanCm = pegY - specimenNorthFromPegCm;
+  } else {
+    return null;
+  }
   return {
     pegLabel: stationPegRaw.toUpperCase(),
     specimenEastFromPegCm,

@@ -1,7 +1,7 @@
-const CACHE_NAME = "kaseki25-pwa-v29-ts-station-peg";
+const CACHE_NAME = "kaseki25-pwa-v30-grid-reference-data";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
-  "./vendor/three.min.js", "./vendor/OrbitControls.js",
+  "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
   "./team_roster_data.js", "./manifest.webmanifest", "./icon.svg", "./icon-512.png"
 ];
 const OPTIONAL_ASSETS = [
