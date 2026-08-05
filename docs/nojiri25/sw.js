@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v34-hide-grid-name-note";
+const CACHE_NAME = "kaseki25-pwa-v35-ts-multipoint";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

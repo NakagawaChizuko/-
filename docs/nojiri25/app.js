@@ -3045,12 +3045,108 @@ function normalizePlanMultiPointDistance(valueRaw) {
   return formatLengthInputValue(distance);
 }
 
+function isTotalStationMeasurementSelected() {
+  return Boolean(recordForm) && normalizePositionMethod(new FormData(recordForm).get("positionMethod")) === "totalStation";
+}
+
+function gridReferenceNameForKuwaku(kuwakuRaw) {
+  const parts = parseKuwaku(kuwakuLabelForSelect(kuwakuRaw));
+  return normalizeTotalStationPointName(`${value(parts.headB)}-${value(parts.block)}-${value(parts.no)}`);
+}
+
+function getCurrentMultiPointGridReference() {
+  return findTotalStationGridReferencePoint(currentInputGridReferenceName());
+}
+
+function getTotalStationMultiPointOffsetsForForm(point) {
+  if (point?.coordinateMode === "stationOffsetSouthWest") {
+    return point;
+  }
+  const gridReference = getCurrentMultiPointGridReference();
+  const stationX = parseTotalStationNumber(recordForm?.elements?.tsStationXNorthM?.value);
+  const stationY = parseTotalStationNumber(recordForm?.elements?.tsStationYEastM?.value);
+  const xEastM = Number(point?.xEastM);
+  const yNorthM = Number(point?.yNorthM);
+  if (gridReference && [stationX, stationY, xEastM, yNorthM].every((number) => Number.isFinite(number))) {
+    const pointX = gridReference.x + PLAN_SIZE_CM / 100 - yNorthM;
+    const pointY = gridReference.y - xEastM;
+    return {
+      southFromStationM: String(pointX - stationX),
+      westFromStationM: String(pointY - stationY),
+      zAltitudeM: value(point?.zAltitudeM),
+      coordinateMode: "stationOffsetSouthWest",
+    };
+  }
+  return {
+    southFromStationM: value(point?.southFromStationM),
+    westFromStationM: value(point?.westFromStationM),
+    zAltitudeM: value(point?.zAltitudeM),
+    coordinateMode: "stationOffsetSouthWest",
+  };
+}
+
+function getGridMultiPointForForm(point) {
+  if (point?.coordinateMode !== "stationOffsetSouthWest") return point;
+  const gridReference = getCurrentMultiPointGridReference();
+  const stationX = parseTotalStationNumber(recordForm?.elements?.tsStationXNorthM?.value);
+  const stationY = parseTotalStationNumber(recordForm?.elements?.tsStationYEastM?.value);
+  const south = Number(point?.southFromStationM);
+  const west = Number(point?.westFromStationM);
+  if (gridReference && [stationX, stationY, south, west].every((number) => Number.isFinite(number))) {
+    const pointX = stationX + south;
+    const pointY = stationY + west;
+    return {
+      xEastM: String(-(pointY - gridReference.y)),
+      yNorthM: String(PLAN_SIZE_CM / 100 - (pointX - gridReference.x)),
+      zAltitudeM: value(point?.zAltitudeM),
+    };
+  }
+  return { xEastM: "", yNorthM: "", zAltitudeM: value(point?.zAltitudeM) };
+}
+
+function convertTotalStationMultiPointToPlanCoords(record, point) {
+  const stationX = parseTotalStationNumber(record?.tsStationXNorthM);
+  const stationY = parseTotalStationNumber(record?.tsStationYEastM);
+  const south = parseTotalStationNumber(point?.southFromStationM);
+  const west = parseTotalStationNumber(point?.westFromStationM);
+  if ([stationX, stationY, south, west].some((number) => number == null)) return null;
+  const pointX = stationX + south;
+  const pointY = stationY + west;
+  const gridReference = findTotalStationGridReferencePoint(gridReferenceNameForKuwaku(getRecordKuwaku(record)));
+  const z = Number.isFinite(Number(point?.zAltitudeM)) ? Number(point.zAltitudeM) : null;
+  if (gridReference) {
+    return {
+      x: -(pointY - gridReference.y) * 100,
+      y: (pointX - gridReference.x) * 100,
+      z,
+    };
+  }
+  const peg = parseTotalStationPeg(record?.tsStationPeg);
+  const grid = parseKuwaku(getRecordKuwaku(record));
+  if (!peg || !grid.block || !grid.no) return null;
+  const pegX = (blockLabelToIndex(peg.block) - blockLabelToIndex(grid.block)) * PLAN_SIZE_CM;
+  const pegY = (Number(peg.no) - Number(grid.no)) * PLAN_SIZE_CM;
+  return { x: pegX - west * 100, y: pegY + south * 100, z };
+}
+
 function createDefaultPlanMultiPoint() {
-  return { xEastM: "", yNorthM: "", zAltitudeM: "" };
+  return isTotalStationMeasurementSelected()
+    ? { southFromStationM: "", westFromStationM: "", zAltitudeM: "", coordinateMode: "stationOffsetSouthWest" }
+    : { xEastM: "", yNorthM: "", zAltitudeM: "" };
 }
 
 function normalizePlanMultiPointEntry(entryRaw) {
   const entry = entryRaw && typeof entryRaw === "object" ? entryRaw : {};
+  const coordinateMode = value(entry.coordinateMode);
+  if (coordinateMode === "stationOffsetSouthWest" || value(entry.southFromStationM) || value(entry.westFromStationM)) {
+    const southFromStationM = value(entry.southFromStationM);
+    const westFromStationM = value(entry.westFromStationM);
+    const zAltitudeM = value(entry.zAltitudeM);
+    if (!Number.isFinite(Number(southFromStationM)) || !Number.isFinite(Number(westFromStationM))) {
+      return null;
+    }
+    return { southFromStationM, westFromStationM, zAltitudeM, coordinateMode: "stationOffsetSouthWest" };
+  }
   let xEastM = value(entry.xEastM);
   let yNorthM = value(entry.yNorthM);
   const zAltitudeM = value(entry.zAltitudeM);
@@ -3077,7 +3173,9 @@ function normalizePlanMultiPoints(pointsRaw) {
     if (!entry) {
       return;
     }
-    const key = `${entry.xEastM}|${entry.yNorthM}|${entry.zAltitudeM}`;
+    const key = entry.coordinateMode === "stationOffsetSouthWest"
+      ? `ts|${entry.southFromStationM}|${entry.westFromStationM}|${entry.zAltitudeM}`
+      : `grid|${entry.xEastM}|${entry.yNorthM}|${entry.zAltitudeM}`;
     if (seen.has(key)) {
       return;
     }
@@ -3089,6 +3187,7 @@ function normalizePlanMultiPoints(pointsRaw) {
 
 function createMultiPointRowElement(pointRaw = {}) {
   const normalized = normalizePlanMultiPointEntry(pointRaw) || createDefaultPlanMultiPoint();
+  const isTotalStation = isTotalStationMeasurementSelected();
   const row = document.createElement("div");
   row.className = "multi-point-row";
   row.dataset.multiPointRow = "1";
@@ -3110,9 +3209,18 @@ function createMultiPointRowElement(pointRaw = {}) {
     label.append(wrap);
     return label;
   };
-  const xLabel = makeField("x 東西（東が正）", "multiPointXEastM", normalized.xEastM);
-  const yLabel = makeField("y 南北（北が正）", "multiPointYNorthM", normalized.yNorthM);
-  const zLabel = makeField("z 高度", "multiPointZAltitudeM", normalized.zAltitudeM);
+  let firstLabel;
+  let secondLabel;
+  if (isTotalStation) {
+    const offsets = getTotalStationMultiPointOffsetsForForm(normalized);
+    firstLabel = makeField("設置点から南へ（南が正）", "multiPointSouthFromStationM", offsets.southFromStationM);
+    secondLabel = makeField("設置点から西へ（西が正）", "multiPointWestFromStationM", offsets.westFromStationM);
+  } else {
+    const gridPoint = getGridMultiPointForForm(normalized);
+    firstLabel = makeField("x 東西（東が正）", "multiPointXEastM", gridPoint.xEastM);
+    secondLabel = makeField("y 南北（北が正）", "multiPointYNorthM", gridPoint.yNorthM);
+  }
+  const zLabel = makeField(isTotalStation ? "標高" : "z 高度", "multiPointZAltitudeM", normalized.zAltitudeM);
 
   const removeButton = document.createElement("button");
   removeButton.type = "button";
@@ -3120,7 +3228,7 @@ function createMultiPointRowElement(pointRaw = {}) {
   removeButton.dataset.multiPointRemove = "1";
   removeButton.textContent = "削除";
 
-  row.append(xLabel, yLabel, zLabel, removeButton);
+  row.append(firstLabel, secondLabel, zLabel, removeButton);
   return row;
 }
 
@@ -3135,6 +3243,23 @@ function renderMultiPointRows(pointsRaw = []) {
     multiPointRows.append(createMultiPointRowElement(point));
   });
   syncMultiPointRemoveButtonState();
+}
+
+function syncMultiPointCoordinateModeUi() {
+  const isTotalStation = isTotalStationMeasurementSelected();
+  const hint = document.getElementById("multi-point-hint");
+  if (hint) {
+    hint.textContent = isTotalStation
+      ? "各点の設置点から南（南が正）・西（西が正）への距離と標高をm単位で入力します。"
+      : "各点の x（東西・東が正）、y（南北・北が正）、z（高度）をm単位で入力できます。";
+  }
+  const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");
+  if (!firstRow) return;
+  const rowsUseTotalStation = Boolean(firstRow.querySelector("[data-multi-point-south-from-station-m]"));
+  if (rowsUseTotalStation !== isTotalStation) {
+    const points = readMultiPointRowsFromForm();
+    renderMultiPointRows(points);
+  }
 }
 
 function syncMultiPointRemoveButtonState() {
@@ -3156,11 +3281,23 @@ function readMultiPointRowsFromForm() {
     return [];
   }
   const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
-  const points = rows.map((row) => ({
-    xEastM: value(row.querySelector("[data-multi-point-x-east-m]")?.value),
-    yNorthM: value(row.querySelector("[data-multi-point-y-north-m]")?.value),
-    zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
-  }));
+  const points = rows.map((row) => {
+    const southField = row.querySelector("[data-multi-point-south-from-station-m]");
+    const westField = row.querySelector("[data-multi-point-west-from-station-m]");
+    if (southField || westField) {
+      return {
+        southFromStationM: value(southField?.value),
+        westFromStationM: value(westField?.value),
+        zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
+        coordinateMode: "stationOffsetSouthWest",
+      };
+    }
+    return {
+      xEastM: value(row.querySelector("[data-multi-point-x-east-m]")?.value),
+      yNorthM: value(row.querySelector("[data-multi-point-y-north-m]")?.value),
+      zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
+    };
+  });
   return normalizePlanMultiPoints(points);
 }
 
@@ -3172,11 +3309,16 @@ function collectPlanMultiPointCoords(record) {
   const coords = [];
   const seen = new Set();
   points.forEach((point) => {
-    const coord = {
-      x: Number(point.xEastM) * 100,
-      y: PLAN_SIZE_CM - Number(point.yNorthM) * 100,
-      z: Number.isFinite(Number(point.zAltitudeM)) ? Number(point.zAltitudeM) : null,
-    };
+    let coord;
+    if (point.coordinateMode === "stationOffsetSouthWest") {
+      coord = convertTotalStationMultiPointToPlanCoords(record, point);
+    } else {
+      coord = {
+        x: Number(point.xEastM) * 100,
+        y: PLAN_SIZE_CM - Number(point.yNorthM) * 100,
+        z: Number.isFinite(Number(point.zAltitudeM)) ? Number(point.zAltitudeM) : null,
+      };
+    }
     if (!coord) {
       return;
     }
@@ -4318,7 +4460,6 @@ function populateRecordForm(record) {
   if (recordForm.elements.planSizeMode) {
     recordForm.elements.planSizeMode.value = normalizePlanSizeMode(record.planSizeMode);
   }
-  renderMultiPointRows(record.multiPoints);
   if (recordForm.elements.largeShapeType) {
     recordForm.elements.largeShapeType.value = normalizeLargeShapeType(record.largeShapeType);
   }
@@ -4388,6 +4529,7 @@ function populateRecordForm(record) {
   ewDirInput.value = normalizeEwDir(record.ewDir);
   recordForm.elements.ewCm.value = record.ewCm || "";
   setPositionMeasurementFields(record);
+  renderMultiPointRows(record.multiPoints);
   syncDirectionTabsFromForm();
   syncAltitudeDirectInputUi();
 
@@ -15423,6 +15565,7 @@ function syncPositionMeasurementUi() {
   document.getElementById("ts-polar-fields")?.classList.toggle("hidden", observationMode !== "polar");
   document.getElementById("level-reading-section")?.classList.toggle("hidden", method === "totalStation");
   siteForm?.querySelector(".site-level")?.classList.toggle("hidden", method === "totalStation");
+  syncMultiPointCoordinateModeUi();
   if (method === "totalStation") {
     applyTotalStationPosition();
   }
