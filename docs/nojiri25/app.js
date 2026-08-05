@@ -14951,7 +14951,7 @@ function normalizeTotalStationPointName(valueRaw) {
     .replace(/[－—–ー―]/g, "-")
     .replace(/\s+/g, "")
     .toUpperCase();
-  return normalized.replace(/^[1Ⅰ](?=-)/, "I");
+  return normalized.replace(/^[1IⅠ](?=-)/, "Ⅰ");
 }
 
 function getTotalStationGridReferencePoints() {
