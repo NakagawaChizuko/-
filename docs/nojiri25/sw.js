@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v37-ts-multipoint-polar";
+const CACHE_NAME = "kaseki25-pwa-v38-input-output-label";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
