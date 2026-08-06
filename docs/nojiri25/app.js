@@ -586,6 +586,17 @@ const sectionDiagramList = document.getElementById("section-diagram-list");
 const photoCameraInput = document.getElementById("photo-camera-input");
 const photoInput = document.getElementById("photo-input");
 const photoList = document.getElementById("photo-list");
+const sectionDiagramCameraBtn = document.getElementById("section-diagram-camera-btn");
+const photoCameraBtn = document.getElementById("photo-camera-btn");
+const cameraCaptureModal = document.getElementById("camera-capture-modal");
+const cameraCaptureVideo = document.getElementById("camera-capture-video");
+const cameraCaptureStatus = document.getElementById("camera-capture-status");
+const cameraCaptureShutterBtn = document.getElementById("camera-capture-shutter-btn");
+const cameraCaptureCloseBtn = document.getElementById("camera-capture-close-btn");
+const cameraCaptureCancelBtn = document.getElementById("camera-capture-cancel-btn");
+
+let activeCameraStream = null;
+let activeCameraDestination = "photo";
 
 const exportListCsvBtn = document.getElementById("export-list-csv-btn");
 const exportCardCsvBtn = document.getElementById("export-card-csv-btn");
@@ -2083,6 +2094,113 @@ async function addPhotosFromFiles(fileList) {
   renderPhotoList();
   persist();
 }
+
+function stopBrowserCamera() {
+  if (activeCameraStream) {
+    activeCameraStream.getTracks().forEach((track) => track.stop());
+    activeCameraStream = null;
+  }
+  if (cameraCaptureVideo) {
+    cameraCaptureVideo.srcObject = null;
+  }
+  if (cameraCaptureShutterBtn) {
+    cameraCaptureShutterBtn.disabled = true;
+  }
+}
+
+function closeBrowserCamera() {
+  stopBrowserCamera();
+  cameraCaptureModal?.classList.add("hidden");
+}
+
+async function openBrowserCamera(destination) {
+  if (!cameraCaptureModal || !cameraCaptureVideo || !cameraCaptureStatus || !cameraCaptureShutterBtn) {
+    return;
+  }
+  activeCameraDestination = destination === "sectionDiagram" ? "sectionDiagram" : "photo";
+  cameraCaptureModal.classList.remove("hidden");
+  cameraCaptureStatus.textContent = "カメラを準備しています。許可の確認が表示されたら「許可」を選んでください。";
+  cameraCaptureShutterBtn.disabled = true;
+  stopBrowserCamera();
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    cameraCaptureStatus.textContent = "このブラウザではカメラを直接使用できません。「保存フォルダから選択」を使用してください。";
+    return;
+  }
+
+  try {
+    activeCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+    cameraCaptureVideo.srcObject = activeCameraStream;
+    await cameraCaptureVideo.play();
+    cameraCaptureShutterBtn.disabled = false;
+    cameraCaptureStatus.textContent = "映像を確認して「撮影して追加」を押してください。続けて複数枚撮影できます。";
+  } catch (_error) {
+    stopBrowserCamera();
+    cameraCaptureStatus.textContent = "カメラを使用できません。ブラウザのサイト設定で、このページのカメラを「許可」にしてください。";
+  }
+}
+
+function cameraFrameToFile() {
+  return new Promise((resolve, reject) => {
+    if (!cameraCaptureVideo?.videoWidth || !cameraCaptureVideo?.videoHeight) {
+      reject(new Error("Camera image unavailable"));
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = cameraCaptureVideo.videoWidth;
+    canvas.height = cameraCaptureVideo.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      reject(new Error("Canvas context unavailable"));
+      return;
+    }
+    context.drawImage(cameraCaptureVideo, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Camera capture failed"));
+        return;
+      }
+      const name = `camera-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`;
+      resolve(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
+    }, "image/jpeg", 0.9);
+  });
+}
+
+sectionDiagramCameraBtn?.addEventListener("click", () => openBrowserCamera("sectionDiagram"));
+photoCameraBtn?.addEventListener("click", () => openBrowserCamera("photo"));
+cameraCaptureCloseBtn?.addEventListener("click", closeBrowserCamera);
+cameraCaptureCancelBtn?.addEventListener("click", closeBrowserCamera);
+cameraCaptureModal?.addEventListener("click", (event) => {
+  if (event.target === cameraCaptureModal) {
+    closeBrowserCamera();
+  }
+});
+cameraCaptureShutterBtn?.addEventListener("click", async () => {
+  cameraCaptureShutterBtn.disabled = true;
+  cameraCaptureStatus.textContent = "撮影した画像を追加しています。";
+  try {
+    const file = await cameraFrameToFile();
+    if (activeCameraDestination === "sectionDiagram") {
+      await addSectionDiagramsFromFiles([file]);
+    } else {
+      await addPhotosFromFiles([file]);
+    }
+    cameraCaptureStatus.textContent = "撮影画像を追加しました。続けて撮影できます。";
+  } catch (_error) {
+    cameraCaptureStatus.textContent = "撮影に失敗しました。カメラ映像が表示されていることを確認してください。";
+  } finally {
+    cameraCaptureShutterBtn.disabled = !activeCameraStream;
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !cameraCaptureModal?.classList.contains("hidden")) {
+    closeBrowserCamera();
+  }
+});
+window.addEventListener("pagehide", stopBrowserCamera);
 
 function setActiveTab(tabId) {
   const previousTabId = getActiveTabId();

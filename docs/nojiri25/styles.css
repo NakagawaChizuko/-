@@ -2229,6 +2229,72 @@ select.saved-carry-value {
   border-color: var(--line);
 }
 
+button.upload-picker-label {
+  width: auto;
+  font: inherit;
+}
+
+.camera-capture-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: rgb(15 23 42 / 72%);
+}
+
+.camera-capture-dialog {
+  width: min(94vw, 760px);
+  max-height: 94vh;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgb(2 6 23 / 38%);
+}
+
+.camera-capture-header,
+.camera-capture-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.camera-capture-header h3 {
+  margin: 0;
+}
+
+#camera-capture-close-btn {
+  width: auto;
+  padding: 6px 11px;
+}
+
+#camera-capture-video {
+  display: block;
+  width: 100%;
+  max-height: 68vh;
+  margin-top: 10px;
+  border-radius: 10px;
+  background: #111827;
+  object-fit: contain;
+}
+
+#camera-capture-status {
+  margin: 10px 0;
+}
+
+.camera-capture-actions {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.camera-capture-modal.hidden {
+  display: none;
+}
+
 .upload-file-input {
   display: none;
 }

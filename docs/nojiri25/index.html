@@ -528,7 +528,7 @@
             <h3>産出状況断面図添付</h3>
             <p class="hint-text">産出状況断面図を追加します。</p>
             <div class="upload-picker-row">
-              <label class="upload-picker-label" for="section-diagram-camera-input">カメラで撮影</label>
+              <button id="section-diagram-camera-btn" class="upload-picker-label" type="button">カメラで撮影</button>
               <label class="upload-picker-label secondary" for="section-diagram-input">保存フォルダから選択</label>
             </div>
             <input id="section-diagram-camera-input" class="upload-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" capture="environment" multiple />
@@ -555,7 +555,7 @@
             <h3>写真添付</h3>
             <p class="hint-text">この記録に紐づける写真を追加します。</p>
             <div class="upload-picker-row">
-              <label class="upload-picker-label" for="photo-camera-input">カメラで撮影</label>
+              <button id="photo-camera-btn" class="upload-picker-label" type="button">カメラで撮影</button>
               <label class="upload-picker-label secondary" for="photo-input">保存フォルダから選択</label>
             </div>
             <input id="photo-camera-input" class="upload-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" capture="environment" multiple />
@@ -1012,6 +1012,21 @@
       </div>
     </div>
 
+    <div id="camera-capture-modal" class="camera-capture-modal hidden" role="dialog" aria-modal="true" aria-labelledby="camera-capture-title">
+      <div class="camera-capture-dialog">
+        <div class="camera-capture-header">
+          <h3 id="camera-capture-title">カメラで撮影</h3>
+          <button id="camera-capture-close-btn" type="button" aria-label="カメラを閉じる">×</button>
+        </div>
+        <video id="camera-capture-video" autoplay muted playsinline></video>
+        <p id="camera-capture-status" class="hint-text">カメラを準備しています。許可の確認が表示されたら「許可」を選んでください。</p>
+        <div class="camera-capture-actions">
+          <button id="camera-capture-shutter-btn" type="button" disabled>撮影して追加</button>
+          <button id="camera-capture-cancel-btn" class="secondary" type="button">閉じる</button>
+        </div>
+      </div>
+    </div>
+
     <div id="cell-edit-modal" class="cell-edit-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cell-edit-title">
       <div class="cell-edit-dialog">
         <div class="cell-edit-header">
@@ -1034,6 +1049,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260806-halfwidth-alphanumeric2"></script>
+    <script src="./app.js?v=20260806-pc-camera1"></script>
   </body>
 </html>
