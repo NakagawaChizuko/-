@@ -13,6 +13,44 @@ const TEAM_ROSTER_TEAM_COL = 45;
 const TEAM_ROSTER_ROLE_COL = 49;
 const TEAM_ROSTER_NAME_COL = 3;
 const DEFAULT_SPECIMEN_PREFIX = "m";
+
+function normalizeAlphanumericWidth(inputText) {
+  return String(inputText)
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/－/g, "-");
+}
+
+function normalizeTypedAlphanumericWidth(event) {
+  if (event.isComposing) {
+    return;
+  }
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+    return;
+  }
+  if (target instanceof HTMLInputElement && ["file", "checkbox", "radio", "date", "time", "color", "range", "button", "submit", "reset", "hidden"].includes(target.type)) {
+    return;
+  }
+  const normalized = normalizeAlphanumericWidth(target.value);
+  if (normalized === target.value) {
+    return;
+  }
+  const selectionStart = target.selectionStart;
+  const selectionEnd = target.selectionEnd;
+  target.value = normalized;
+  if (selectionStart != null && selectionEnd != null) {
+    try {
+      target.setSelectionRange(selectionStart, selectionEnd);
+    } catch (_error) {
+      // number inputなど、選択範囲を設定できない入力欄では値の変換だけを行う。
+    }
+  }
+}
+
+document.addEventListener("input", normalizeTypedAlphanumericWidth, true);
+document.addEventListener("change", normalizeTypedAlphanumericWidth, true);
+document.addEventListener("compositionend", normalizeTypedAlphanumericWidth, true);
+
 const SPECIMEN_CATEGORY_MAP = {
   m: "哺乳類",
   b: "植物",

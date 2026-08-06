@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v38-input-output-label";
+const CACHE_NAME = "kaseki25-pwa-v40-halfwidth-alphanumeric-hyphen";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
