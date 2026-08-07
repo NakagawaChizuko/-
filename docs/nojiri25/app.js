@@ -11573,7 +11573,8 @@ function incrementGridNo(noRaw, step) {
   return String(Number(raw) + step);
 }
 
-function buildPlanLegendHtml() {
+function buildPlanLegendHtml(options = {}) {
+  const includeTotalStation = options.includeTotalStation !== false;
   const order = ["m", "b", "l", "s", "i", "g", "h", "a"];
   const specimenLegend = order
     .map((prefix) => {
@@ -11582,7 +11583,10 @@ function buildPlanLegendHtml() {
       return `<span class="plan-legend-item"><span class="plan-legend-dot" style="background:${color}"></span>${prefix}: ${label}</span>`;
     })
     .join("");
-  return `${specimenLegend}<span class="plan-legend-item"><span class="plan-legend-dot" style="background:#0067c5"></span>TS: トータルステーション設置位置</span>`;
+  const totalStationLegend = includeTotalStation
+    ? '<span class="plan-legend-item"><span class="plan-legend-dot" style="background:#0067c5"></span>TS: トータルステーション設置位置</span>'
+    : "";
+  return `${specimenLegend}${totalStationLegend}`;
 }
 
 function getSpecimenPrefixColor(prefixRaw) {
@@ -13777,7 +13781,7 @@ function buildPlanPdfHtml(groups) {
           <div class="pdf-plan-wrap">
             ${mapSvg}
           </div>
-          <div class="pdf-plan-legend">${buildPlanLegendHtml()}</div>
+          <div class="pdf-plan-legend">${buildPlanLegendHtml({ includeTotalStation: false })}</div>
           ${recordTable}
         </section>
       `;
@@ -14007,6 +14011,8 @@ function buildPdfPrintStyles(pageSizeRaw) {
       color: #111827;
       font-size: 11px;
       line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .pdf-page {
       width: 100%;
@@ -14182,6 +14188,8 @@ function buildPdfPrintStyles(pageSizeRaw) {
       border-radius: 50%;
       border: 1px solid rgba(0, 0, 0, 0.25);
       display: inline-block;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .pdf-plan-records {
       margin-top: 8px;
