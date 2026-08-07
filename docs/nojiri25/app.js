@@ -13817,7 +13817,8 @@ function buildPlanPdfRecordTable(recordsRaw) {
   if (!records.length) return "";
   const rows = records
     .map((record, index) => {
-      return `<tr>
+      const importantClass = normalizeHasFlag(record?.importantFlag) === "有" ? " pdf-plan-record-important" : "";
+      return `<tr class="${importantClass.trim()}">
         <td>${escapeHtml(record.specimenNo || `（${index + 1}）`)}</td>
         <td>${escapeHtml(record.nameMemo || "-")}</td>
       </tr>`;
@@ -14227,6 +14228,14 @@ function buildPdfPrintStyles(pageSizeRaw) {
     }
     .pdf-plan-record-table th:nth-child(1), .pdf-plan-record-table td:nth-child(1) { width: 28%; }
     .pdf-plan-record-table th:nth-child(2), .pdf-plan-record-table td:nth-child(2) { width: 72%; }
+    .pdf-plan-record-table tr.pdf-plan-record-important td {
+      text-decoration-line: underline;
+      text-decoration-color: #dc2626;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   `;
 }
 

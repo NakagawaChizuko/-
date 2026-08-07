@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v51-plan-pdf-team";
+const CACHE_NAME = "kaseki25-pwa-v52-plan-pdf-important";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
