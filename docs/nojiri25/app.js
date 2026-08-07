@@ -1384,7 +1384,9 @@ function bindEvents() {
   });
   if (recordNewBtn) {
     recordNewBtn.addEventListener("click", () => {
-      const shouldClear = window.confirm("詳細データは全て消去されます。よろしいですか？");
+      const shouldClear = window.confirm(
+        "現在入力している詳細情報は消去されます。\n新規入力を始める場合は「OK」を押してください。"
+      );
       if (!shouldClear) {
         return;
       }
