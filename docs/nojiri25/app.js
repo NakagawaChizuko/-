@@ -2207,12 +2207,7 @@ async function addModels3dFromFiles(fileList) {
       showToast(`${fileName} は対応形式ではありません`);
       continue;
     }
-    if (Number(file.size) > 100 * 1024 * 1024) {
-      showToast(`${fileName} は100MBを超えるため添付できません`);
-      continue;
-    }
     try {
-      const dataBase64 = await readFileAsDataUrl(file);
       const model = {
         id: newId("model3d"),
         fileName,
@@ -2220,12 +2215,11 @@ async function addModels3dFromFiles(fileList) {
         mimeType: value(file.type) || getModel3dMimeType(extension),
         size: Number(file.size) || 0,
         createdAt: nowIso(),
-        dataBase64,
       };
-      await putModel3dData(model);
+      await putModel3dFile(model, file);
       currentModels3d.push(model);
     } catch (_error) {
-      showToast(`${fileName} の添付に失敗しました`);
+      showToast(`${fileName} を端末へ保存できませんでした。空き容量を確認してください`);
     }
   }
   renderModel3dList();
@@ -2324,10 +2318,11 @@ async function buildJsonExportState() {
     record.models3d = await Promise.all(
       models.map(async (metadata) => {
         const stored = metadata.dataBase64 ? metadata : await getModel3dData(metadata.id);
-        if (!stored?.dataBase64) {
+        const dataBase64 = stored?.dataBase64 || (stored?.blob instanceof Blob ? await readBlobAsDataUrl(stored.blob) : "");
+        if (!dataBase64) {
           throw new Error(`3D data missing: ${metadata.fileName || metadata.id}`);
         }
-        return { ...metadata, dataBase64: stored.dataBase64 };
+        return { ...metadata, dataBase64 };
       })
     );
   }
@@ -12366,6 +12361,14 @@ async function putModel3dData(modelRaw) {
   return true;
 }
 
+async function putModel3dFile(modelRaw, fileRaw) {
+  const model = model3dMetadata([modelRaw])[0];
+  const blob = fileRaw instanceof Blob ? fileRaw : null;
+  if (!model?.id || !blob) return false;
+  await durableDbPut(DURABLE_MODEL_STORE, { ...model, blob });
+  return true;
+}
+
 async function getModel3dData(modelIdRaw) {
   const modelId = value(modelIdRaw);
   if (!modelId) return null;
@@ -16041,6 +16044,19 @@ function readFileAsDataUrl(file) {
     };
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(sourceFile);
+  });
+}
+
+function readBlobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    if (!(blob instanceof Blob)) {
+      reject(new Error("Invalid blob"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read blob"));
+    reader.readAsDataURL(blob);
   });
 }
 
