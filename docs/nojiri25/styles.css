@@ -643,6 +643,7 @@ main {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
   margin-top: -2px;
 }
 
@@ -659,6 +660,25 @@ main {
 #position-preview-btn:hover {
   background: #c2410c;
   border-color: #9a3412;
+}
+
+.record-save-shortcut-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 4px;
+}
+
+.record-save-shortcut {
+  width: auto;
+  background: #d97706;
+  border-color: #d97706;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.record-save-shortcut:hover {
+  background: #b45309;
+  border-color: #b45309;
 }
 
 .position-preview-modal {

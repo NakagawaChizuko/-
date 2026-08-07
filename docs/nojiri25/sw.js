@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v46-layer-color-lithology";
+const CACHE_NAME = "kaseki25-pwa-v47-save-shortcuts";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
