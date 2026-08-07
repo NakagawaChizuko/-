@@ -5327,13 +5327,15 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
   const kuwaku = normalizeKuwakuText(value(preferredKuwaku) || value(record.kuwaku) || getRecordKuwaku(record));
   const teamState = normalizeTeamState(value(record.team), value(record.teamOther));
   const nowIsoValue = nowIso();
+  const initialPrefix = DEFAULT_SPECIMEN_PREFIX;
+  const initialSerial = findSmallestUnusedSpecimenSerial(kuwaku, initialPrefix, "");
   const insertedBase = {
     id: newId("record"),
     kuwaku,
-    specimenPrefix: DEFAULT_SPECIMEN_PREFIX,
-    specimenSerial: "",
-    specimenNo: "",
-    category: categoryFromPrefix(DEFAULT_SPECIMEN_PREFIX),
+    specimenPrefix: initialPrefix,
+    specimenSerial: initialSerial,
+    specimenNo: buildSpecimenNo(initialPrefix, initialSerial),
+    category: categoryFromPrefix(initialPrefix),
     analysisType: "",
     levelHeight: "",
     date: value(record.date),
@@ -5442,7 +5444,7 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
   renderOutputs();
   const insertedIndex = state.records.findIndex((item) => item === insertedRecord);
   window.requestAnimationFrame(() => {
-    openOutputCellEditModal(insertedRecord.id, "specimenNo", String(insertedIndex >= 0 ? insertedIndex : ""));
+    openOutputCellEditModal(insertedRecord.id, "category", String(insertedIndex >= 0 ? insertedIndex : ""));
   });
 }
 
@@ -6889,8 +6891,15 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
           </select>
         </label>
         <label>
-          <span class="label-title">標本番号</span>
-          <input name="specimenNo" type="text" value="${escapeHtml(parsedSpecimen.specimenNo)}" placeholder="例: ${specimenPrefix}-1" data-cell-edit-specimen-no />
+          <span class="label-title">番号</span>
+          <div class="specimen-number-row">
+            <span data-cell-edit-prefix-label class="specimen-prefix-chip">${escapeHtml(specimenPrefix)}</span>
+            <span>-</span>
+            <input name="specimenSerial" type="text" inputmode="numeric" value="${escapeHtml(
+              parsedSpecimen.serial
+            )}" placeholder="例: 1" data-cell-edit-specimen-serial />
+          </div>
+          <span class="hint-text">この区画・分類で未使用の最小番号を自動入力しています。変更もできます。</span>
         </label>
         <label data-cell-edit-analysis-row class="${analysisHiddenClass}">
           <span class="label-title">分析用試料の区分</span>
@@ -7062,23 +7071,23 @@ function bindOutputCellEditDynamicFields(editKey) {
   if (editKey === "category") {
     const prefixSelect = cellEditFields.querySelector("[data-cell-edit-prefix-select]");
     const analysisRow = cellEditFields.querySelector("[data-cell-edit-analysis-row]");
-    const specimenNoInput = cellEditFields.querySelector("[data-cell-edit-specimen-no]");
+    const specimenSerialInput = cellEditFields.querySelector("[data-cell-edit-specimen-serial]");
+    const prefixLabel = cellEditFields.querySelector("[data-cell-edit-prefix-label]");
     if (prefixSelect instanceof HTMLSelectElement && analysisRow instanceof HTMLElement) {
-      const toggle = () => {
+      const toggle = (useAutoSerial = false) => {
         const prefix = normalizeSpecimenPrefix(prefixSelect.value);
         analysisRow.classList.toggle("hidden", prefix !== "a");
-        if (specimenNoInput instanceof HTMLInputElement) {
-          const parsed = parseSpecimenNo(specimenNoInput.value, prefix, "");
-          let serial = compactNoSpaceValue(parsed.serial);
-          if (!serial || normalizeSpecimenPrefix(parsed.prefix) !== prefix) {
-            serial = findSmallestUnusedSpecimenSerialForActiveEdit(prefix);
+        if (prefixLabel instanceof HTMLElement) {
+          prefixLabel.textContent = prefix;
+        }
+        if (specimenSerialInput instanceof HTMLInputElement) {
+          if (useAutoSerial || !compactNoSpaceValue(specimenSerialInput.value)) {
+            specimenSerialInput.value = findSmallestUnusedSpecimenSerialForActiveEdit(prefix);
           }
-          specimenNoInput.value = buildSpecimenNo(prefix, serial);
-          specimenNoInput.placeholder = `例: ${prefix}-${serial || "1"}`;
         }
       };
-      prefixSelect.addEventListener("change", toggle);
-      toggle();
+      prefixSelect.addEventListener("change", () => toggle(true));
+      toggle(false);
     }
   }
   if (editKey === "altitudeM") {
@@ -7195,15 +7204,12 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
   }
   if (editKey === "category") {
     const nextPrefix = normalizeSpecimenPrefix(formData.get("specimenPrefix"));
-    const currentSpecimen = parseSpecimenNo(formData.get("specimenNo"), nextPrefix, "");
-    const nextSerial = compactNoSpaceValue(currentSpecimen.serial) || findSmallestUnusedSpecimenSerial(getRecordKuwaku(record), nextPrefix, record.id);
+    const nextSerial = compactNoSpaceValue(formData.get("specimenSerial"));
     if (!nextSerial) {
-      record.specimenPrefix = nextPrefix;
-      record.specimenSerial = "";
-      record.specimenNo = "";
-      record.category = categoryFromPrefix(nextPrefix);
-      record.analysisType = nextPrefix === "a" ? normalizeAnalysisType(formData.get("analysisType")) : "";
-      return { ok: true };
+      return { ok: false, message: "番号を入力してください" };
+    }
+    if (!/^\d+$/.test(nextSerial)) {
+      return { ok: false, message: "番号は半角数字で入力してください" };
     }
     const nextSpecimenNo = buildSpecimenNo(nextPrefix, nextSerial);
     const duplicate = findDuplicateRecordByKuwakuAndSpecimen(getRecordKuwaku(record), nextSpecimenNo, record.id);
