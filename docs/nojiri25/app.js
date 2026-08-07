@@ -830,6 +830,7 @@ function bindEvents() {
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
+  bindLayerChoiceSelects();
   if (customLargeImageFileInput) {
     customLargeImageFileInput.addEventListener("change", async (event) => {
       const input = event.target;
@@ -2148,6 +2149,34 @@ function stopBrowserCamera() {
   if (cameraCaptureShutterBtn) {
     cameraCaptureShutterBtn.disabled = true;
   }
+}
+
+function bindLayerChoiceSelects() {
+  document.querySelectorAll("select[data-layer-choice-target]").forEach((select) => {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const input = recordForm?.elements?.namedItem(value(select.dataset.layerChoiceTarget));
+    if (!(input instanceof HTMLInputElement)) return;
+    select.addEventListener("change", () => {
+      if (!value(select.value)) return;
+      input.value = select.value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    input.addEventListener("input", () => {
+      const hasMatchingOption = Array.from(select.options).some((option) => option.value === input.value);
+      select.value = hasMatchingOption ? input.value : "";
+    });
+  });
+  syncLayerChoiceSelects();
+}
+
+function syncLayerChoiceSelects() {
+  document.querySelectorAll("select[data-layer-choice-target]").forEach((select) => {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const input = recordForm?.elements?.namedItem(value(select.dataset.layerChoiceTarget));
+    if (!(input instanceof HTMLInputElement)) return;
+    const hasMatchingOption = Array.from(select.options).some((option) => option.value === input.value);
+    select.value = hasMatchingOption ? input.value : "";
+  });
 }
 
 function closeBrowserCamera() {
@@ -4175,6 +4204,7 @@ function applyCarryForwardFields(saved) {
   recordForm.elements.layerRef.value = value(saved?.layerRef);
   recordForm.elements.layerFromCm.value = value(saved?.layerFromCm);
   recordForm.elements.layerRelative.value = value(saved?.layerRelative);
+  syncLayerChoiceSelects();
   syncDirectionTabsFromForm();
 }
 
@@ -4918,6 +4948,7 @@ function populateRecordForm(record) {
   recordForm.elements.layerColor.value = getLayerColor(record);
   recordForm.elements.layerLithology.value = getLayerLithology(record);
   recordForm.elements.layerFacies.value = composeLayerFacies(getLayerColor(record), getLayerLithology(record));
+  syncLayerChoiceSelects();
   if (recordForm.elements.rectSide1Cm) {
     recordForm.elements.rectSide1Cm.value = record.rectSide1Cm || "";
   }

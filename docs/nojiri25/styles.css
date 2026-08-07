@@ -1293,6 +1293,23 @@ main {
   padding: 6px 8px;
 }
 
+.compact-input-group select,
+.layer-choice-stack select {
+  width: 100%;
+  min-width: 0;
+}
+
+.layer-choice-stack {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.layer-choice-stack input {
+  width: 100%;
+  min-width: 0;
+}
+
 .compact-input-group.no-caption {
   gap: 0;
 }

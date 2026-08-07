@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260807-save-shortcuts1" />
+    <link rel="stylesheet" href="./styles.css?v=20260807-mobile-layer-select1" />
   </head>
   <body>
     <header class="app-header">
@@ -504,36 +504,41 @@
                 <input class="detail-sub-input" name="detailSub" type="text" placeholder="上，下など" aria-label="細分" />
               </label>
               <label class="compact-input-group"><span class="label-title">色</span>
-                <input name="layerColor" type="text" list="layer-color-options" placeholder="選択または手入力" />
+                <select id="layer-color-select" data-layer-choice-target="layerColor">
+                  <option value="">候補から選択</option>
+                  <option value="黒色">黒色</option><option value="暗灰色">暗灰色</option><option value="灰色">灰色</option>
+                  <option value="暗灰褐色">暗灰褐色</option><option value="灰褐色">灰褐色</option><option value="褐色">褐色</option>
+                  <option value="明褐色">明褐色</option><option value="茶褐色">茶褐色</option><option value="黄褐色">黄褐色</option>
+                  <option value="緑灰色">緑灰色</option><option value="青灰色">青灰色</option><option value="紫灰色">紫灰色</option>
+                </select>
+                <input name="layerColor" type="text" placeholder="手入力もできます" />
               </label>
               <label class="compact-input-group"><span class="label-title">岩相</span>
-                <input name="layerLithology" type="text" list="layer-lithology-options" placeholder="選択または手入力" />
+                <select id="layer-lithology-select" data-layer-choice-target="layerLithology">
+                  <option value="">候補から選択</option>
+                  <option value="礫">礫</option><option value="砂礫">砂礫</option><option value="極粗粒砂">極粗粒砂</option>
+                  <option value="粗粒砂">粗粒砂</option><option value="中粒砂">中粒砂</option><option value="細粒砂">細粒砂</option>
+                  <option value="極細粒砂">極細粒砂</option><option value="シルト">シルト</option><option value="粘土">粘土</option>
+                </select>
+                <input name="layerLithology" type="text" placeholder="手入力もできます" />
               </label>
               <input name="layerFacies" type="hidden" />
             </div>
-            <datalist id="layer-color-options">
-              <option value="黒色"></option><option value="暗灰色"></option><option value="灰色"></option>
-              <option value="暗灰褐色"></option><option value="灰褐色"></option><option value="褐色"></option>
-              <option value="明褐色"></option><option value="茶褐色"></option><option value="黄褐色"></option>
-              <option value="緑灰色"></option><option value="青灰色"></option><option value="紫灰色"></option>
-            </datalist>
-            <datalist id="layer-lithology-options">
-              <option value="礫"></option><option value="砂礫"></option><option value="極粗粒砂"></option>
-              <option value="粗粒砂"></option><option value="中粒砂"></option><option value="細粒砂"></option>
-              <option value="極細粒砂"></option><option value="シルト"></option><option value="粘土"></option>
-            </datalist>
             <fieldset class="inline-fieldset span-2">
               <legend>地層中の位置<span class="required">*</span></legend>
               <div class="layer-position-row top">
-                <input name="layerRef" type="text" list="layer-reference-options" placeholder="選択または手入力" />
+                <div class="layer-choice-stack">
+                  <select id="layer-reference-select" data-layer-choice-target="layerRef">
+                    <option value="">候補から選択</option>
+                    <option value="上Iピンク">上Iピンク</option><option value="赤スコ">赤スコ</option><option value="中IIピンク">中IIピンク</option>
+                    <option value="ニセノミ">ニセノミ</option><option value="中Iピンク">中Iピンク</option><option value="青ヒゲ">青ヒゲ</option>
+                    <option value="ヒゲスコ">ヒゲスコ</option><option value="ドライカレー">ドライカレー</option><option value="粉アズキ">粉アズキ</option>
+                    <option value="ブレッチャーゾーン">ブレッチャーゾーン</option><option value="黄ゴマ">黄ゴマ</option><option value="3点セット">3点セット</option>
+                  </select>
+                  <input name="layerRef" type="text" placeholder="手入力もできます" />
+                </div>
                 <span>から<span class="required">*</span></span>
               </div>
-              <datalist id="layer-reference-options">
-                <option value="上Iピンク"></option><option value="赤スコ"></option><option value="中IIピンク"></option>
-                <option value="ニセノミ"></option><option value="中Iピンク"></option><option value="青ヒゲ"></option>
-                <option value="ヒゲスコ"></option><option value="ドライカレー"></option><option value="粉アズキ"></option>
-                <option value="ブレッチャーゾーン"></option><option value="黄ゴマ"></option><option value="3点セット"></option>
-              </datalist>
               <div class="layer-position-row bottom">
                 <div class="dir-tabs" role="tablist" aria-label="地層中の位置（上/下）">
                   <button class="dir-tab" data-group="layerRelative" data-value="上" type="button">上</button>
@@ -1080,6 +1085,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260807-mirror-height1"></script>
+    <script src="./app.js?v=20260807-mobile-layer-select1"></script>
   </body>
 </html>
