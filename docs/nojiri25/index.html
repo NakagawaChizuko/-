@@ -502,16 +502,37 @@
               <label class="compact-input-group"><span class="label-title">細分</span>
                 <input class="detail-sub-input" name="detailSub" type="text" placeholder="上，下など" aria-label="細分" />
               </label>
-              <label class="compact-input-group layer-facies-group"><span class="label-title">層相</span>
-                <input class="layer-facies-input" name="layerFacies" type="text" placeholder="例：暗灰色中粒砂" aria-label="層相（自由表記）" />
+              <label class="compact-input-group"><span class="label-title">色</span>
+                <input name="layerColor" type="text" list="layer-color-options" placeholder="選択または手入力" />
               </label>
+              <label class="compact-input-group"><span class="label-title">岩相</span>
+                <input name="layerLithology" type="text" list="layer-lithology-options" placeholder="選択または手入力" />
+              </label>
+              <input name="layerFacies" type="hidden" />
             </div>
+            <datalist id="layer-color-options">
+              <option value="黒色"></option><option value="暗灰色"></option><option value="灰色"></option>
+              <option value="暗灰褐色"></option><option value="灰褐色"></option><option value="褐色"></option>
+              <option value="明褐色"></option><option value="茶褐色"></option><option value="黄褐色"></option>
+              <option value="緑灰色"></option><option value="青灰色"></option><option value="紫灰色"></option>
+            </datalist>
+            <datalist id="layer-lithology-options">
+              <option value="礫"></option><option value="砂礫"></option><option value="極粗粒砂"></option>
+              <option value="粗粒砂"></option><option value="中粒砂"></option><option value="細粒砂"></option>
+              <option value="極細粒砂"></option><option value="シルト"></option><option value="粘土"></option>
+            </datalist>
             <fieldset class="inline-fieldset span-2">
               <legend>地層中の位置<span class="required">*</span></legend>
               <div class="layer-position-row top">
-                <input name="layerRef" type="text" placeholder="層理面や鍵層名" />
+                <input name="layerRef" type="text" list="layer-reference-options" placeholder="選択または手入力" />
                 <span>から<span class="required">*</span></span>
               </div>
+              <datalist id="layer-reference-options">
+                <option value="上Iピンク"></option><option value="赤スコ"></option><option value="中IIピンク"></option>
+                <option value="ニセノミ"></option><option value="中Iピンク"></option><option value="青ヒゲ"></option>
+                <option value="ヒゲスコ"></option><option value="ドライカレー"></option><option value="粉アズキ"></option>
+                <option value="ブレッチャーゾーン"></option><option value="黄ゴマ"></option><option value="3点セット"></option>
+              </datalist>
               <div class="layer-position-row bottom">
                 <div class="dir-tabs" role="tablist" aria-label="地層中の位置（上/下）">
                   <button class="dir-tab" data-group="layerRelative" data-value="上" type="button">上</button>
@@ -550,7 +571,7 @@
               </label>
               <label class="section-diagram-check-item">
                 <input name="sectionDiagramLayerFaciesChecked" type="checkbox" />
-                <span>・産出した地層や上下の地層の層相を記入している（色，粒径，堆積構造，円磨度，淘汰など）</span>
+                <span>・産出した地層や上下の地層の色・岩相を記入している（色，粒径，堆積構造，円磨度，淘汰など）</span>
               </label>
             </div>
             <p class="checklist-warning">全てにチェックが入ると画像が保存できます</p>
@@ -1054,6 +1075,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260807-grid-edge-results1"></script>
+    <script src="./app.js?v=20260807-layer-color-lithology1"></script>
   </body>
 </html>

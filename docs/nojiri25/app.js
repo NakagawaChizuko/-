@@ -205,6 +205,8 @@ const REQUIRED_FIELD_LABELS = {
   layerName: "地層名",
   layerOther: "地層名（その他）",
   unit: "ユニット",
+  layerColor: "色",
+  layerLithology: "岩相",
   layerRef: "地層中の位置（層理面や鍵層名）",
   layerRelative: "地層中の位置（上/下）",
   layerFromCm: "地層中の位置（cm）",
@@ -216,7 +218,8 @@ const HISTORY_SNAPSHOT_FIELDS = [
   { key: "layerName", label: "地層名" },
   { key: "unit", label: "ユニット" },
   { key: "detail", label: "サブユニット" },
-  { key: "layerFacies", label: "層相" },
+  { key: "layerColor", label: "色" },
+  { key: "layerLithology", label: "岩相" },
   { key: "layerPosition", label: "地層中の位置" },
 ];
 const HISTORY_SNAPSHOT_FIELD_KEYS = new Set(HISTORY_SNAPSHOT_FIELDS.map((field) => field.key));
@@ -228,6 +231,29 @@ const PRESET_LAYER_NAMES = [
 ];
 const OTHER_LAYER_NAME = "4.その他";
 const DEFAULT_LAYER_NAME = "2.立が鼻砂部層";
+const LAYER_COLOR_OPTIONS = [
+  "黒色", "暗灰色", "灰色", "暗灰褐色", "灰褐色", "褐色",
+  "明褐色", "茶褐色", "黄褐色", "緑灰色", "青灰色", "紫灰色",
+];
+
+function getLayerColor(record) {
+  const explicit = value(record?.layerColor);
+  if (explicit) return explicit;
+  const legacy = value(record?.layerFacies);
+  return [...LAYER_COLOR_OPTIONS].sort((a, b) => b.length - a.length).find((color) => legacy.startsWith(color)) || "";
+}
+
+function getLayerLithology(record) {
+  const explicit = value(record?.layerLithology);
+  if (explicit) return explicit;
+  const legacy = value(record?.layerFacies);
+  const color = getLayerColor(record);
+  return color && legacy.startsWith(color) ? legacy.slice(color.length) : legacy;
+}
+
+function composeLayerFacies(colorRaw, lithologyRaw) {
+  return `${value(colorRaw)}${value(lithologyRaw)}`;
+}
 const LEGACY_LAYER_NAME_ALIASES = {
   "2.立が花砂部層": "2.立が鼻砂部層",
 };
@@ -1278,7 +1304,9 @@ function bindEvents() {
       layerName: getSelectedLayerName(),
       detail: compactNoSpaceValue(formData.get("detail")),
       detailSub: value(formData.get("detailSub")),
-      layerFacies: value(formData.get("layerFacies")),
+      layerColor: value(formData.get("layerColor")),
+      layerLithology: value(formData.get("layerLithology")),
+      layerFacies: composeLayerFacies(formData.get("layerColor"), formData.get("layerLithology")),
       layerRef: value(formData.get("layerRef")),
       layerFromCm: value(formData.get("layerFromCm")),
       layerRelative: value(formData.get("layerRelative")),
@@ -1335,6 +1363,8 @@ function bindEvents() {
       unit: record.unit,
       detail: record.detail,
       detailSub: record.detailSub,
+      layerColor: getLayerColor(record),
+      layerLithology: getLayerLithology(record),
       layerFacies: record.layerFacies,
       layerRef: record.layerRef,
       layerFromCm: record.layerFromCm,
@@ -4137,7 +4167,9 @@ function applyCarryForwardFields(saved) {
   syncUnitTabSelection();
   recordForm.elements.detail.value = value(saved?.detail);
   recordForm.elements.detailSub.value = value(saved?.detailSub);
-  recordForm.elements.layerFacies.value = value(saved?.layerFacies);
+  recordForm.elements.layerColor.value = getLayerColor(saved);
+  recordForm.elements.layerLithology.value = getLayerLithology(saved);
+  recordForm.elements.layerFacies.value = composeLayerFacies(getLayerColor(saved), getLayerLithology(saved));
   recordForm.elements.layerRef.value = value(saved?.layerRef);
   recordForm.elements.layerFromCm.value = value(saved?.layerFromCm);
   recordForm.elements.layerRelative.value = value(saved?.layerRelative);
@@ -4156,9 +4188,8 @@ function markCarryForwardSavedFields(saved) {
   if (value(saved?.detailSub)) {
     recordForm.elements.detailSub.classList.add("saved-carry-value");
   }
-  if (value(saved?.layerFacies)) {
-    recordForm.elements.layerFacies.classList.add("saved-carry-value");
-  }
+  if (getLayerColor(saved)) recordForm.elements.layerColor.classList.add("saved-carry-value");
+  if (getLayerLithology(saved)) recordForm.elements.layerLithology.classList.add("saved-carry-value");
   if (value(saved?.layerRef)) {
     recordForm.elements.layerRef.classList.add("saved-carry-value");
   }
@@ -4179,7 +4210,8 @@ function clearCarryForwardSavedFields() {
   recordForm.elements.unit.classList.remove("saved-carry-value");
   recordForm.elements.detail.classList.remove("saved-carry-value");
   recordForm.elements.detailSub.classList.remove("saved-carry-value");
-  recordForm.elements.layerFacies.classList.remove("saved-carry-value");
+  recordForm.elements.layerColor.classList.remove("saved-carry-value");
+  recordForm.elements.layerLithology.classList.remove("saved-carry-value");
   recordForm.elements.layerRef.classList.remove("saved-carry-value");
   recordForm.elements.layerFromCm.classList.remove("saved-carry-value");
   recordForm.elements.layerRelative.classList.remove("saved-carry-value");
@@ -4263,7 +4295,8 @@ function markOverwriteUpdatedState(previousRecord, nextRecord, previousKuwakuRaw
     "customLargeImageAspect",
     "detail",
     "detailSub",
-    "layerFacies",
+    "layerColor",
+    "layerLithology",
     "layerRef",
     "layerFromCm",
     "layerRelative",
@@ -4392,7 +4425,8 @@ function handleRecordFormFieldEdit(event) {
     (target.name === "unit" ||
       target.name === "detail" ||
       target.name === "detailSub" ||
-      target.name === "layerFacies" ||
+      target.name === "layerColor" ||
+      target.name === "layerLithology" ||
       target.name === "layerRef" ||
       target.name === "layerFromCm" ||
       target.name === "layerRelative");
@@ -4879,7 +4913,9 @@ function populateRecordForm(record) {
   setLayerFromValue(record.layerName);
   recordForm.elements.detail.value = record.detail || "";
   recordForm.elements.detailSub.value = record.detailSub || "";
-  recordForm.elements.layerFacies.value = record.layerFacies || "";
+  recordForm.elements.layerColor.value = getLayerColor(record);
+  recordForm.elements.layerLithology.value = getLayerLithology(record);
+  recordForm.elements.layerFacies.value = composeLayerFacies(getLayerColor(record), getLayerLithology(record));
   if (recordForm.elements.rectSide1Cm) {
     recordForm.elements.rectSide1Cm.value = record.rectSide1Cm || "";
   }
@@ -5139,7 +5175,9 @@ function buildCurrentEditDraftRecord() {
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
     detailSub: value(formData.get("detailSub")),
-    layerFacies: value(formData.get("layerFacies")),
+    layerColor: value(formData.get("layerColor")),
+    layerLithology: value(formData.get("layerLithology")),
+    layerFacies: composeLayerFacies(formData.get("layerColor"), formData.get("layerLithology")),
     layerRef: value(formData.get("layerRef")),
     layerRelative: value(formData.get("layerRelative")),
     layerFromCm: value(formData.get("layerFromCm")),
@@ -5379,6 +5417,8 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     layerName: DEFAULT_LAYER_NAME,
     detail: "",
     detailSub: "",
+    layerColor: "",
+    layerLithology: "",
     layerFacies: "",
     layerRef: "",
     layerFromCm: "",
@@ -7757,7 +7797,8 @@ function renderCardOutput() {
         <div><span>地層名</span><strong>${escapeHtml(selectedRecord.layerName || "")}</strong></div>
         <div><span>ユニット</span><strong>${escapeHtml(selectedRecord.unit || "")}</strong></div>
         <div><span>サブユニット</span><strong>${escapeHtml(formatDetailForRecord(selectedRecord))}</strong></div>
-        <div><span>層相</span><strong>${escapeHtml(selectedRecord.layerFacies || "")}</strong></div>
+        <div><span>色</span><strong>${escapeHtml(getLayerColor(selectedRecord))}</strong></div>
+        <div><span>岩相</span><strong>${escapeHtml(getLayerLithology(selectedRecord))}</strong></div>
         <div><span>地層中の位置</span><strong>${escapeHtml(formatLayerPosition(selectedRecord))}</strong></div>
         <div><span>発見者</span><strong>${escapeHtml(selectedRecord.discoverer || "")}</strong></div>
         <div><span>判定者</span><strong>${escapeHtml(selectedRecord.identifier || "")}</strong></div>
@@ -12099,6 +12140,8 @@ function normalizeState(candidate) {
         layerName: value(card.layerName),
         detail: value(card.detail),
         detailSub: value(card.detailSub),
+        layerColor: value(card.layerColor),
+        layerLithology: value(card.layerLithology),
         layerFacies: value(card.layerFacies),
         layerRef: value(card.layerRef) || value(card.layerPosition),
         layerFromCm: value(card.layerFromCm),
@@ -12258,7 +12301,9 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     layerName: normalizeLayerName(value(item.layerName)),
     detail: compactNoSpaceValue(item.detail),
     detailSub: value(item.detailSub),
-    layerFacies: value(item.layerFacies),
+    layerColor: value(item.layerColor) || getLayerColor(item),
+    layerLithology: value(item.layerLithology) || getLayerLithology(item),
+    layerFacies: value(item.layerFacies) || composeLayerFacies(item.layerColor, item.layerLithology),
     layerRef: value(item.layerRef) || value(item.layerPosition),
     layerFromCm: value(item.layerFromCm),
     layerRelative: value(item.layerRelative),
@@ -12330,7 +12375,8 @@ function createHistorySnapshot(record) {
     layerName: value(record?.layerName),
     unit: value(record?.unit),
     detail: formatDetailForRecord(record),
-    layerFacies: value(record?.layerFacies),
+    layerColor: getLayerColor(record),
+    layerLithology: getLayerLithology(record),
     layerPosition: formatLayerPosition(record),
   };
 }
@@ -13199,7 +13245,8 @@ function buildCardCsv() {
     "ユニット",
     "サブユニット",
     "細分",
-    "層相",
+    "色",
+    "岩相",
     "地層中の位置",
     "レベル読値",
     "平面位置",
@@ -13222,7 +13269,8 @@ function buildCardCsv() {
     record.unit,
     record.detail,
     record.detailSub,
-    record.layerFacies,
+    getLayerColor(record),
+    getLayerLithology(record),
     formatLayerPosition(record),
     formatLevelRead(record),
     formatPlanPosition(record),
@@ -13410,7 +13458,9 @@ function buildCardPdfHtml(records) {
               <tr><th>サブユニット</th><td>${escapeHtml(record.detail || "")}</td><th>細分</th><td>${escapeHtml(
                 record.detailSub || ""
               )}</td></tr>
-              <tr><th>層相</th><td colspan="3">${escapeHtml(record.layerFacies || "")}</td></tr>
+              <tr><th>色</th><td>${escapeHtml(getLayerColor(record))}</td><th>岩相</th><td>${escapeHtml(
+                getLayerLithology(record)
+              )}</td></tr>
               <tr><th>地層中の位置</th><td colspan="3">${escapeHtml(formatLayerPosition(record))}</td></tr>
               <tr><th>発見者氏名</th><td>${escapeHtml(record.discoverer || "")}</td><th>判定者氏名</th><td>${escapeHtml(
                 record.identifier || ""
