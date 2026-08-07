@@ -13768,14 +13768,22 @@ function buildPlanPdfHtml(groups) {
       const detailSubLabel =
         value(group.detailSubLabel) ||
         (group.detailSubValue === ALL_DETAIL_SUBS_VALUE ? "全細分" : detailSubLabelForSelect(group.detailSubValue));
+      const groupRecords = Array.isArray(group.records) ? group.records : [];
+      const teamLabel = collectPlanPdfRecordLabels(groupRecords, (record) => getRecordTeamValue(record));
+      const teamLeadLabel = collectPlanPdfRecordLabels(groupRecords, (record) => getRecordTeamLead(record));
+      const recorderLabel = collectPlanPdfRecordLabels(groupRecords, (record) => getRecordRecorder(record));
+      const memberLabel = collectPlanPdfRecordLabels(groupRecords, (record) => value(record?.discoverer));
       const mapSvg = buildPlanPdfMapSvg(group.drawables, kuwakuValue);
-      const recordTable = buildPlanPdfRecordTable(group.records);
+      const recordTable = buildPlanPdfRecordTable(groupRecords);
       return `
         <section class="pdf-page ${index < groups.length - 1 ? "pdf-page-break" : ""}">
           <header class="pdf-header">
             <h1>層準別平面図</h1>
             <div class="pdf-meta">
-              <span>区画: ${escapeHtml(kuwakuLabel)}</span>
+              <span>区画: ${escapeHtml(kuwakuLabel)}　発掘班: ${escapeHtml(teamLabel || "-")}</span>
+              <span>班長: ${escapeHtml(teamLeadLabel || "-")}</span>
+              <span>記載係: ${escapeHtml(recorderLabel || "-")}</span>
+              <span>班員: ${escapeHtml(memberLabel || "-")}</span>
               <span>出力モード: ${escapeHtml(value(group.modeLabel) || "-")}</span>
               <span>ユニット: ${escapeHtml(unitLabel)}</span>
               <span>サブユニット: ${escapeHtml(detailLabel)}</span>
@@ -13795,25 +13803,23 @@ function buildPlanPdfHtml(groups) {
     .join("");
 }
 
+function collectPlanPdfRecordLabels(recordsRaw, getter) {
+  const labels = new Set();
+  (Array.isArray(recordsRaw) ? recordsRaw : []).forEach((record) => {
+    const label = value(typeof getter === "function" ? getter(record) : "");
+    if (label) labels.add(label);
+  });
+  return Array.from(labels).join("、");
+}
+
 function buildPlanPdfRecordTable(recordsRaw) {
   const records = Array.isArray(recordsRaw) ? recordsRaw : [];
   if (!records.length) return "";
   const rows = records
     .map((record, index) => {
-      const complete = isRecordDataComplete(record);
       return `<tr>
-        <td>${index + 1}</td>
-        <td>${escapeHtml(getRecordKuwaku(record))}</td>
-        <td>${escapeHtml(getRecordTeamValue(record))}<br>${escapeHtml(getRecordDate(record))}</td>
-        <td class="${complete ? "pdf-status-complete" : "pdf-status-incomplete"}">${complete ? "○" : "未記入"}</td>
-        <td>${escapeHtml(record.specimenNo || "")}<br>${escapeHtml(formatCategoryForRecord(record))}</td>
-        <td>${escapeHtml(record.nameMemo || "")}<br>重要品: ${escapeHtml(record.importantFlag || "-")}</td>
-        <td>${escapeHtml(record.unit || "-")}<br>${escapeHtml(formatDetailForRecord(record) || "-")}</td>
-        <td>${escapeHtml(record.discoverer || "-")}<br>${escapeHtml(record.identifier || "-")}</td>
-        <td>${escapeHtml(formatLevelRead(record) || "-")}<br>${escapeHtml(formatRecordAltitudeM(record) || "-")} m</td>
-        <td>${escapeHtml(record.occurrenceSection || "-")}<br>${escapeHtml(record.occurrenceSketch || "-")}</td>
-        <td>${escapeHtml(formatPlanPosition(record) || "-")}</td>
-        <td>${escapeHtml(record.notes || "-")}</td>
+        <td>${escapeHtml(record.specimenNo || `（${index + 1}）`)}</td>
+        <td>${escapeHtml(record.nameMemo || "-")}</td>
       </tr>`;
     })
     .join("");
@@ -13821,9 +13827,7 @@ function buildPlanPdfRecordTable(recordsRaw) {
     <h2>表示している化石・遺物</h2>
     <table class="pdf-table pdf-plan-record-table">
       <thead><tr>
-        <th>No.</th><th>区画</th><th>発掘班<br>日付</th><th>データ</th><th>標本番号<br>分類</th><th>名称<br>重要品</th>
-        <th>ユニット<br>サブユニット</th><th>発見者<br>判定者</th><th>レベル読値<br>標高(m)</th>
-        <th>産出状況断面<br>産状スケッチ</th><th>平面位置</th><th>備考</th>
+        <th>標本番号</th><th>化石・遺物名</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -14208,8 +14212,8 @@ function buildPdfPrintStyles(pageSizeRaw) {
     .pdf-plan-record-table {
       table-layout: fixed;
       margin-top: 0;
-      font-size: 7px;
-      line-height: 1.25;
+      font-size: 10px;
+      line-height: 1.35;
       overflow-wrap: anywhere;
     }
     .pdf-plan-record-table thead {
@@ -14219,12 +14223,10 @@ function buildPdfPrintStyles(pageSizeRaw) {
       page-break-inside: avoid;
     }
     .pdf-plan-record-table th, .pdf-plan-record-table td {
-      padding: 2px 3px;
+      padding: 4px 6px;
     }
-    .pdf-plan-record-table th:nth-child(1), .pdf-plan-record-table td:nth-child(1) { width: 4%; }
-    .pdf-plan-record-table th:nth-child(2), .pdf-plan-record-table td:nth-child(2) { width: 8%; }
-    .pdf-plan-record-table th:nth-child(4), .pdf-plan-record-table td:nth-child(4) { width: 5%; }
-    .pdf-plan-record-table th:nth-child(11), .pdf-plan-record-table td:nth-child(11) { width: 13%; }
+    .pdf-plan-record-table th:nth-child(1), .pdf-plan-record-table td:nth-child(1) { width: 28%; }
+    .pdf-plan-record-table th:nth-child(2), .pdf-plan-record-table td:nth-child(2) { width: 72%; }
   `;
 }
 
