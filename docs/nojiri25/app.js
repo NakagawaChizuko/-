@@ -13568,14 +13568,15 @@ function buildPlanPdfGroupsForExport(filters = {}) {
     return [];
   }
   const categoryValue = value(filters.categoryValue) || EXPORT_CATEGORY_ALL_VALUE;
-  const scopedRecords = getRecordsByExportRangeFilters({
-    kuwakuValue,
+  const rangeRecords = getRecordsByExportRangeFilters({
+    kuwakuValue: ALL_GRIDS_VALUE,
     categoryValue,
     statusValue: "all",
     dateFromRaw: filters.dateFromRaw,
     dateToRaw: filters.dateToRaw,
   });
-  if (!scopedRecords.length) {
+  const scopedItems = buildPlanPdfItemsAroundGrid(rangeRecords, kuwakuValue);
+  if (!scopedItems.length) {
     return [];
   }
 
@@ -13590,12 +13591,8 @@ function buildPlanPdfGroupsForExport(filters = {}) {
       unitLabelForSelect(a).localeCompare(unitLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" })
     );
     selectedUnitValues.forEach((unitValue) => {
-      const records = filterPlanRecordsForMode(scopedRecords, { unitValues: [unitValue] });
-      if (!records.length) {
-        return;
-      }
-      const drawables = records.map((record) => buildPlanDrawable(record)).filter(Boolean);
-      if (!drawables.length) {
+      const items = scopedItems.filter((item) => unitValueForSelect(item.record.unit) === unitValue);
+      if (!items.length) {
         return;
       }
       groups.push({
@@ -13607,8 +13604,9 @@ function buildPlanPdfGroupsForExport(filters = {}) {
         unitLabel: unitLabelForSelect(unitValue),
         detailLabel: "-",
         detailSubLabel: "-",
-        drawables,
-        count: records.length,
+        drawables: items.map((item) => item.drawable),
+        records: items.map((item) => item.record),
+        count: items.length,
       });
     });
   }
@@ -13617,20 +13615,14 @@ function buildPlanPdfGroupsForExport(filters = {}) {
     const selectedUnitValue = value(detailSelection.unitValue);
     if (selectedUnitValue) {
       const selectedDetailValues = Array.from(normalizeSelectionSet(detailSelection.detailValues));
-      const unitRecords = filterPlanRecordsForMode(scopedRecords, {
-        unitValues: [selectedUnitValue],
-      });
+      const unitItems = scopedItems.filter((item) => unitValueForSelect(item.record.unit) === selectedUnitValue);
       selectedDetailValues
         .sort((a, b) =>
           detailLabelForSelect(a).localeCompare(detailLabelForSelect(b), "ja", { numeric: true, sensitivity: "base" })
         )
         .forEach((detailValue) => {
-          const records = filterPlanRecordsForMode(unitRecords, { detailValues: [detailValue] });
-          if (!records.length) {
-            return;
-          }
-          const drawables = records.map((record) => buildPlanDrawable(record)).filter(Boolean);
-          if (!drawables.length) {
+          const items = unitItems.filter((item) => detailValueForSelect(item.record.detail) === detailValue);
+          if (!items.length) {
             return;
           }
           groups.push({
@@ -13642,8 +13634,9 @@ function buildPlanPdfGroupsForExport(filters = {}) {
             unitLabel: unitLabelForSelect(selectedUnitValue),
             detailLabel: detailLabelForSelect(detailValue),
             detailSubLabel: "-",
-            drawables,
-            count: records.length,
+            drawables: items.map((item) => item.drawable),
+            records: items.map((item) => item.record),
+            count: items.length,
           });
         });
     }
@@ -13654,12 +13647,11 @@ function buildPlanPdfGroupsForExport(filters = {}) {
     const selectedDetailValue = value(detailSubSelection.detailValue);
     if (selectedUnitValue && selectedDetailValue) {
       const selectedDetailSubValues = Array.from(normalizeSelectionSet(detailSubSelection.detailSubValues));
-      const unitRecords = filterPlanRecordsForMode(scopedRecords, {
-        unitValues: [selectedUnitValue],
-      });
-      const detailRecords = filterPlanRecordsForMode(unitRecords, {
-        detailValues: [selectedDetailValue],
-      });
+      const detailItems = scopedItems.filter(
+        (item) =>
+          unitValueForSelect(item.record.unit) === selectedUnitValue &&
+          detailValueForSelect(item.record.detail) === selectedDetailValue
+      );
       selectedDetailSubValues
         .sort((a, b) =>
           detailSubLabelForSelect(a).localeCompare(detailSubLabelForSelect(b), "ja", {
@@ -13668,12 +13660,8 @@ function buildPlanPdfGroupsForExport(filters = {}) {
           })
         )
         .forEach((detailSubValue) => {
-          const records = filterPlanRecordsForMode(detailRecords, { detailSubValues: [detailSubValue] });
-          if (!records.length) {
-            return;
-          }
-          const drawables = records.map((record) => buildPlanDrawable(record)).filter(Boolean);
-          if (!drawables.length) {
+          const items = detailItems.filter((item) => detailSubValueForSelect(item.record.detailSub) === detailSubValue);
+          if (!items.length) {
             return;
           }
           groups.push({
@@ -13685,14 +13673,74 @@ function buildPlanPdfGroupsForExport(filters = {}) {
             unitLabel: unitLabelForSelect(selectedUnitValue),
             detailLabel: detailLabelForSelect(selectedDetailValue),
             detailSubLabel: detailSubLabelForSelect(detailSubValue),
-            drawables,
-            count: records.length,
+            drawables: items.map((item) => item.drawable),
+            records: items.map((item) => item.record),
+            count: items.length,
           });
         });
     }
   }
 
   return groups;
+}
+
+function buildPlanPdfItemsAroundGrid(recordsRaw, targetKuwakuRaw) {
+  const target = parseKuwaku(targetKuwakuRaw);
+  const targetBlockIndex = blockLabelToIndex(target.block);
+  const targetNo = Number(target.no);
+  if (!target.block || !Number.isFinite(targetNo)) {
+    return [];
+  }
+  const min = -100;
+  const max = PLAN_SIZE_CM + 100;
+  return (Array.isArray(recordsRaw) ? recordsRaw : [])
+    .map((record) => {
+      const recordGrid = parseKuwaku(getRecordKuwaku(record));
+      const recordNo = Number(recordGrid.no);
+      if (
+        recordGrid.headA !== target.headA ||
+        recordGrid.headB !== target.headB ||
+        !recordGrid.block ||
+        !Number.isFinite(recordNo)
+      ) {
+        return null;
+      }
+      const drawable = buildPlanDrawable(record);
+      if (!drawable || drawable.type === "totalStation") {
+        return null;
+      }
+      const offsetX = (blockLabelToIndex(recordGrid.block) - targetBlockIndex) * PLAN_SIZE_CM;
+      const offsetY = (recordNo - targetNo) * PLAN_SIZE_CM;
+      const translated = translatePlanDrawable(drawable, offsetX, offsetY);
+      const extent = getPlanDrawableExtent(translated);
+      if (!extent || extent.maxX < min || extent.minX > max || extent.maxY < min || extent.minY > max) {
+        return null;
+      }
+      return { record, drawable: translated };
+    })
+    .filter(Boolean);
+}
+
+function translatePlanDrawable(drawableRaw, offsetXRaw, offsetYRaw) {
+  const drawable = { ...drawableRaw };
+  const offsetX = Number(offsetXRaw) || 0;
+  const offsetY = Number(offsetYRaw) || 0;
+  ["x", "x1", "x2", "left"].forEach((key) => {
+    if (Number.isFinite(Number(drawable[key]))) drawable[key] = Number(drawable[key]) + offsetX;
+  });
+  ["y", "y1", "y2", "top"].forEach((key) => {
+    if (Number.isFinite(Number(drawable[key]))) drawable[key] = Number(drawable[key]) + offsetY;
+  });
+  ["points", "hull"].forEach((key) => {
+    if (Array.isArray(drawable[key])) {
+      drawable[key] = drawable[key].map((point) => ({
+        ...point,
+        x: Number(point.x) + offsetX,
+        y: Number(point.y) + offsetY,
+      }));
+    }
+  });
+  return drawable;
 }
 
 function buildPlanPdfHtml(groups) {
@@ -13711,6 +13759,7 @@ function buildPlanPdfHtml(groups) {
         value(group.detailSubLabel) ||
         (group.detailSubValue === ALL_DETAIL_SUBS_VALUE ? "全細分" : detailSubLabelForSelect(group.detailSubValue));
       const mapSvg = buildPlanPdfMapSvg(group.drawables, kuwakuValue);
+      const recordTable = buildPlanPdfRecordTable(group.records);
       return `
         <section class="pdf-page ${index < groups.length - 1 ? "pdf-page-break" : ""}">
           <header class="pdf-header">
@@ -13729,10 +13778,46 @@ function buildPlanPdfHtml(groups) {
             ${mapSvg}
           </div>
           <div class="pdf-plan-legend">${buildPlanLegendHtml()}</div>
+          ${recordTable}
         </section>
       `;
     })
     .join("");
+}
+
+function buildPlanPdfRecordTable(recordsRaw) {
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  if (!records.length) return "";
+  const rows = records
+    .map((record, index) => {
+      const complete = isRecordDataComplete(record);
+      return `<tr>
+        <td>${index + 1}</td>
+        <td>${escapeHtml(getRecordKuwaku(record))}</td>
+        <td>${escapeHtml(getRecordTeamValue(record))}<br>${escapeHtml(getRecordDate(record))}</td>
+        <td class="${complete ? "pdf-status-complete" : "pdf-status-incomplete"}">${complete ? "○" : "未記入"}</td>
+        <td>${escapeHtml(record.specimenNo || "")}<br>${escapeHtml(formatCategoryForRecord(record))}</td>
+        <td>${escapeHtml(record.nameMemo || "")}<br>重要品: ${escapeHtml(record.importantFlag || "-")}</td>
+        <td>${escapeHtml(record.unit || "-")}<br>${escapeHtml(formatDetailForRecord(record) || "-")}</td>
+        <td>${escapeHtml(record.discoverer || "-")}<br>${escapeHtml(record.identifier || "-")}</td>
+        <td>${escapeHtml(formatLevelRead(record) || "-")}<br>${escapeHtml(formatRecordAltitudeM(record) || "-")} m</td>
+        <td>${escapeHtml(record.occurrenceSection || "-")}<br>${escapeHtml(record.occurrenceSketch || "-")}</td>
+        <td>${escapeHtml(formatPlanPosition(record) || "-")}</td>
+        <td>${escapeHtml(record.notes || "-")}</td>
+      </tr>`;
+    })
+    .join("");
+  return `<section class="pdf-plan-records">
+    <h2>表示している化石・遺物</h2>
+    <table class="pdf-table pdf-plan-record-table">
+      <thead><tr>
+        <th>No.</th><th>区画</th><th>発掘班<br>日付</th><th>データ</th><th>標本番号<br>分類</th><th>名称<br>重要品</th>
+        <th>ユニット<br>サブユニット</th><th>発見者<br>判定者</th><th>レベル読値<br>標高(m)</th>
+        <th>産出状況断面<br>産状スケッチ</th><th>平面位置</th><th>備考</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>`;
 }
 
 function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
@@ -13742,8 +13827,11 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
   const horizontalGrid = [100, 200, 300]
     .map((y) => `<line class="pdf-plan-grid-line" x1="0" y1="${y}" x2="${PLAN_SIZE_CM}" y2="${y}" />`)
     .join("");
-  const pointsSvg = drawables.map((drawable, index) => renderPlanPdfDrawableSvg(drawable, index)).join("");
-  const viewBox = computePlanSvgViewBox(drawables);
+  const pointsSvg = drawables
+    .filter((drawable) => drawable?.type !== "totalStation")
+    .map((drawable, index) => renderPlanPdfDrawableSvg(drawable, index))
+    .join("");
+  const viewBox = { minX: -100, minY: -100, width: PLAN_SIZE_CM + 200, height: PLAN_SIZE_CM + 200 };
   const cornerLabels = buildPlanCornerLabels(kuwakuRaw);
 
   return `
@@ -13767,8 +13855,8 @@ function buildPlanPdfMapSvg(drawables, kuwakuRaw) {
 }
 
 function renderPlanPdfDrawableSvg(drawable, index = 0) {
-  const labelX = Math.min(PLAN_SIZE_CM - 2, drawable.x + 6);
-  const labelY = Math.max(8, drawable.y - 6);
+  const labelX = clamp(drawable.x + 6, -98, PLAN_SIZE_CM + 98);
+  const labelY = clamp(drawable.y - 6, -92, PLAN_SIZE_CM + 98);
   let shapeSvg = "";
   if (drawable.type === "line") {
     shapeSvg = `<line class="pdf-plan-shape-line" x1="${drawable.x1}" y1="${drawable.y1}" x2="${drawable.x2}" y2="${drawable.y2}" stroke="${drawable.color}" />`;
@@ -14019,7 +14107,7 @@ function buildPdfPrintStyles(pageSizeRaw) {
       width: 100%;
       height: 100%;
       display: block;
-      overflow: visible;
+      overflow: hidden;
     }
     .pdf-plan-svg .pdf-plan-frame {
       fill: #fff;
@@ -14066,10 +14154,10 @@ function buildPdfPrintStyles(pageSizeRaw) {
       border-radius: 4px;
       padding: 1px 5px;
     }
-    .pdf-plan-corner.top-left { top: 10mm; left: 10mm; }
-    .pdf-plan-corner.top-right { top: 10mm; right: 10mm; }
-    .pdf-plan-corner.bottom-left { bottom: 10mm; left: 10mm; }
-    .pdf-plan-corner.bottom-right { bottom: 10mm; right: 10mm; }
+    .pdf-plan-corner.top-left { top: 34mm; left: 34mm; }
+    .pdf-plan-corner.top-right { top: 34mm; right: 34mm; }
+    .pdf-plan-corner.bottom-left { bottom: 34mm; left: 34mm; }
+    .pdf-plan-corner.bottom-right { bottom: 34mm; right: 34mm; }
     .pdf-plan-legend {
       margin-top: 6px;
       display: flex;
@@ -14095,6 +14183,34 @@ function buildPdfPrintStyles(pageSizeRaw) {
       border: 1px solid rgba(0, 0, 0, 0.25);
       display: inline-block;
     }
+    .pdf-plan-records {
+      margin-top: 8px;
+      page-break-inside: auto;
+    }
+    .pdf-plan-records h2 {
+      margin: 0 0 4px;
+      font-size: 13px;
+    }
+    .pdf-plan-record-table {
+      table-layout: fixed;
+      margin-top: 0;
+      font-size: 7px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .pdf-plan-record-table thead {
+      display: table-header-group;
+    }
+    .pdf-plan-record-table tr {
+      page-break-inside: avoid;
+    }
+    .pdf-plan-record-table th, .pdf-plan-record-table td {
+      padding: 2px 3px;
+    }
+    .pdf-plan-record-table th:nth-child(1), .pdf-plan-record-table td:nth-child(1) { width: 4%; }
+    .pdf-plan-record-table th:nth-child(2), .pdf-plan-record-table td:nth-child(2) { width: 8%; }
+    .pdf-plan-record-table th:nth-child(4), .pdf-plan-record-table td:nth-child(4) { width: 5%; }
+    .pdf-plan-record-table th:nth-child(11), .pdf-plan-record-table td:nth-child(11) { width: 13%; }
   `;
 }
 
