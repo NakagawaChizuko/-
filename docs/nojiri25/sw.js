@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v53-new-input-warning";
+const CACHE_NAME = "kaseki25-pwa-v54-mirror-height";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

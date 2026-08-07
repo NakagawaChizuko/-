@@ -259,7 +259,7 @@
               <div class="ts-setup-grid">
                 <div class="ts-setup-row"><strong>設置点</strong><label>登録点から選択 <select id="ts-station-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsStationPeg" type="text" placeholder="例：Ⅰ-C-5" /></label><label>x <input name="tsStationXNorthM" type="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsStationYEastM" type="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsStationAltitudeM" type="text" /> m</label></div>
                 <div class="ts-setup-row"><strong>後視点（基準点）</strong><label>登録点から選択 <select id="ts-backsight-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsBacksightPeg" type="text" placeholder="例：Ⅰ-C-5" /></label><label>x <input name="tsBacksightXNorthM" type="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsBacksightYEastM" type="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsBacksightAltitudeM" type="text" /> m</label></div>
-                <div class="ts-setup-row"><strong>高さ</strong><label>機械高 <input name="tsInstrumentHeightM" type="text" /> m</label><label>目標高 <input name="tsTargetHeightM" type="text" /> m</label></div>
+                <div class="ts-setup-row"><strong>高さ</strong><label>機械高 <input name="tsInstrumentHeightM" type="text" /> m</label><label>ミラー高 <input name="tsTargetHeightM" type="text" /> m</label></div>
               </div>
               <p class="hint-text">設置点の杭名称を平面図の基準にします。後視点は、距離・傾斜・方向角入力の方向角0°を定める基準です。</p>
               <div class="ts-setup-save-row">
@@ -1080,6 +1080,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260807-new-input-warning1"></script>
+    <script src="./app.js?v=20260807-mirror-height1"></script>
   </body>
 </html>

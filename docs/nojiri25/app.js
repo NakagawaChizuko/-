@@ -161,7 +161,7 @@ const REQUIRED_FIELD_LABELS = {
   tsBacksightYEastM: "TS後視点y（西正）",
   tsBacksightAltitudeM: "TS後視点標高",
   tsInstrumentHeightM: "TS機械高",
-  tsTargetHeightM: "TS目標高",
+  tsTargetHeightM: "TSミラー高",
   tsObservationMode: "TS標本位置入力方法",
   tsPointXNorthM: "TS設置点から南への距離（南正）",
   tsPointYEastM: "TS設置点から西への距離",
@@ -15945,7 +15945,7 @@ function saveTotalStationSetup() {
     ["設置点x", setup.tsStationXNorthM], ["設置点y", setup.tsStationYEastM],
     ["設置点標高", setup.tsStationAltitudeM], ["後視点x", setup.tsBacksightXNorthM],
     ["後視点y", setup.tsBacksightYEastM], ["後視点標高", setup.tsBacksightAltitudeM],
-    ["機械高", setup.tsInstrumentHeightM], ["目標高", setup.tsTargetHeightM],
+    ["機械高", setup.tsInstrumentHeightM], ["ミラー高", setup.tsTargetHeightM],
   ];
   for (const [label, raw] of requiredNumbers) {
     if (parseTotalStationNumber(raw) == null) {
@@ -15985,7 +15985,7 @@ function getTotalStationInputError(requireAltitude = false) {
     ["設置点x", data.get("tsStationXNorthM")], ["設置点y", data.get("tsStationYEastM")],
     ["設置点標高", data.get("tsStationAltitudeM")], ["後視点x", data.get("tsBacksightXNorthM")],
     ["後視点y", data.get("tsBacksightYEastM")], ["後視点標高", data.get("tsBacksightAltitudeM")],
-    ["機械高", data.get("tsInstrumentHeightM")], ["目標高", data.get("tsTargetHeightM")],
+    ["機械高", data.get("tsInstrumentHeightM")], ["ミラー高", data.get("tsTargetHeightM")],
   ];
   for (const [label, raw] of requiredNumbers) {
     if (parseTotalStationNumber(raw) == null) {
