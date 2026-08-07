@@ -893,6 +893,12 @@ function bindEvents() {
     }
     input.addEventListener("input", updateDuplicateSpecimenWarning);
     input.addEventListener("change", updateDuplicateSpecimenWarning);
+    input.addEventListener("input", () => {
+      if (isTotalStationMeasurementSelected()) applyTotalStationPosition();
+    });
+    input.addEventListener("change", () => {
+      if (isTotalStationMeasurementSelected()) applyTotalStationPosition();
+    });
   });
   if (editTeamInput) {
     editTeamInput.addEventListener("change", () => {
@@ -936,9 +942,12 @@ function bindEvents() {
     multiPointAddBtn.addEventListener("click", () => {
       multiPointRows.append(createMultiPointRowElement(createDefaultPlanMultiPoint()));
       syncMultiPointRemoveButtonState();
+      updateMultiPointCalculationResults();
     });
   }
   if (multiPointRows) {
+    multiPointRows.addEventListener("input", updateMultiPointCalculationResults);
+    multiPointRows.addEventListener("change", updateMultiPointCalculationResults);
     multiPointRows.addEventListener("click", (event) => {
       const target = event.target;
       if (!(target instanceof Element)) {
@@ -958,6 +967,7 @@ function bindEvents() {
       }
       row.remove();
       syncMultiPointRemoveButtonState();
+      updateMultiPointCalculationResults();
     });
   }
 
@@ -3274,7 +3284,8 @@ function convertTotalStationMultiPointToPlanCoords(record, point) {
   const pointX = stationX + south;
   const pointY = stationY + west;
   const gridReference = findTotalStationGridReferencePoint(gridReferenceNameForKuwaku(getRecordKuwaku(record)));
-  const z = Number.isFinite(Number(point?.zAltitudeM)) ? Number(point.zAltitudeM) : null;
+  const zRaw = value(point?.zAltitudeM);
+  const z = zRaw && Number.isFinite(Number(zRaw)) ? Number(zRaw) : null;
   if (gridReference) {
     return {
       x: -(pointY - gridReference.y) * 100,
@@ -3475,6 +3486,13 @@ function createMultiPointRowElement(pointRaw = {}) {
   removeButton.textContent = "削除";
 
   row.append(firstLabel, secondLabel, thirdLabel, removeButton);
+  if (isTotalStation) {
+    const result = document.createElement("p");
+    result.className = "multi-point-calculation-result hint-text";
+    result.dataset.multiPointCalculationResult = "1";
+    result.textContent = "入力すると、北から・西からの距離を計算します。";
+    row.append(result);
+  }
   return row;
 }
 
@@ -3489,6 +3507,7 @@ function renderMultiPointRows(pointsRaw = []) {
     multiPointRows.append(createMultiPointRowElement(point));
   });
   syncMultiPointRemoveButtonState();
+  updateMultiPointCalculationResults();
 }
 
 function syncMultiPointCoordinateModeUi() {
@@ -3566,6 +3585,61 @@ function readMultiPointRowsFromForm() {
     };
   });
   return normalizePlanMultiPoints(points);
+}
+
+function readMultiPointRowFromElement(row) {
+  if (!(row instanceof Element)) return null;
+  const slopeField = row.querySelector("[data-multi-point-slope-distance-m]");
+  if (slopeField) {
+    return normalizePlanMultiPointEntry({
+      slopeDistanceM: value(slopeField.value),
+      inclinationDeg: value(row.querySelector("[data-multi-point-inclination-deg]")?.value),
+      inclinationMin: value(row.querySelector("[data-multi-point-inclination-min]")?.value),
+      inclinationSec: value(row.querySelector("[data-multi-point-inclination-sec]")?.value),
+      directionDeg: value(row.querySelector("[data-multi-point-direction-deg]")?.value),
+      directionMin: value(row.querySelector("[data-multi-point-direction-min]")?.value),
+      directionSec: value(row.querySelector("[data-multi-point-direction-sec]")?.value),
+      coordinateMode: "stationPolar",
+    });
+  }
+  const southField = row.querySelector("[data-multi-point-south-from-station-m]");
+  const westField = row.querySelector("[data-multi-point-west-from-station-m]");
+  if (southField || westField) {
+    return normalizePlanMultiPointEntry({
+      southFromStationM: value(southField?.value),
+      westFromStationM: value(westField?.value),
+      zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
+      coordinateMode: "stationOffsetSouthWest",
+    });
+  }
+  return null;
+}
+
+function formatGridEdgeCalculationResult(coord, { prefix = "計算結果：" } = {}) {
+  if (!coord || !Number.isFinite(Number(coord.x)) || !Number.isFinite(Number(coord.y))) return "";
+  const hasAltitude = coord.z !== null && coord.z !== undefined && coord.z !== "" && Number.isFinite(Number(coord.z));
+  const altitude = hasAltitude ? `、標高 ${Number(Number(coord.z).toFixed(4))} m` : "";
+  return `${prefix}北から ${formatLengthInputValue(coord.y)} cm、西から ${formatLengthInputValue(coord.x)} cm${altitude}`;
+}
+
+function updateMultiPointCalculationResults() {
+  if (!multiPointRows || !isTotalStationMeasurementSelected()) return;
+  const draftRecord = buildCurrentRecordDraftForPositionPreview();
+  if (!draftRecord) return;
+  const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
+  rows.forEach((row, index) => {
+    const resultEl = row.querySelector("[data-multi-point-calculation-result]");
+    if (!resultEl) return;
+    const point = readMultiPointRowFromElement(row);
+    const coord = point?.coordinateMode === "stationPolar"
+      ? convertTotalStationPolarMultiPointToPlanCoords(draftRecord, point)
+      : point?.coordinateMode === "stationOffsetSouthWest"
+        ? convertTotalStationMultiPointToPlanCoords(draftRecord, point)
+        : null;
+    const resultText = formatGridEdgeCalculationResult(coord, { prefix: `計算結果 ${index + 1}：` });
+    resultEl.textContent = resultText || `計算結果 ${index + 1}：入力値を確認してください。`;
+    resultEl.classList.toggle("total-station-result-ok", Boolean(resultText));
+  });
 }
 
 function collectPlanMultiPointCoords(record) {
@@ -7559,15 +7633,8 @@ function formatPlanPosition(record) {
   const totalStationCoords = normalizePositionMethod(record?.positionMethod) === "totalStation"
     ? convertPositionToPlanCoords(record?.nsDir, record?.nsCm, record?.ewDir, record?.ewCm)
     : null;
-  const gridPegLabel = gridReferenceNameForKuwaku(getRecordKuwaku(record));
-  if (totalStationCoords && gridPegLabel) {
-    const eastWestText = totalStationCoords.x < 0
-      ? `西に${formatCmValue(Math.abs(totalStationCoords.x))}`
-      : `東に${formatCmValue(totalStationCoords.x)}`;
-    const northSouthText = totalStationCoords.y < 0
-      ? `北に${formatCmValue(Math.abs(totalStationCoords.y))}`
-      : `南に${formatCmValue(totalStationCoords.y)}`;
-    base = `${gridPegLabel}杭から${eastWestText}、${northSouthText}`;
+  if (totalStationCoords) {
+    base = `北から${formatCmValue(totalStationCoords.y)}、西から${formatCmValue(totalStationCoords.x)}`;
   } else if (nsPart && ewPart) {
     base = `${nsPart} / ${ewPart}`;
   } else {
@@ -7575,8 +7642,15 @@ function formatPlanPosition(record) {
   }
   const planSizeMode = normalizePlanSizeMode(record?.planSizeMode);
   if (planSizeMode === "複数点") {
-    const multiPointCount = collectPlanMultiPointCoords(record).length;
+    const multiPointCoords = collectPlanMultiPointCoords(record);
+    const multiPointCount = multiPointCoords.length;
     if (multiPointCount > 0) {
+      if (normalizePositionMethod(record?.positionMethod) === "totalStation") {
+        const details = multiPointCoords.map((coord, index) =>
+          formatGridEdgeCalculationResult(coord, { prefix: `${index + 1}: ` })
+        );
+        return `複数点(${multiPointCount}点) / ${details.join(" / ")}`;
+      }
       return base ? `複数点(${multiPointCount}点) / ${base}` : `複数点(${multiPointCount}点)`;
     }
   }
@@ -15824,6 +15898,7 @@ function calculateTotalStationPosition() {
 }
 
 function applyTotalStationPosition() {
+  updateMultiPointCalculationResults();
   const result = calculateTotalStationPosition();
   const resultEl = document.getElementById("total-station-result");
   if (!result) {
@@ -15850,17 +15925,11 @@ function applyTotalStationPosition() {
   syncDirectionTabsFromForm();
   syncAltitudeDirectInputUi();
   if (resultEl) {
-    const altitudeText =
-      result.altitudeM == null ? "" : `、標高 ${Number(result.altitudeM.toFixed(4))} m`;
-    const eastWestText =
-      result.specimenEastFromGridPegCm < 0
-        ? `西に ${formatLengthInputValue(Math.abs(result.specimenEastFromGridPegCm))} cm`
-        : `東に ${formatLengthInputValue(result.specimenEastFromGridPegCm)} cm`;
-    const northSouthText =
-      result.specimenSouthFromGridPegCm < 0
-        ? `北に ${formatLengthInputValue(Math.abs(result.specimenSouthFromGridPegCm))} cm`
-        : `南に ${formatLengthInputValue(result.specimenSouthFromGridPegCm)} cm`;
-    resultEl.textContent = `計算結果：${result.gridPegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
+    resultEl.textContent = formatGridEdgeCalculationResult({
+      x: result.xPlanCm,
+      y: result.yPlanCm,
+      z: result.altitudeM,
+    });
     resultEl.classList.add("total-station-result-ok");
   }
 }

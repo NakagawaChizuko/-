@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v44-grid-peg-result";
+const CACHE_NAME = "kaseki25-pwa-v45-grid-edge-results";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

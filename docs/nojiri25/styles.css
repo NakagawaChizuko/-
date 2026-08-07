@@ -1895,6 +1895,14 @@ textarea {
   margin-top: 4px;
 }
 
+.multi-point-calculation-result {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
 .multi-point-input span {
   color: #5b6777;
   font-size: 0.84rem;
