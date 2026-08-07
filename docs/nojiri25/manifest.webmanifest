@@ -1,9 +1,11 @@
 {
   "name": "第25次 化石・遺物 入力フォーム",
   "short_name": "第25次入力",
+  "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f4f5f8",
   "theme_color": "#12303a",
   "icons": [

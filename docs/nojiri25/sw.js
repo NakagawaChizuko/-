@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v42-ts-text-coordinate";
+const CACHE_NAME = "kaseki25-pwa-v43-ios-complete-offline";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
@@ -38,13 +38,21 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request, { cache: "no-store" }).then((response) => {
-      if (response?.ok) caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", response.clone()));
+      if (!response?.ok) {
+        throw new Error("Navigation unavailable");
+      }
+      caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", response.clone()));
       return response;
-    }).catch(() => caches.match("./index.html")));
+    }).catch(() => caches.match("./index.html", { ignoreSearch: true }).then((cached) =>
+      cached || new Response("オフライン用画面を読み込めませんでした。オンラインで一度開いてください。", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      })
+    )));
     return;
   }
-  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
+  event.respondWith(caches.match(event.request, { ignoreSearch: true }).then((cached) => cached || fetch(event.request).then((response) => {
     if (response?.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
     return response;
-  }).catch(() => caches.match("./index.html"))));
+  }).catch(() => new Response("Offline", { status: 503 }))));
 });

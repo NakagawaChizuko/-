@@ -2925,6 +2925,24 @@ th.sortable-header.sort-desc::after {
   color: #0f766e;
   font-weight: 700;
 }
+.offline-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.offline-status.ready {
+  background: #dcfce7;
+  color: #166534;
+}
+.offline-status.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
 @media (max-width: 720px) {
   .grid-position-fields {
     grid-template-columns: 1fr;

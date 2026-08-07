@@ -15892,7 +15892,19 @@ if (recordForm) {
 }
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
+  const offlineStatus = document.getElementById("offline-status");
+  navigator.serviceWorker.register("./sw.js")
+    .then(() => navigator.serviceWorker.ready)
+    .then(() => {
+      if (offlineStatus) {
+        offlineStatus.textContent = "オフライン利用準備完了";
+        offlineStatus.classList.add("ready");
+      }
+    })
+    .catch(() => {
+      if (offlineStatus) {
+        offlineStatus.textContent = "オフライン利用の準備に失敗";
+        offlineStatus.classList.add("error");
+      }
+    });
 }
