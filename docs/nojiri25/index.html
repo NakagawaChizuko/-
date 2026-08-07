@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260807-mobile-layer-select1" />
+    <link rel="stylesheet" href="./styles.css?v=20260807-model3d-backup1" />
   </head>
   <body>
     <header class="app-header">
@@ -610,6 +610,16 @@
             <p class="checklist-warning">全てにチェックが入ると画像が保存できます</p>
           </section>
 
+          <section class="model3d-upload-wrap">
+            <h3>3Dデータ添付</h3>
+            <p class="hint-text">この標本番号に紐づける3Dデータを追加します。GLBを推奨します。OBJの材質・画像はMTLやテクスチャも一緒に選択してください。</p>
+            <div class="upload-picker-row">
+              <label class="upload-picker-label secondary" for="model3d-input">3Dデータを選択</label>
+            </div>
+            <input id="model3d-input" class="upload-file-input" type="file" accept=".glb,.gltf,.fbx,.obj,.mtl,.ply,.stl,image/png,image/jpeg" multiple />
+            <div id="model3d-list" class="model3d-list"></div>
+          </section>
+
             <div class="panel-actions">
               <button id="record-prev-btn" type="button">前へ</button>
               <button id="record-next-btn" type="button">次へ</button>
@@ -947,10 +957,12 @@
 
         <section class="panel">
           <h2>データ入出力（JSON）</h2>
+          <p class="hint-text">3Dデータを添付した記録は、3Dファイル本体をBase64化してJSON内に含めます。</p>
           <div class="export-button-grid">
             <button id="export-json-btn" type="button">JSON書き出し</button>
             <label class="import-label" for="import-json-input">JSON読み込み</label>
             <input id="import-json-input" type="file" accept="application/json" />
+            <button id="restore-backup-btn" class="secondary" type="button">端末バックアップから復元</button>
           </div>
         </section>
       </section>
@@ -1085,6 +1097,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260807-mobile-pdf-close1"></script>
+    <script src="./app.js?v=20260807-model3d-backup1"></script>
   </body>
 </html>

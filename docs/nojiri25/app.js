@@ -1,4 +1,10 @@
 const STORAGE_KEY = "nojiri-kaseki-mobile-localonly-v1";
+const STORAGE_BACKUP_KEY = "nojiri-kaseki-mobile-localonly-v1-backup";
+const DURABLE_DB_NAME = "nojiri-kaseki-mobile-durable-v1";
+const DURABLE_DB_VERSION = 1;
+const DURABLE_STATE_STORE = "stateBackups";
+const DURABLE_MODEL_STORE = "models3d";
+const DURABLE_STATE_KEY = "latest";
 const CLOUD_ENDPOINT_KEY = "nojiri-kaseki-cloud-endpoint-localonly-v1";
 const CLOUD_CLIENT_ID_KEY = "nojiri-kaseki-cloud-client-id-localonly-v1";
 const TOTAL_STATION_SETUP_KEY = "nojiri-total-station-setup-v1";
@@ -382,6 +388,7 @@ let editingRecordId = null;
 let activeEditRecordContext = null;
 let currentSectionDiagrams = [];
 let currentPhotos = [];
+let currentModels3d = [];
 let selectedCardRecordId = "";
 let selectedOutputKuwaku = ALL_GRIDS_VALUE;
 let selectedOutputCategory = EXPORT_CATEGORY_ALL_VALUE;
@@ -612,6 +619,8 @@ const sectionDiagramList = document.getElementById("section-diagram-list");
 const photoCameraInput = document.getElementById("photo-camera-input");
 const photoInput = document.getElementById("photo-input");
 const photoList = document.getElementById("photo-list");
+const model3dInput = document.getElementById("model3d-input");
+const model3dList = document.getElementById("model3d-list");
 const sectionDiagramCameraBtn = document.getElementById("section-diagram-camera-btn");
 const photoCameraBtn = document.getElementById("photo-camera-btn");
 const cameraCaptureModal = document.getElementById("camera-capture-modal");
@@ -631,6 +640,7 @@ const exportCardPdfBtn = document.getElementById("export-card-pdf-btn");
 const exportPlanPdfBtn = document.getElementById("export-plan-pdf-btn");
 const exportJsonBtn = document.getElementById("export-json-btn");
 const importJsonInput = document.getElementById("import-json-input");
+const restoreBackupBtn = document.getElementById("restore-backup-btn");
 const cloudEndpointInput = document.getElementById("cloud-endpoint-input");
 const cloudConnectBtn = document.getElementById("cloud-connect-btn");
 const cloudSyncBtn = document.getElementById("cloud-sync-btn");
@@ -709,6 +719,7 @@ function initialize() {
   void loadLargeShapeImageManifest();
   void loadTeamRosterFromDefaultFile();
   void bootstrapCloudSync();
+  void initializeDurableStateBackup();
 }
 
 function bindEvents() {
@@ -1021,7 +1032,7 @@ function bindEvents() {
     });
   }
 
-  recordForm.addEventListener("submit", (event) => {
+  recordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const isEditTab = getActiveTabId() === "edit-tab";
@@ -1133,6 +1144,13 @@ function bindEvents() {
       isEditTab ? `${specimenNo}の情報を上書き保存しますか？` : `${specimenNo}の情報を保存しますか？`
     );
     if (!saveAnswer) {
+      return;
+    }
+    let models3d = [];
+    try {
+      models3d = await persistCurrentModels3d();
+    } catch (_error) {
+      showToast("3Dデータを端末へ保存できませんでした。空き容量を確認してください");
       return;
     }
     const hasSpecimenChanged = Boolean(found && found.specimenNo !== specimenNo);
@@ -1314,6 +1332,7 @@ function bindEvents() {
       notes: value(formData.get("notes")),
       sectionDiagrams: clonePhotos(currentSectionDiagrams),
       photos: clonePhotos(currentPhotos),
+      models3d,
       createdAt: found?.createdAt || nowIsoValue,
       updatedAt: nowIsoValue,
       deletedAt: "",
@@ -2003,6 +2022,21 @@ function bindEvents() {
     persist("写真を削除しました");
   });
 
+  if (model3dInput) {
+    model3dInput.addEventListener("change", async (event) => {
+      await addModels3dFromFiles(event.target.files);
+      event.target.value = "";
+    });
+  }
+  if (model3dList) {
+    model3dList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-remove-model3d-id]");
+      if (!button) return;
+      currentModels3d = currentModels3d.filter((item) => item.id !== button.dataset.removeModel3dId);
+      renderModel3dList();
+    });
+  }
+
   exportListCsvBtn.addEventListener("click", () => {
     if (!getListExportRecords().length) {
       showToast("CSV出力対象データがありません");
@@ -2041,10 +2075,19 @@ function bindEvents() {
     });
   }
 
-  exportJsonBtn.addEventListener("click", () => {
-    const json = JSON.stringify(state, null, 2);
-    downloadFile(`nojiri-kaseki-${timestamp()}.json`, json, "application/json");
-    showToast("JSONを書き出しました");
+  exportJsonBtn.addEventListener("click", async () => {
+    exportJsonBtn.disabled = true;
+    showToast("3Dデータを含むJSONを準備しています…");
+    try {
+      const exportState = await buildJsonExportState();
+      const json = JSON.stringify(exportState, null, 2);
+      downloadFile(`nojiri-kaseki-${timestamp()}.json`, json, "application/json");
+      showToast("JSONを書き出しました");
+    } catch (_error) {
+      showToast("JSON書き出しに失敗しました");
+    } finally {
+      exportJsonBtn.disabled = false;
+    }
   });
 
   importJsonInput.addEventListener("change", async (event) => {
@@ -2055,6 +2098,7 @@ function bindEvents() {
     try {
       const text = await file.text();
       const imported = JSON.parse(text);
+      await importEmbeddedModels3d(imported);
       state = normalizeState(imported);
       hydrateSiteForm();
       resetRecordForm({ showMessage: false });
@@ -2066,6 +2110,20 @@ function bindEvents() {
     } finally {
       importJsonInput.value = "";
     }
+  });
+  restoreBackupBtn?.addEventListener("click", async () => {
+    const backup = await loadBestDurableStateBackup();
+    if (!backup || !hasAnyStateData(backup)) {
+      showToast("復元できる端末バックアップがありません");
+      return;
+    }
+    if (!window.confirm("端末バックアップのデータで現在の画面を復元しますか？")) return;
+    state = normalizeState(backup);
+    hydrateSiteForm();
+    resetRecordForm({ showMessage: false });
+    renderRecordTable();
+    renderOutputs();
+    persist("端末バックアップから復元しました");
   });
 }
 
@@ -2136,6 +2194,155 @@ async function addPhotosFromFiles(fileList) {
   }
   renderPhotoList();
   persist();
+}
+
+async function addModels3dFromFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const allowedExtensions = new Set(["glb", "gltf", "fbx", "obj", "mtl", "ply", "stl", "png", "jpg", "jpeg"]);
+  for (const file of files) {
+    const fileName = value(file?.name) || "3d-data";
+    const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+    if (!allowedExtensions.has(extension)) {
+      showToast(`${fileName} は対応形式ではありません`);
+      continue;
+    }
+    if (Number(file.size) > 100 * 1024 * 1024) {
+      showToast(`${fileName} は100MBを超えるため添付できません`);
+      continue;
+    }
+    try {
+      const dataBase64 = await readFileAsDataUrl(file);
+      const model = {
+        id: newId("model3d"),
+        fileName,
+        format: extension,
+        mimeType: value(file.type) || getModel3dMimeType(extension),
+        size: Number(file.size) || 0,
+        createdAt: nowIso(),
+        dataBase64,
+      };
+      await putModel3dData(model);
+      currentModels3d.push(model);
+    } catch (_error) {
+      showToast(`${fileName} の添付に失敗しました`);
+    }
+  }
+  renderModel3dList();
+}
+
+function getModel3dMimeType(extensionRaw) {
+  const extension = value(extensionRaw).toLowerCase();
+  const mimeMap = {
+    glb: "model/gltf-binary",
+    gltf: "model/gltf+json",
+    fbx: "application/octet-stream",
+    obj: "text/plain",
+    mtl: "text/plain",
+    ply: "application/octet-stream",
+    stl: "model/stl",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+  };
+  return mimeMap[extension] || "application/octet-stream";
+}
+
+function formatFileSize(bytesRaw) {
+  const bytes = Number(bytesRaw);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderModel3dList() {
+  if (!model3dList) return;
+  if (!currentModels3d.length) {
+    model3dList.innerHTML = '<p class="hint-text">3Dデータはまだありません。</p>';
+    return;
+  }
+  model3dList.innerHTML = currentModels3d
+    .map(
+      (model) => `<div class="model3d-item">
+        <div><strong>${escapeHtml(model.fileName || "3Dデータ")}</strong><br><span class="hint-text">${escapeHtml(
+          String(model.format || "").toUpperCase()
+        )} / ${escapeHtml(formatFileSize(model.size))}</span></div>
+        <button class="danger" type="button" data-remove-model3d-id="${escapeHtml(model.id)}">削除</button>
+      </div>`
+    )
+    .join("");
+}
+
+function normalizeModels3d(modelsRaw) {
+  return (Array.isArray(modelsRaw) ? modelsRaw : [])
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const fileName = value(item.fileName || item.name);
+      const format = value(item.format || (fileName.includes(".") ? fileName.split(".").pop() : "")).toLowerCase();
+      return {
+        id: value(item.id) || newId("model3d"),
+        fileName,
+        format,
+        mimeType: value(item.mimeType) || getModel3dMimeType(format),
+        size: Number(item.size) || 0,
+        createdAt: value(item.createdAt) || nowIso(),
+        ...(value(item.dataBase64 || item.dataUrl) ? { dataBase64: value(item.dataBase64 || item.dataUrl) } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
+function model3dMetadata(modelsRaw) {
+  return normalizeModels3d(modelsRaw).map(({ dataBase64: _dataBase64, ...metadata }) => metadata);
+}
+
+async function hydrateCurrentModels3dData() {
+  const expectedIds = currentModels3d.map((model) => model.id).join("|");
+  const hydrated = await Promise.all(
+    currentModels3d.map(async (metadata) => {
+      if (metadata.dataBase64) return metadata;
+      const stored = await getModel3dData(metadata.id);
+      return stored ? { ...metadata, dataBase64: value(stored.dataBase64) } : metadata;
+    })
+  );
+  if (currentModels3d.map((model) => model.id).join("|") !== expectedIds) return;
+  currentModels3d = hydrated;
+  renderModel3dList();
+}
+
+async function persistCurrentModels3d() {
+  for (const model of currentModels3d) {
+    if (model.dataBase64) await putModel3dData(model);
+  }
+  return model3dMetadata(currentModels3d);
+}
+
+async function buildJsonExportState() {
+  const exportState = typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+  for (const record of exportState.records || []) {
+    const models = normalizeModels3d(record.models3d);
+    record.models3d = await Promise.all(
+      models.map(async (metadata) => {
+        const stored = metadata.dataBase64 ? metadata : await getModel3dData(metadata.id);
+        if (!stored?.dataBase64) {
+          throw new Error(`3D data missing: ${metadata.fileName || metadata.id}`);
+        }
+        return { ...metadata, dataBase64: stored.dataBase64 };
+      })
+    );
+  }
+  return exportState;
+}
+
+async function importEmbeddedModels3d(importedStateRaw) {
+  const records = Array.isArray(importedStateRaw?.records) ? importedStateRaw.records : [];
+  for (const record of records) {
+    const models = normalizeModels3d(record?.models3d);
+    for (const model of models) {
+      if (model.dataBase64) await putModel3dData(model);
+    }
+    record.models3d = model3dMetadata(models);
+  }
 }
 
 function stopBrowserCamera() {
@@ -4809,8 +5016,10 @@ function resetRecordForm({ showMessage }) {
 
   currentPhotos = [];
   currentSectionDiagrams = [];
+  currentModels3d = [];
   renderSectionDiagramList();
   renderPhotoList();
+  renderModel3dList();
   clearEditHistory();
   clearEditMissingRequiredHighlights();
 
@@ -5003,6 +5212,9 @@ function populateRecordForm(record) {
   renderSectionDiagramList();
   currentPhotos = clonePhotos(record.photos || []);
   renderPhotoList();
+  currentModels3d = model3dMetadata(record.models3d || []);
+  renderModel3dList();
+  void hydrateCurrentModels3dData();
   syncCustomLargeImageStatus();
   void syncImageFrameSizeFromAspectLock("populate").then(() => {
     syncLargeShapeImagePreviewTransform();
@@ -5217,6 +5429,7 @@ function buildCurrentEditDraftRecord() {
     notes: value(formData.get("notes")),
     sectionDiagrams: clonePhotos(currentSectionDiagrams),
     photos: clonePhotos(currentPhotos),
+    models3d: model3dMetadata(currentModels3d),
   };
 }
 
@@ -5278,6 +5491,7 @@ function copyCurrentEditToInput() {
     id: "",
     sectionDiagrams: [],
     photos: [],
+    models3d: [],
     sectionDiagramDistanceChecked: "",
     sectionDiagramHorizonChecked: "",
     sectionDiagramLayerFaciesChecked: "",
@@ -5334,6 +5548,7 @@ function copySavedRecordToInput(recordId, preferredKuwaku = "", recordRaw = null
     id: "",
     sectionDiagrams: [],
     photos: [],
+    models3d: [],
     sectionDiagramDistanceChecked: "",
     sectionDiagramHorizonChecked: "",
     sectionDiagramLayerFaciesChecked: "",
@@ -5388,6 +5603,7 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     occurrenceSketch: "要",
     sectionDiagrams: [],
     photos: [],
+    models3d: [],
     sectionDiagramDistanceChecked: "",
     sectionDiagramHorizonChecked: "",
     sectionDiagramLayerFaciesChecked: "",
@@ -12023,20 +12239,140 @@ function renderSectionDiagramList() {
     .join("");
 }
 
+function parseStoredState(raw) {
+  if (!value(raw)) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_error) {
+    return null;
+  }
+}
+
 function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
+  const primary = parseStoredState(localStorage.getItem(STORAGE_KEY));
+  const fallback = parseStoredState(localStorage.getItem(STORAGE_BACKUP_KEY));
+  const parsed = primary || fallback;
+  if (!parsed) {
     stateNeedsRewriteAfterLoad = false;
     return createInitialState();
   }
+  const normalized = normalizeState(parsed);
+  stateNeedsRewriteAfterLoad = hasSpacingNormalizationDiff(parsed, normalized) || !primary;
+  return normalized;
+}
+
+function openDurableDb() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const request = indexedDB.open(DURABLE_DB_NAME, DURABLE_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(DURABLE_STATE_STORE)) db.createObjectStore(DURABLE_STATE_STORE);
+      if (!db.objectStoreNames.contains(DURABLE_MODEL_STORE)) db.createObjectStore(DURABLE_MODEL_STORE, { keyPath: "id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
+  });
+}
+
+async function durableDbGet(storeName, key) {
+  const db = await openDurableDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, "readonly");
+    const request = transaction.objectStore(storeName).get(key);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error || new Error("IndexedDB read failed"));
+    transaction.oncomplete = () => db.close();
+  });
+}
+
+async function durableDbPut(storeName, valueRaw, key) {
+  const db = await openDurableDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, "readwrite");
+    const store = transaction.objectStore(storeName);
+    if (key === undefined) store.put(valueRaw);
+    else store.put(valueRaw, key);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve(true);
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error || new Error("IndexedDB write failed"));
+    };
+  });
+}
+
+async function saveStateToDurableDb(stateRaw) {
+  const normalized = normalizeState(stateRaw);
+  if (!hasAnyStateData(normalized)) return false;
+  await durableDbPut(DURABLE_STATE_STORE, { savedAt: nowIso(), state: normalized }, DURABLE_STATE_KEY);
+  return true;
+}
+
+async function loadStateFromDurableDb() {
   try {
-    const parsed = JSON.parse(raw);
-    const normalized = normalizeState(parsed);
-    stateNeedsRewriteAfterLoad = hasSpacingNormalizationDiff(parsed, normalized);
-    return normalized;
+    const entry = await durableDbGet(DURABLE_STATE_STORE, DURABLE_STATE_KEY);
+    return entry?.state ? normalizeState(entry.state) : null;
   } catch (_error) {
-    stateNeedsRewriteAfterLoad = false;
-    return createInitialState();
+    return null;
+  }
+}
+
+async function loadBestDurableStateBackup() {
+  const indexedBackup = await loadStateFromDurableDb();
+  const localBackupRaw = parseStoredState(localStorage.getItem(STORAGE_BACKUP_KEY));
+  const localBackup = localBackupRaw ? normalizeState(localBackupRaw) : null;
+  if (!indexedBackup) return localBackup;
+  if (!localBackup) return indexedBackup;
+  return getStateUpdatedAt(indexedBackup) >= getStateUpdatedAt(localBackup) ? indexedBackup : localBackup;
+}
+
+async function initializeDurableStateBackup() {
+  const durableState = await loadStateFromDurableDb();
+  const localHasData = hasAnyStateData(state);
+  const durableHasData = hasAnyStateData(durableState);
+  if (durableHasData && (!localHasData || getStateUpdatedAt(durableState) > getStateUpdatedAt(state))) {
+    state = normalizeState(durableState);
+    hydrateSiteForm();
+    resetRecordForm({ showMessage: false });
+    renderRecordTable();
+    renderOutputs();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (_error) {
+      // IndexedDBからは復元済み。
+    }
+    showToast("端末バックアップから保存データを復元しました");
+    return;
+  }
+  if (localHasData) {
+    try {
+      await saveStateToDurableDb(state);
+    } catch (_error) {
+      // localStorage保存は維持する。
+    }
+  }
+}
+
+async function putModel3dData(modelRaw) {
+  const model = normalizeModels3d([modelRaw])[0];
+  if (!model?.id || !model.dataBase64) return false;
+  await durableDbPut(DURABLE_MODEL_STORE, model);
+  return true;
+}
+
+async function getModel3dData(modelIdRaw) {
+  const modelId = value(modelIdRaw);
+  if (!modelId) return null;
+  try {
+    return await durableDbGet(DURABLE_MODEL_STORE, modelId);
+  } catch (_error) {
+    return null;
   }
 }
 
@@ -12357,6 +12693,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     }),
     sectionDiagrams: normalizePhotos(item.sectionDiagrams),
     photos: normalizePhotos(item.photos),
+    models3d: model3dMetadata(item.models3d),
     history: normalizeRecordHistory(item.history),
     createdAt: value(item.createdAt) || new Date().toISOString(),
     updatedAt: value(item.updatedAt) || new Date().toISOString(),
@@ -12615,12 +12952,19 @@ function findDuplicateRecordByKuwakuAndSpecimen(kuwakuRaw, specimenNoRaw, exclud
 
 function persist(successMessage) {
   try {
+    const previousRaw = localStorage.getItem(STORAGE_KEY);
+    const previousState = parseStoredState(previousRaw);
+    if (previousRaw && previousRaw.length <= 1000000 && previousState && hasAnyStateData(previousState)) {
+      localStorage.setItem(STORAGE_BACKUP_KEY, previousRaw);
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    void saveStateToDurableDb(state).catch(() => null);
     if (successMessage) {
       showToast(successMessage);
     }
     scheduleCloudSave();
   } catch (error) {
+    void saveStateToDurableDb(state).catch(() => null);
     void recoverFromQuotaError(successMessage, error);
   }
 }

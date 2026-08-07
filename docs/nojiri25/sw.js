@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v56-mobile-pdf-close";
+const CACHE_NAME = "kaseki25-pwa-v57-model3d-backup";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

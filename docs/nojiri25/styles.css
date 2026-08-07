@@ -1310,6 +1310,28 @@ main {
   min-width: 0;
 }
 
+.model3d-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.model3d-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.model3d-item strong,
+.model3d-item span {
+  overflow-wrap: anywhere;
+}
+
 .compact-input-group.no-caption {
   gap: 0;
 }
