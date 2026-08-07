@@ -3422,7 +3422,6 @@ function createMultiPointRowElement(pointRaw = {}) {
     wrap.className = "multi-point-input";
     const input = document.createElement("input");
     input.type = "text";
-    input.inputMode = "decimal";
     input.placeholder = "m";
     input.dataset[dataKey] = "1";
     input.value = value(fieldValue);
@@ -3440,7 +3439,6 @@ function createMultiPointRowElement(pointRaw = {}) {
     [["Deg", "°"], ["Min", "′"], ["Sec", "″"]].forEach(([suffix, unit], index) => {
       const input = document.createElement("input");
       input.type = "text";
-      input.inputMode = index === 1 ? "numeric" : "decimal";
       input.dataset[`multiPoint${prefix}${suffix}`] = "1";
       input.value = value(values[index]);
       const unitEl = document.createElement("span");
@@ -3460,9 +3458,9 @@ function createMultiPointRowElement(pointRaw = {}) {
     thirdLabel = makeDmsField("方向角", "Direction", [polarPoint.directionDeg, polarPoint.directionMin, polarPoint.directionSec]);
   } else if (isTotalStation) {
     const offsets = getTotalStationMultiPointOffsetsForForm(normalized);
-    firstLabel = makeField("設置点から南へ（南が正）", "multiPointSouthFromStationM", offsets.southFromStationM);
-    secondLabel = makeField("設置点から西へ（西が正）", "multiPointWestFromStationM", offsets.westFromStationM);
-    thirdLabel = makeField("標高", "multiPointZAltitudeM", normalized.zAltitudeM);
+    firstLabel = makeField("X　設置点から南へ（南が正）", "multiPointSouthFromStationM", offsets.southFromStationM);
+    secondLabel = makeField("Y　設置点から西へ（西が正）", "multiPointWestFromStationM", offsets.westFromStationM);
+    thirdLabel = makeField("Z　標高", "multiPointZAltitudeM", normalized.zAltitudeM);
   } else {
     const gridPoint = getGridMultiPointForForm(normalized);
     firstLabel = makeField("x 東西（東が正）", "multiPointXEastM", gridPoint.xEastM);
@@ -3501,7 +3499,7 @@ function syncMultiPointCoordinateModeUi() {
     hint.textContent = isPolar
       ? "各点の斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
       : isTotalStation
-        ? "各点の設置点から南（南が正）・西（西が正）への距離と標高をm単位で入力します。"
+        ? "各点のX（設置点から南・南が正）、Y（設置点から西・西が正）、Z（標高）をm単位で入力します。"
         : "各点の x（東西・東が正）、y（南北・北が正）、z（高度）をm単位で入力できます。";
   }
   const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");

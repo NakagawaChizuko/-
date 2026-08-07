@@ -252,9 +252,9 @@
               <legend>トータルステーション設定</legend>
               <p class="hint-text">x＝南北（南が正）、y＝東西（西が正）、z＝標高。すべてm単位で入力します。</p>
               <div class="ts-setup-grid">
-                <div class="ts-setup-row"><strong>設置点</strong><label>登録点から選択 <select id="ts-station-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsStationPeg" type="text" placeholder="例：Ⅰ-C-5" /></label><label>x <input name="tsStationXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsStationYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsStationAltitudeM" type="text" inputmode="decimal" /> m</label></div>
-                <div class="ts-setup-row"><strong>後視点（基準点）</strong><label>登録点から選択 <select id="ts-backsight-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsBacksightPeg" type="text" placeholder="例：Ⅰ-C-5" /></label><label>x <input name="tsBacksightXNorthM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsBacksightYEastM" type="text" inputmode="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsBacksightAltitudeM" type="text" inputmode="decimal" /> m</label></div>
-                <div class="ts-setup-row"><strong>高さ</strong><label>機械高 <input name="tsInstrumentHeightM" type="text" inputmode="decimal" /> m</label><label>目標高 <input name="tsTargetHeightM" type="text" inputmode="decimal" /> m</label></div>
+                <div class="ts-setup-row"><strong>設置点</strong><label>登録点から選択 <select id="ts-station-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsStationPeg" type="text" placeholder="例：Ⅰ-C-5" /></label><label>x <input name="tsStationXNorthM" type="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsStationYEastM" type="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsStationAltitudeM" type="text" /> m</label></div>
+                <div class="ts-setup-row"><strong>後視点（基準点）</strong><label>登録点から選択 <select id="ts-backsight-point-select"><option value="">手入力</option></select></label><label>杭（点）名称 <input name="tsBacksightPeg" type="text" placeholder="例：Ⅰ-C-5" /></label><label>x <input name="tsBacksightXNorthM" type="text" placeholder="例：-1.25" /> m</label><label>y <input name="tsBacksightYEastM" type="text" placeholder="例：-1.25" /> m</label><label>標高 <input name="tsBacksightAltitudeM" type="text" /> m</label></div>
+                <div class="ts-setup-row"><strong>高さ</strong><label>機械高 <input name="tsInstrumentHeightM" type="text" /> m</label><label>目標高 <input name="tsTargetHeightM" type="text" /> m</label></div>
               </div>
               <p class="hint-text">設置点の杭名称を平面図の基準にします。後視点は、距離・傾斜・方向角入力の方向角0°を定める基準です。</p>
               <div class="ts-setup-save-row">
@@ -266,18 +266,18 @@
             <fieldset id="ts-specimen-position-section" class="inline-fieldset span-3 ts-specimen-position hidden">
               <legend>化石・遺物の位置</legend>
               <div class="position-method-options ts-observation-methods">
-                <label><input name="tsObservationMode" type="radio" value="coordinate" checked /> 設置点からの南・西距離・標高</label>
+                <label><input name="tsObservationMode" type="radio" value="coordinate" checked /> 座標（X・Y・Z）</label>
                 <label><input name="tsObservationMode" type="radio" value="polar" /> 距離・傾斜・方向角</label>
               </div>
               <div id="ts-coordinate-fields" class="ts-observation-row">
-                <label>設置点から南へ（南が正）<span><input name="tsPointXNorthM" type="text" inputmode="text" placeholder="例：1.25" /> m</span></label>
-                <label>設置点から西へ<span><input name="tsPointYEastM" type="text" inputmode="text" placeholder="例：0.50" /> m</span></label>
-                <label>標高<span><input name="tsPointAltitudeM" type="text" inputmode="decimal" /> m</span></label>
+                <label>X　設置点から南へ（南が正）<span><input name="tsPointXNorthM" type="text" placeholder="例：1.25" /> m</span></label>
+                <label>Y　設置点から西へ（西が正）<span><input name="tsPointYEastM" type="text" placeholder="例：0.50" /> m</span></label>
+                <label>Z　標高<span><input name="tsPointAltitudeM" type="text" /> m</span></label>
               </div>
               <div id="ts-polar-fields" class="ts-polar-fields hidden">
-                <label>斜距離 <span><input name="tsSlopeDistanceM" type="text" inputmode="decimal" /> m</span></label>
-                <div class="ts-dms-field"><strong>傾斜</strong><span class="hint-text">水平0°、上向き＋・下向き−</span><label><input name="tsInclinationDeg" type="text" inputmode="decimal" /> °</label><label><input name="tsInclinationMin" type="text" inputmode="numeric" value="0" /> ′</label><label><input name="tsInclinationSec" type="text" inputmode="decimal" value="0" /> ″</label></div>
-                <div class="ts-dms-field"><strong>方向角</strong><span class="hint-text">後視点方向を0°として時計回り</span><label><input name="tsDirectionDeg" type="text" inputmode="numeric" /> °</label><label><input name="tsDirectionMin" type="text" inputmode="numeric" value="0" /> ′</label><label><input name="tsDirectionSec" type="text" inputmode="decimal" value="0" /> ″</label></div>
+                <label>斜距離 <span><input name="tsSlopeDistanceM" type="text" /> m</span></label>
+                <div class="ts-dms-field"><strong>傾斜</strong><span class="hint-text">水平0°、上向き＋・下向き−</span><label><input name="tsInclinationDeg" type="text" /> °</label><label><input name="tsInclinationMin" type="text" value="0" /> ′</label><label><input name="tsInclinationSec" type="text" value="0" /> ″</label></div>
+                <div class="ts-dms-field"><strong>方向角</strong><span class="hint-text">後視点方向を0°として時計回り</span><label><input name="tsDirectionDeg" type="text" /> °</label><label><input name="tsDirectionMin" type="text" value="0" /> ′</label><label><input name="tsDirectionSec" type="text" value="0" /> ″</label></div>
               </div>
               <p id="total-station-result" class="hint-text" aria-live="polite">設置点から南・西への距離と標高を入力すると、区画内の平面位置を自動計算します。</p>
             </fieldset>
@@ -1049,6 +1049,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260806-pc-camera1"></script>
+    <script src="./app.js?v=20260807-ts-text-coordinate1"></script>
   </body>
 </html>
