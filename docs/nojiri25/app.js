@@ -13970,6 +13970,13 @@ function buildPdfImageGrid(itemsRaw, emptyText, gridClassRaw = "") {
 function openPdfPrintWindow({ title, pageSize, bodyHtml }) {
   const safeTitle = escapeHtml(title || "出力");
   const safeBody = bodyHtml || "<p>出力データがありません。</p>";
+  const returnUrlEncoded = encodeURIComponent(window.location.href.split("#")[0]);
+  const screenActions = `
+    <div class="pdf-screen-actions">
+      <button type="button" onclick="window.print()">PDF出力を開く</button>
+      <button type="button" onclick="var returnUrl=decodeURIComponent('${returnUrlEncoded}');if(window.opener&&!window.opener.closed){window.opener.focus();}window.close();window.setTimeout(function(){window.location.replace(returnUrl);},150);">入力フォームへ戻る</button>
+    </div>
+  `;
   const htmlText = `
     <!doctype html>
     <html lang="ja">
@@ -13979,7 +13986,7 @@ function openPdfPrintWindow({ title, pageSize, bodyHtml }) {
         <title>${safeTitle}</title>
         <style>${buildPdfPrintStyles(pageSize)}</style>
       </head>
-      <body>${safeBody}</body>
+      <body>${screenActions}${safeBody}</body>
     </html>
   `;
 
@@ -14057,6 +14064,32 @@ function buildPdfPrintStyles(pageSizeRaw) {
       line-height: 1.45;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    .pdf-screen-actions {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 0 10px;
+      padding: 10px;
+      background: #ffffff;
+      border-bottom: 1px solid #cbd5e1;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14);
+    }
+    .pdf-screen-actions button {
+      min-height: 42px;
+      border: 1px solid #0f766e;
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: #ffffff;
+      background: #0f766e;
+      font: inherit;
+      font-weight: 700;
+    }
+    @media print {
+      .pdf-screen-actions { display: none !important; }
     }
     .pdf-page {
       width: 100%;
