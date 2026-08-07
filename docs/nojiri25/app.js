@@ -7556,7 +7556,19 @@ function formatPlanPosition(record) {
   const nsPart = `${nsDir}${nsCm}`;
   const ewPart = `${ewDir}${ewCm}`;
   let base = "";
-  if (nsPart && ewPart) {
+  const totalStationCoords = normalizePositionMethod(record?.positionMethod) === "totalStation"
+    ? convertPositionToPlanCoords(record?.nsDir, record?.nsCm, record?.ewDir, record?.ewCm)
+    : null;
+  const gridPegLabel = gridReferenceNameForKuwaku(getRecordKuwaku(record));
+  if (totalStationCoords && gridPegLabel) {
+    const eastWestText = totalStationCoords.x < 0
+      ? `西に${formatCmValue(Math.abs(totalStationCoords.x))}`
+      : `東に${formatCmValue(totalStationCoords.x)}`;
+    const northSouthText = totalStationCoords.y < 0
+      ? `北に${formatCmValue(Math.abs(totalStationCoords.y))}`
+      : `南に${formatCmValue(totalStationCoords.y)}`;
+    base = `${gridPegLabel}杭から${eastWestText}、${northSouthText}`;
+  } else if (nsPart && ewPart) {
     base = `${nsPart} / ${ewPart}`;
   } else {
     base = nsPart || ewPart;
@@ -15775,7 +15787,8 @@ function calculateTotalStationPosition() {
   const specimenWestFromStationM = pointY - stationY;
   const specimenEastFromPegCm = -specimenWestFromStationM * 100;
   const specimenNorthFromPegCm = -specimenSouthFromStationM * 100;
-  const gridReference = findTotalStationGridReferencePoint(currentInputGridReferenceName());
+  const gridPegLabel = currentInputGridReferenceName();
+  const gridReference = findTotalStationGridReferencePoint(gridPegLabel);
   let stationPlanX;
   let stationPlanY;
   let xPlanCm;
@@ -15799,6 +15812,9 @@ function calculateTotalStationPosition() {
     pegLabel: stationPegRaw.toUpperCase(),
     specimenEastFromPegCm,
     specimenNorthFromPegCm,
+    gridPegLabel,
+    specimenEastFromGridPegCm: xPlanCm,
+    specimenSouthFromGridPegCm: yPlanCm,
     xPlanCm,
     yPlanCm,
     stationPlanX, stationPlanY, pointX, pointY,
@@ -15837,14 +15853,14 @@ function applyTotalStationPosition() {
     const altitudeText =
       result.altitudeM == null ? "" : `、標高 ${Number(result.altitudeM.toFixed(4))} m`;
     const eastWestText =
-      result.specimenEastFromPegCm < 0
-        ? `西に ${formatLengthInputValue(Math.abs(result.specimenEastFromPegCm))} cm`
-        : `東に ${formatLengthInputValue(result.specimenEastFromPegCm)} cm`;
+      result.specimenEastFromGridPegCm < 0
+        ? `西に ${formatLengthInputValue(Math.abs(result.specimenEastFromGridPegCm))} cm`
+        : `東に ${formatLengthInputValue(result.specimenEastFromGridPegCm)} cm`;
     const northSouthText =
-      result.specimenNorthFromPegCm < 0
-        ? `南に ${formatLengthInputValue(Math.abs(result.specimenNorthFromPegCm))} cm`
-        : `北に ${formatLengthInputValue(result.specimenNorthFromPegCm)} cm`;
-    resultEl.textContent = `計算結果：設置点から南に ${Number(result.specimenSouthFromStationM.toFixed(4))} m、西に ${Number(result.specimenWestFromStationM.toFixed(4))} m、標高 ${Number(result.altitudeM.toFixed(4))} m／${result.pegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
+      result.specimenSouthFromGridPegCm < 0
+        ? `北に ${formatLengthInputValue(Math.abs(result.specimenSouthFromGridPegCm))} cm`
+        : `南に ${formatLengthInputValue(result.specimenSouthFromGridPegCm)} cm`;
+    resultEl.textContent = `計算結果：${result.gridPegLabel}杭から${eastWestText}、${northSouthText}${altitudeText}`;
     resultEl.classList.add("total-station-result-ok");
   }
 }
