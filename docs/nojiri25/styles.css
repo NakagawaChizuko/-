@@ -1332,6 +1332,17 @@ main {
   overflow-wrap: anywhere;
 }
 
+.model3d-item .status-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #795500;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .compact-input-group.no-caption {
   gap: 0;
 }

@@ -2207,22 +2207,31 @@ async function addModels3dFromFiles(fileList) {
       showToast(`${fileName} は対応形式ではありません`);
       continue;
     }
+    const model = {
+      id: newId("model3d"),
+      fileName,
+      format: extension,
+      mimeType: value(file.type) || getModel3dMimeType(extension),
+      size: Number(file.size) || 0,
+      createdAt: nowIso(),
+      isSaving: true,
+    };
+    currentModels3d.push(model);
+    renderModel3dList();
     try {
-      const model = {
-        id: newId("model3d"),
-        fileName,
-        format: extension,
-        mimeType: value(file.type) || getModel3dMimeType(extension),
-        size: Number(file.size) || 0,
-        createdAt: nowIso(),
-      };
-      await putModel3dFile(model, file);
-      currentModels3d.push(model);
+      try {
+        await putModel3dFile(model, file);
+      } catch (_blobError) {
+        const dataBase64 = await readBlobAsDataUrl(file);
+        await putModel3dData({ ...model, dataBase64 });
+      }
+      model.isSaving = false;
     } catch (_error) {
+      currentModels3d = currentModels3d.filter((item) => item.id !== model.id);
       showToast(`${fileName} を端末へ保存できませんでした。空き容量を確認してください`);
     }
+    renderModel3dList();
   }
-  renderModel3dList();
 }
 
 function getModel3dMimeType(extensionRaw) {
@@ -2258,10 +2267,10 @@ function renderModel3dList() {
   model3dList.innerHTML = currentModels3d
     .map(
       (model) => `<div class="model3d-item">
-        <div><strong>${escapeHtml(model.fileName || "3Dデータ")}</strong><br><span class="hint-text">${escapeHtml(
+        <div><strong>${escapeHtml(model.fileName || "3Dデータ")}</strong>${model.isSaving ? ' <span class="status-badge">保存中…</span>' : ""}<br><span class="hint-text">${escapeHtml(
           String(model.format || "").toUpperCase()
         )} / ${escapeHtml(formatFileSize(model.size))}</span></div>
-        <button class="danger" type="button" data-remove-model3d-id="${escapeHtml(model.id)}">削除</button>
+        <button class="danger" type="button" data-remove-model3d-id="${escapeHtml(model.id)}"${model.isSaving ? " disabled" : ""}>削除</button>
       </div>`
     )
     .join("");
@@ -2305,6 +2314,9 @@ async function hydrateCurrentModels3dData() {
 }
 
 async function persistCurrentModels3d() {
+  if (currentModels3d.some((model) => model.isSaving)) {
+    throw new Error("3D data is still saving");
+  }
   for (const model of currentModels3d) {
     if (model.dataBase64) await putModel3dData(model);
   }
