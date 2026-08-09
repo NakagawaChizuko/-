@@ -14330,10 +14330,11 @@ function openPdfPrintWindow({ title, pageSize, bodyHtml }) {
   const safeTitle = escapeHtml(title || "出力");
   const safeBody = bodyHtml || "<p>出力データがありません。</p>";
   const returnUrlEncoded = encodeURIComponent(window.location.href.split("#")[0]);
+  const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const screenActions = `
     <div class="pdf-screen-actions">
       <button type="button" onclick="window.print()">PDF出力を開く</button>
-      <button type="button" onclick="var returnUrl=decodeURIComponent('${returnUrlEncoded}');if(window.opener&&!window.opener.closed){window.opener.focus();}window.close();window.setTimeout(function(){window.location.replace(returnUrl);},150);">入力フォームへ戻る</button>
+      <button class="pdf-return-button" type="button" onclick="var returnUrl=decodeURIComponent('${returnUrlEncoded}');if(window.opener&&!window.opener.closed){window.opener.focus();window.close();}else{window.location.replace(returnUrl);}window.setTimeout(function(){if(!window.closed){window.location.replace(returnUrl);}},150);">入力フォームへ戻る</button>
     </div>
   `;
   const htmlText = `
@@ -14368,10 +14369,12 @@ function openPdfPrintWindow({ title, pageSize, bodyHtml }) {
         // ignore
       }
     };
-    printWindow.onload = () => {
-      window.setTimeout(triggerPrint, 220);
-    };
-    window.setTimeout(triggerPrint, 900);
+    if (!isAppleMobile) {
+      printWindow.onload = () => {
+        window.setTimeout(triggerPrint, 220);
+      };
+      window.setTimeout(triggerPrint, 900);
+    }
     return true;
   }
 
@@ -14417,6 +14420,7 @@ function buildPdfPrintStyles(pageSizeRaw) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      padding-bottom: 72px;
       font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
       color: #111827;
       font-size: 11px;
@@ -14425,14 +14429,16 @@ function buildPdfPrintStyles(pageSizeRaw) {
       print-color-adjust: exact;
     }
     .pdf-screen-actions {
-      position: sticky;
-      top: 0;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
       z-index: 1000;
       display: flex;
       justify-content: center;
       gap: 10px;
-      margin: 0 0 10px;
-      padding: 10px;
+      margin: 0;
+      padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
       background: #ffffff;
       border-bottom: 1px solid #cbd5e1;
       box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14);
@@ -14447,8 +14453,13 @@ function buildPdfPrintStyles(pageSizeRaw) {
       font: inherit;
       font-weight: 700;
     }
+    .pdf-screen-actions .pdf-return-button {
+      border-color: #334155;
+      background: #334155;
+    }
     @media print {
       .pdf-screen-actions { display: none !important; }
+      body { padding-bottom: 0; }
     }
     .pdf-page {
       width: 100%;
