@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v60-ios-pdf-return";
+const CACHE_NAME = "kaseki25-pwa-v61-copy-position-fix";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

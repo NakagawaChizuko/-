@@ -5370,6 +5370,16 @@ function buildCurrentEditDraftRecord() {
     tsTargetHeightM: value(formData.get("tsTargetHeightM")),
     tsObservationMode: value(formData.get("tsObservationMode")) === "polar" ? "polar" : "coordinate",
     tsPointCoordinateMode: "stationOffsetSouthWest",
+    tsPointXNorthM: value(formData.get("tsPointXNorthM")),
+    tsPointYEastM: value(formData.get("tsPointYEastM")),
+    tsPointAltitudeM: value(formData.get("tsPointAltitudeM")),
+    tsSlopeDistanceM: value(formData.get("tsSlopeDistanceM")),
+    tsInclinationDeg: value(formData.get("tsInclinationDeg")),
+    tsInclinationMin: value(formData.get("tsInclinationMin")),
+    tsInclinationSec: value(formData.get("tsInclinationSec")),
+    tsDirectionDeg: value(formData.get("tsDirectionDeg")),
+    tsDirectionMin: value(formData.get("tsDirectionMin")),
+    tsDirectionSec: value(formData.get("tsDirectionSec")),
     multiPoints: draftMultiPoints,
     planSizeMode: draftPlanSizeMode,
     largeShapeType: draftShapeType,
@@ -5473,7 +5483,7 @@ function copyCurrentEditToInput() {
     siteForm.elements.kuwakuHeadB.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
     siteForm.elements.kuwakuBlock.value = kuwakuParts.block || "";
     siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
-    siteForm.elements.levelHeight.value = value(draft.levelHeight);
+    siteForm.elements.levelHeight.value = value(draft.levelHeight) || value(state.site?.levelHeight) || value(siteForm.elements.levelHeight.value);
     siteForm.elements.date.value = value(draft.date);
     siteForm.elements.team.value = teamState.team;
     siteForm.elements.teamOther.value = teamState.teamOther;
@@ -5530,7 +5540,7 @@ function copySavedRecordToInput(recordId, preferredKuwaku = "", recordRaw = null
     siteForm.elements.kuwakuHeadB.value = kuwakuParts.headB || DEFAULT_KUWAKU_HEAD_B;
     siteForm.elements.kuwakuBlock.value = kuwakuParts.block || "";
     siteForm.elements.kuwakuNo.value = kuwakuParts.no || "";
-    siteForm.elements.levelHeight.value = value(record.levelHeight);
+    siteForm.elements.levelHeight.value = value(record.levelHeight) || value(state.site?.levelHeight) || value(siteForm.elements.levelHeight.value);
     siteForm.elements.date.value = value(record.date);
     siteForm.elements.team.value = teamState.team;
     siteForm.elements.teamOther.value = teamState.teamOther;
@@ -16227,7 +16237,7 @@ function setPositionMeasurementFields(record = {}) {
       ].includes(name);
       const rawValue = value(record[name]);
       const numericValue = isLegacyCoordinateField ? parseTotalStationNumber(rawValue) : null;
-      field.value = numericValue == null ? rawValue || field.value : String(-numericValue);
+      field.value = numericValue == null ? rawValue : String(-numericValue);
     }
   });
   const stationPegField = recordForm.elements.tsStationPeg;
@@ -16587,6 +16597,9 @@ function syncPositionMeasurementUi() {
   document.getElementById("ts-polar-fields")?.classList.toggle("hidden", observationMode !== "polar");
   document.getElementById("level-reading-section")?.classList.toggle("hidden", method === "totalStation");
   siteForm?.querySelector(".site-level")?.classList.toggle("hidden", method === "totalStation");
+  if (method === "grid" && siteForm?.elements?.levelHeight && !value(siteForm.elements.levelHeight.value)) {
+    siteForm.elements.levelHeight.value = value(state.site?.levelHeight);
+  }
   syncMultiPointCoordinateModeUi();
   if (method === "totalStation") {
     applyTotalStationPosition();
