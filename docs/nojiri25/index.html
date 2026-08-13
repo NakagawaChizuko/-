@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260808-model3d-ipad3" />
+    <link rel="stylesheet" href="./styles.css?v=20260813-specimen-name-parts1" />
   </head>
   <body>
     <header class="app-header">
@@ -150,9 +150,32 @@
               <input id="specimen-no-input" name="specimenNo" type="hidden" />
             </fieldset>
 
-            <label><span class="label-title">化石・遺物名称<span class="required">*</span></span>
-              <input name="nameMemo" type="text" />
-            </label>
+            <fieldset class="inline-fieldset span-2 specimen-name-fieldset">
+              <legend>化石・遺物名称<span class="required">*</span></legend>
+              <div class="specimen-name-grid">
+                <label><span class="label-title">種類</span>
+                  <select data-specimen-name-target="nameType">
+                    <option value="">候補から選択</option><option value="ナウマンゾウ">ナウマンゾウ</option><option value="ヤベオオツノジカ">ヤベオオツノジカ</option><option value="ノウサギ属">ノウサギ属</option>
+                    <option value="種類不明">種類不明</option><option value="骨">骨</option><option value="加工骨">加工骨</option><option value="骨製品">骨製品</option><option value="材">材</option>
+                    <option value="木">木</option><option value="礫">礫</option><option value="石">石</option><option value="石遺物">石遺物</option><option value="石器">石器</option>
+                  </select>
+                  <input name="nameType" type="text" placeholder="手入力もできます" />
+                </label>
+                <label><span class="label-title">部位</span>
+                  <select data-specimen-name-target="namePart">
+                    <option value="">候補から選択</option><option value="骨片">骨片</option><option value="頭蓋骨">頭蓋骨</option><option value="頭蓋骨片">頭蓋骨片</option><option value="頬骨">頬骨</option><option value="頬骨片">頬骨片</option><option value="頬骨弓">頬骨弓</option>
+                    <option value="切歯">切歯</option><option value="切歯片">切歯片</option><option value="臼歯">臼歯</option><option value="大臼歯">大臼歯</option><option value="ラメラ">ラメラ</option><option value="ラメラ片">ラメラ片</option>
+                    <option value="角">角</option><option value="角片">角片</option><option value="掌状角">掌状角</option><option value="椎骨">椎骨</option><option value="椎骨片">椎骨片</option><option value="胸椎">胸椎</option><option value="腰椎">腰椎</option><option value="軸椎片">軸椎片</option>
+                    <option value="肋骨">肋骨</option><option value="肋骨片">肋骨片</option><option value="肋骨頭">肋骨頭</option><option value="肩甲骨">肩甲骨</option><option value="上腕骨">上腕骨</option><option value="上腕骨片">上腕骨片</option>
+                    <option value="橈骨">橈骨</option><option value="橈骨片">橈骨片</option><option value="橈骨遠位部">橈骨遠位部</option><option value="脛骨">脛骨</option><option value="四肢骨片">四肢骨片</option><option value="中手骨">中手骨</option>
+                    <option value="手根骨">手根骨</option><option value="指骨">指骨</option><option value="基節骨">基節骨</option><option value="中節骨">中節骨</option><option value="種子骨">種子骨</option><option value="舌骨">舌骨</option>
+                    <option value="剥片">剥片</option><option value="チップ">チップ</option><option value="石片">石片</option><option value="砕片">砕片</option><option value="木片">木片</option>
+                  </select>
+                  <input name="namePart" type="text" placeholder="手入力もできます" />
+                </label>
+              </div>
+              <input name="nameMemo" type="hidden" />
+            </fieldset>
             <fieldset class="inline-fieldset">
               <legend>重要品指定<span class="required">*</span></legend>
               <div class="dir-tabs" role="tablist" aria-label="重要品指定">
@@ -1097,6 +1120,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260813-multipoint-mode-fix3"></script>
+    <script src="./app.js?v=20260813-specimen-name-parts1"></script>
   </body>
 </html>

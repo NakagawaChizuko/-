@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v64-multipoint-mode-fix";
+const CACHE_NAME = "kaseki25-pwa-v65-specimen-name-parts";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

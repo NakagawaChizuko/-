@@ -19,6 +19,20 @@ const TEAM_ROSTER_TEAM_COL = 45;
 const TEAM_ROSTER_ROLE_COL = 49;
 const TEAM_ROSTER_NAME_COL = 3;
 const DEFAULT_SPECIMEN_PREFIX = "m";
+const SPECIMEN_NAME_TYPE_PREFIXES = [
+  "ヤベオオツノジカ",
+  "ナウマンゾウ",
+  "ノウサギ属",
+  "種類不明",
+  "石遺物",
+  "加工骨",
+  "骨製品",
+  "石器",
+  "材",
+  "木",
+  "礫",
+  "石",
+];
 
 function normalizeAlphanumericWidth(inputText) {
   return String(inputText)
@@ -842,6 +856,22 @@ function bindEvents() {
 
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
+  recordForm.addEventListener("input", (event) => {
+    if (event.target instanceof Element && event.target.matches('[name="nameType"], [name="namePart"]')) {
+      syncSpecimenNameMemoFromParts();
+      syncSpecimenNameChoiceSelects();
+    }
+  });
+  recordForm.querySelectorAll("select[data-specimen-name-target]").forEach((select) => {
+    select.addEventListener("change", () => {
+      const targetName = value(select.dataset.specimenNameTarget);
+      const target = recordForm.elements[targetName];
+      if (target instanceof HTMLInputElement && value(select.value)) {
+        target.value = value(select.value);
+        syncSpecimenNameMemoFromParts();
+      }
+    });
+  });
   bindLayerChoiceSelects();
   if (customLargeImageFileInput) {
     customLargeImageFileInput.addEventListener("change", async (event) => {
@@ -1035,6 +1065,7 @@ function bindEvents() {
 
   recordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    syncSpecimenNameMemoFromParts();
 
     const isEditTab = getActiveTabId() === "edit-tab";
     let recordKuwaku = "";
@@ -1226,7 +1257,9 @@ function bindEvents() {
       teamOther: recordTeamState.teamOther,
       teamLead: recordSiteSnapshot.teamLead,
       recorder: recordSiteSnapshot.recorder,
-      nameMemo: value(formData.get("nameMemo")),
+      nameType: value(formData.get("nameType")),
+      namePart: value(formData.get("namePart")),
+      nameMemo: composeSpecimenName(formData.get("nameType"), formData.get("namePart")),
       unit: compactNoSpaceValue(formData.get("unit")),
       discoverer: value(formData.get("discoverer")),
       identifier: value(formData.get("identifier")),
@@ -5095,7 +5128,11 @@ function populateRecordForm(record) {
   specimenSerialInput.value = parsedSpecimen.serial;
   updateSpecimenNoFromParts();
 
-  recordForm.elements.nameMemo.value = record.nameMemo || "";
+  const specimenNameParts = splitSpecimenName(record.nameMemo, record.nameType, record.namePart);
+  recordForm.elements.nameType.value = specimenNameParts.nameType;
+  recordForm.elements.namePart.value = specimenNameParts.namePart;
+  syncSpecimenNameMemoFromParts();
+  syncSpecimenNameChoiceSelects();
   recordForm.elements.unit.value = record.unit || "";
   recordForm.elements.discoverer.value = record.discoverer || "";
   recordForm.elements.identifier.value = record.identifier || "";
@@ -5382,7 +5419,9 @@ function buildCurrentEditDraftRecord() {
     specimenSerial,
     specimenNo: buildSpecimenNo(specimenPrefix, specimenSerial),
     analysisType: specimenPrefix === "a" ? normalizeAnalysisType(value(formData.get("analysisType"))) : "",
-    nameMemo: value(formData.get("nameMemo")),
+    nameType: value(formData.get("nameType")),
+    namePart: value(formData.get("namePart")),
+    nameMemo: composeSpecimenName(formData.get("nameType"), formData.get("namePart")),
     importantFlag: value(formData.get("importantFlag")),
     simpleRecordFlag: value(formData.get("simpleRecordFlag")),
     discoverer: value(formData.get("discoverer")),
@@ -5656,6 +5695,8 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     teamLead: value(record.teamLead),
     recorder: value(record.recorder),
     nameMemo: "",
+    nameType: "",
+    namePart: "",
     unit: "",
     discoverer: "",
     identifier: "",
@@ -5861,7 +5902,8 @@ function updateEditMissingRequiredHighlights() {
     analysisTypeSelect.classList.add("edit-missing-field");
   }
   if (missingKeys.has("nameMemo")) {
-    markEditMissingFieldByName("nameMemo");
+    markEditMissingFieldByName("nameType");
+    markEditMissingFieldByName("namePart");
   }
   if (missingKeys.has("importantFlag")) {
     markEditMissingGroupByName("importantFlag");
@@ -7538,6 +7580,9 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
   }
   if (editKey === "nameMemo") {
     record.nameMemo = value(formData.get("nameMemo"));
+    const parts = splitSpecimenName(record.nameMemo);
+    record.nameType = parts.nameType;
+    record.namePart = parts.namePart;
     return { ok: true };
   }
   if (editKey === "importantFlag") {
@@ -8515,7 +8560,9 @@ function buildCurrentRecordDraftForPositionPreview() {
     specimenPrefix,
     specimenSerial,
     specimenNo: buildSpecimenNo(specimenPrefix, specimenSerial),
-    nameMemo: value(formData.get("nameMemo")),
+    nameType: value(formData.get("nameType")),
+    namePart: value(formData.get("namePart")),
+    nameMemo: composeSpecimenName(formData.get("nameType"), formData.get("namePart")),
     unit: compactNoSpaceValue(formData.get("unit")),
     detail: compactNoSpaceValue(formData.get("detail")),
     detailSub: value(formData.get("detailSub")),
@@ -12637,6 +12684,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
   const kuwaku = !rawKuwaku || isDefaultKuwaku(rawKuwaku) ? fallbackKuwaku : rawKuwaku;
   const rawLargeShapeType = value(item.largeShapeType);
   const normalizedLargeShapeType = normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType);
+  const specimenNameParts = splitSpecimenName(item.nameMemo, item.nameType, item.namePart);
 
   return {
     id,
@@ -12652,7 +12700,9 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     teamOther: teamState.teamOther,
     teamLead: value(item.teamLead) || value(fallbackSite.teamLead),
     recorder: value(item.recorder) || value(fallbackSite.recorder),
-    nameMemo: value(item.nameMemo),
+    nameType: specimenNameParts.nameType,
+    namePart: specimenNameParts.namePart,
+    nameMemo: composeSpecimenName(specimenNameParts.nameType, specimenNameParts.namePart),
     unit: compactNoSpaceValue(item.unit),
     discoverer: value(item.discoverer),
     identifier: value(item.identifier),
@@ -13648,6 +13698,8 @@ function buildListCsv() {
     "標本番号",
     "分類",
     "名称",
+    "種類",
+    "部位",
     "ユニット",
     "発見者",
     "判定者",
@@ -13673,6 +13725,8 @@ function buildListCsv() {
     record.specimenNo,
     formatCategoryForRecord(record),
     record.nameMemo,
+    record.nameType,
+    record.namePart,
     record.unit,
     record.discoverer,
     record.identifier,
@@ -13698,6 +13752,8 @@ function buildCardCsv() {
     "標本番号",
     "分類",
     "化石・遺物名称",
+    "種類",
+    "部位",
     "重要品指定",
     "簡易記載",
     "地層名",
@@ -13722,6 +13778,8 @@ function buildCardCsv() {
     record.specimenNo,
     formatCategoryForRecord(record),
     record.nameMemo,
+    record.nameType,
+    record.namePart,
     record.importantFlag,
     record.simpleRecordFlag,
     record.layerName,
@@ -15799,6 +15857,51 @@ function normalizeAsciiWidth(inputText) {
 
 function value(input) {
   return input == null ? "" : normalizeAsciiWidth(String(input)).trim();
+}
+
+function composeSpecimenName(nameTypeRaw, namePartRaw) {
+  const nameType = value(nameTypeRaw);
+  const namePart = value(namePartRaw);
+  if (!nameType) return namePart;
+  if (!namePart) return nameType;
+  return `${nameType} ${namePart}`;
+}
+
+function splitSpecimenName(nameMemoRaw, nameTypeRaw = "", namePartRaw = "") {
+  const explicitType = value(nameTypeRaw);
+  const explicitPart = value(namePartRaw);
+  if (explicitType || explicitPart) {
+    return { nameType: explicitType, namePart: explicitPart };
+  }
+  const nameMemo = value(nameMemoRaw);
+  if (!nameMemo) return { nameType: "", namePart: "" };
+  const spaced = nameMemo.match(/^(.+?)\s+(.+)$/);
+  if (spaced && SPECIMEN_NAME_TYPE_PREFIXES.includes(value(spaced[1]))) {
+    return { nameType: value(spaced[1]), namePart: value(spaced[2]) };
+  }
+  const prefix = SPECIMEN_NAME_TYPE_PREFIXES.find((candidate) => nameMemo === candidate || nameMemo.startsWith(candidate));
+  if (prefix) {
+    return { nameType: prefix, namePart: value(nameMemo.slice(prefix.length)) };
+  }
+  return { nameType: "", namePart: nameMemo };
+}
+
+function syncSpecimenNameMemoFromParts() {
+  if (!recordForm?.elements) return;
+  const memoField = recordForm.elements.nameMemo;
+  if (memoField instanceof HTMLInputElement) {
+    memoField.value = composeSpecimenName(recordForm.elements.nameType?.value, recordForm.elements.namePart?.value);
+  }
+}
+
+function syncSpecimenNameChoiceSelects() {
+  if (!recordForm) return;
+  recordForm.querySelectorAll("select[data-specimen-name-target]").forEach((select) => {
+    const target = recordForm.elements[value(select.dataset.specimenNameTarget)];
+    const targetValue = target instanceof HTMLInputElement ? value(target.value) : "";
+    const hasOption = Array.from(select.options).some((option) => option.value === targetValue);
+    select.value = hasOption ? targetValue : "";
+  });
 }
 
 function clamp(number, min, max) {
