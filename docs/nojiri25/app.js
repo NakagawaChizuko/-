@@ -3861,7 +3861,7 @@ function syncMultiPointCoordinateModeUi() {
       : firstRow.querySelector("[data-multi-point-north-from-cm]")
         ? "grid"
         : "legacyGrid";
-  const rowMode = detectedRowMode === "legacyGrid" ? "grid" : detectedRowMode;
+  const rowMode = detectedRowMode;
   const targetMode = isPolar ? "polar" : isTotalStation ? "offset" : "grid";
   if (rowMode !== targetMode) {
     const points = readMultiPointRowsFromForm({ useFallback: true });
@@ -4312,6 +4312,9 @@ function syncLargeShapeSectionFromForm() {
   }
   if (isMultiPoint && multiPointRows && !multiPointRows.querySelector("[data-multi-point-row]")) {
     renderMultiPointRows([]);
+  }
+  if (isMultiPoint) {
+    syncMultiPointCoordinateModeUi();
   }
   if (!isLarge) {
     if (largeShapeTypeInput) {
@@ -7233,8 +7236,27 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
     case "specimenNo":
       return `
         <label>
-          <span class="label-title">標本番号</span>
-          <input name="specimenNo" type="text" value="${escapeHtml(parsedSpecimen.specimenNo)}" placeholder="例: m-1" />
+          <span class="label-title">分類</span>
+          <select name="specimenPrefix" data-cell-edit-prefix-select>
+            ${buildOutputCellEditPrefixOptionsHtml(specimenPrefix)}
+          </select>
+        </label>
+        <label>
+          <span class="label-title">番号</span>
+          <div class="specimen-number-row">
+            <span data-cell-edit-prefix-label class="specimen-prefix-chip">${escapeHtml(specimenPrefix)}</span>
+            <span>-</span>
+            <input name="specimenSerial" type="text" inputmode="numeric" value="${escapeHtml(
+              parsedSpecimen.serial
+            )}" placeholder="例: 1" data-cell-edit-specimen-serial />
+          </div>
+          <span class="hint-text">現在の分類と番号を表示しています。どちらも変更できます。</span>
+        </label>
+        <label data-cell-edit-analysis-row class="${analysisHiddenClass}">
+          <span class="label-title">分析用試料の区分</span>
+          <select name="analysisType">
+            ${buildOutputCellEditAnalysisOptionsHtml(analysisType)}
+          </select>
         </label>
       `;
     case "category":
@@ -7264,12 +7286,25 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
         </label>
       `;
     case "nameMemo":
+      {
+        const nameParts = splitSpecimenName(record?.nameMemo, record?.nameType, record?.namePart);
       return `
         <label>
-          <span class="label-title">化石・遺物名称</span>
-          <input name="nameMemo" type="text" value="${escapeHtml(value(record?.nameMemo))}" />
+          <span class="label-title">種類</span>
+          <select data-cell-edit-name-target="nameType">
+            ${buildOutputCellEditSpecimenNameOptionsHtml("nameType", nameParts.nameType)}
+          </select>
+          <input name="nameType" type="text" value="${escapeHtml(nameParts.nameType)}" placeholder="手入力もできます" />
+        </label>
+        <label>
+          <span class="label-title">部位</span>
+          <select data-cell-edit-name-target="namePart">
+            ${buildOutputCellEditSpecimenNameOptionsHtml("namePart", nameParts.namePart)}
+          </select>
+          <input name="namePart" type="text" value="${escapeHtml(nameParts.namePart)}" placeholder="手入力もできます" />
         </label>
       `;
+      }
     case "importantFlag":
       return `
         <label>
@@ -7423,7 +7458,7 @@ function bindOutputCellEditDynamicFields(editKey) {
       toggle();
     }
   }
-  if (editKey === "category") {
+  if (editKey === "category" || editKey === "specimenNo") {
     const prefixSelect = cellEditFields.querySelector("[data-cell-edit-prefix-select]");
     const analysisRow = cellEditFields.querySelector("[data-cell-edit-analysis-row]");
     const specimenSerialInput = cellEditFields.querySelector("[data-cell-edit-specimen-serial]");
@@ -7436,7 +7471,7 @@ function bindOutputCellEditDynamicFields(editKey) {
           prefixLabel.textContent = prefix;
         }
         if (specimenSerialInput instanceof HTMLInputElement) {
-          if (useAutoSerial || !compactNoSpaceValue(specimenSerialInput.value)) {
+          if (editKey === "category" && (useAutoSerial || !compactNoSpaceValue(specimenSerialInput.value))) {
             specimenSerialInput.value = findSmallestUnusedSpecimenSerialForActiveEdit(prefix);
           }
         }
@@ -7444,6 +7479,22 @@ function bindOutputCellEditDynamicFields(editKey) {
       prefixSelect.addEventListener("change", () => toggle(true));
       toggle(false);
     }
+  }
+  if (editKey === "nameMemo") {
+    cellEditFields.querySelectorAll("select[data-cell-edit-name-target]").forEach((select) => {
+      if (!(select instanceof HTMLSelectElement)) return;
+      const targetName = value(select.dataset.cellEditNameTarget);
+      const input = cellEditFields.querySelector(`input[name="${targetName}"]`);
+      if (!(input instanceof HTMLInputElement)) return;
+      select.addEventListener("change", () => {
+        if (value(select.value)) input.value = value(select.value);
+      });
+      input.addEventListener("input", () => {
+        const inputValue = value(input.value);
+        const hasOption = Array.from(select.options).some((option) => option.value === inputValue);
+        select.value = hasOption ? inputValue : "";
+      });
+    });
   }
   if (editKey === "altitudeM") {
     const check = cellEditFields.querySelector("[data-cell-edit-altitude-check]");
@@ -7539,22 +7590,24 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     return { ok: true };
   }
   if (editKey === "specimenNo") {
-    const parsed = parseSpecimenNo(formData.get("specimenNo"), record.specimenPrefix, record.specimenSerial);
-    if (!parsed.serial) {
-      return { ok: false, message: "標本番号を入力してください（例: m-1）" };
+    const nextPrefix = normalizeSpecimenPrefix(formData.get("specimenPrefix"));
+    const nextSerial = compactNoSpaceValue(formData.get("specimenSerial"));
+    if (!nextSerial) {
+      return { ok: false, message: "番号を入力してください" };
     }
-    const nextSpecimenNo = buildSpecimenNo(parsed.prefix, parsed.serial);
+    if (!/^\d+$/.test(nextSerial)) {
+      return { ok: false, message: "番号は半角数字で入力してください" };
+    }
+    const nextSpecimenNo = buildSpecimenNo(nextPrefix, nextSerial);
     const duplicate = findDuplicateRecordByKuwakuAndSpecimen(getRecordKuwaku(record), nextSpecimenNo, record.id);
     if (duplicate) {
       return { ok: false, message: `この区画には ${nextSpecimenNo} がすでにあります` };
     }
-    record.specimenPrefix = normalizeSpecimenPrefix(parsed.prefix);
-    record.specimenSerial = compactNoSpaceValue(parsed.serial);
+    record.specimenPrefix = nextPrefix;
+    record.specimenSerial = nextSerial;
     record.specimenNo = nextSpecimenNo;
-    record.category = categoryFromPrefix(record.specimenPrefix);
-    if (record.specimenPrefix !== "a") {
-      record.analysisType = "";
-    }
+    record.category = categoryFromPrefix(nextPrefix);
+    record.analysisType = nextPrefix === "a" ? normalizeAnalysisType(formData.get("analysisType")) : "";
     return { ok: true };
   }
   if (editKey === "category") {
@@ -7579,10 +7632,12 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     return { ok: true };
   }
   if (editKey === "nameMemo") {
-    record.nameMemo = value(formData.get("nameMemo"));
-    const parts = splitSpecimenName(record.nameMemo);
-    record.nameType = parts.nameType;
-    record.namePart = parts.namePart;
+    record.nameType = value(formData.get("nameType"));
+    record.namePart = value(formData.get("namePart"));
+    record.nameMemo = composeSpecimenName(record.nameType, record.namePart);
+    if (!record.nameMemo) {
+      return { ok: false, message: "種類または部位を入力してください" };
+    }
     return { ok: true };
   }
   if (editKey === "importantFlag") {
@@ -7688,6 +7743,23 @@ function buildOutputCellEditAnalysisOptionsHtml(selectedTypeRaw) {
     options.push(`<option value="${escapeHtml(optionValue)}" ${optionValue === selectedType ? "selected" : ""}>${escapeHtml(optionValue)}</option>`);
   });
   return options.join("");
+}
+
+function buildOutputCellEditSpecimenNameOptionsHtml(targetNameRaw, selectedValueRaw) {
+  const targetName = value(targetNameRaw);
+  const selectedValue = value(selectedValueRaw);
+  const sourceSelect = recordForm?.querySelector(`select[data-specimen-name-target="${targetName}"]`);
+  if (!(sourceSelect instanceof HTMLSelectElement)) {
+    return '<option value="">候補から選択</option>';
+  }
+  return Array.from(sourceSelect.options)
+    .map((option) => {
+      const optionValue = value(option.value);
+      return `<option value="${escapeHtml(optionValue)}" ${optionValue === selectedValue ? "selected" : ""}>${escapeHtml(
+        option.textContent || optionValue
+      )}</option>`;
+    })
+    .join("");
 }
 
 function isOutputListColumnVisible(columnKeyRaw) {
