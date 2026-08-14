@@ -2550,19 +2550,6 @@ button.upload-picker-label {
   outline-offset: -2px;
 }
 
-.specimen-no-list-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.specimen-no-edit-btn {
-  padding: 3px 7px;
-  min-height: 28px;
-  font-size: 0.75rem;
-}
-
 #record-form .panel-actions {
   justify-content: center;
 }

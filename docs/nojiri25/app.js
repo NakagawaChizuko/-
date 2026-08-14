@@ -1486,10 +1486,6 @@ function bindEvents() {
     const recordIndex = value(button.dataset.recordIndex) || value(row?.dataset?.recordIndex);
     const record = findRecordByEditContext(recordId, recordIndex, null);
 
-    if (action === "edit-specimen-no") {
-      openOutputCellEditModal(recordId, "specimenNo", recordIndex);
-      return;
-    }
     if (action === "edit") {
       const rowKuwaku = value(button.dataset.kuwaku);
       openRecordForEdit(recordId, rowKuwaku, recordIndex);
@@ -7907,14 +7903,7 @@ function renderListOutput() {
         <td data-col-key="dataStatus" class="${listCellClass(dataComplete ? "data-status-complete" : "data-status-incomplete", !dataComplete)}" ${missingTitle}>${
           dataComplete ? "○" : "未記入"
         }</td>
-        <td data-col-key="specimenNo" data-cell-edit-key="specimenNo" class="${listCellClass("", specimenMissing)}" ${missingTitle}>
-          <div class="specimen-no-list-cell">
-            <span>${escapeHtml(record.specimenNo)}</span>
-            <button type="button" class="specimen-no-edit-btn" data-action="edit-specimen-no" data-id="${escapeHtml(
-              value(record.id)
-            )}" data-record-index="${Number.isInteger(recordIndex) && recordIndex >= 0 ? recordIndex : ""}">編集</button>
-          </div>
-        </td>
+        <td data-col-key="specimenNo" data-cell-edit-key="specimenNo" class="${listCellClass("", specimenMissing)}" ${missingTitle}>${escapeHtml(record.specimenNo)}</td>
         <td data-col-key="category" data-cell-edit-key="category" class="${listCellClass("category-color-cell", categoryMissing)}" style="background:${categoryBackground};color:#111827;border-color:${categoryBorderColor};" ${missingTitle}>${escapeHtml(
           formatCategoryForRecord(record)
         )}</td>
@@ -12022,8 +12011,7 @@ function incrementGridNo(noRaw, step) {
   return String(Number(raw) + step);
 }
 
-function buildPlanLegendHtml(options = {}) {
-  const includeTotalStation = options.includeTotalStation !== false;
+function buildPlanLegendHtml() {
   const order = ["m", "b", "l", "s", "i", "g", "h", "a"];
   const specimenLegend = order
     .map((prefix) => {
@@ -12032,10 +12020,7 @@ function buildPlanLegendHtml(options = {}) {
       return `<span class="plan-legend-item"><span class="plan-legend-dot" style="background:${color}"></span>${prefix}: ${label}</span>`;
     })
     .join("");
-  const totalStationLegend = includeTotalStation
-    ? '<span class="plan-legend-item"><span class="plan-legend-dot" style="background:#0067c5"></span>TS: トータルステーション設置位置</span>'
-    : "";
-  return `${specimenLegend}${totalStationLegend}`;
+  return specimenLegend;
 }
 
 function getSpecimenPrefixColor(prefixRaw) {
