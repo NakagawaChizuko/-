@@ -367,7 +367,7 @@ const PHOTO_COMPRESSION_STEPS = [
   { maxLength: 560, quality: 0.46 },
 ];
 const PHOTO_TARGET_JPEG_BYTES = 1024 * 1024;
-const PHOTO_TARGET_MAX_LENGTH = 2560;
+const PHOTO_TARGET_MAX_LENGTH = 4096;
 
 const createInitialState = () => ({
   site: {
@@ -16394,6 +16394,9 @@ async function loadImageFileDataUrlWithFallback(
       const originalDataUrl = normalizeImageDataUrlForUpload(await readFileAsDataUrl(sourceFile), sourceFile, outputMimeType);
       if (!originalDataUrl) {
         throw new Error("Unsupported image type");
+      }
+      if (getDataUrlDecodedByteLength(originalDataUrl) <= Number(targetBytes)) {
+        return originalDataUrl;
       }
       return await resizeDataUrlImageToTargetJpeg(originalDataUrl, maxLength, Number(targetBytes));
     }
