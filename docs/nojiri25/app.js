@@ -366,6 +366,8 @@ const PHOTO_COMPRESSION_STEPS = [
   { maxLength: 720, quality: 0.54 },
   { maxLength: 560, quality: 0.46 },
 ];
+const PHOTO_TARGET_JPEG_BYTES = 1024 * 1024;
+const PHOTO_TARGET_MAX_LENGTH = 2560;
 
 const createInitialState = () => ({
   site: {
@@ -2166,9 +2168,10 @@ async function addPhotosFromFiles(fileList) {
   for (const file of files) {
     try {
       const dataUrl = await loadImageFileDataUrlWithFallback(file, {
-        maxLength: 1280,
-        quality: 0.72,
+        maxLength: PHOTO_TARGET_MAX_LENGTH,
+        quality: 0.98,
         mimeType: "image/jpeg",
+        targetBytes: PHOTO_TARGET_JPEG_BYTES,
       });
       currentPhotos.push({
         id: newId("photo"),
@@ -16204,6 +16207,79 @@ function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72, mimeType = "imag
   });
 }
 
+function getDataUrlDecodedByteLength(dataUrlRaw) {
+  const dataUrl = String(dataUrlRaw || "");
+  const commaIndex = dataUrl.indexOf(",");
+  if (commaIndex < 0) return 0;
+  const payload = dataUrl.slice(commaIndex + 1).replace(/\s/g, "");
+  if (!payload) return 0;
+  const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor(payload.length * 3 / 4) - padding);
+}
+
+function resizeDataUrlImageToTargetJpeg(dataUrl, maxLength, targetBytes) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const sourceWidth = Math.max(1, Number(image.naturalWidth || image.width) || 1);
+      const sourceHeight = Math.max(1, Number(image.naturalHeight || image.height) || 1);
+      const initialScale = Math.min(1, maxLength / Math.max(sourceWidth, sourceHeight));
+      let width = Math.max(1, Math.round(sourceWidth * initialScale));
+      let height = Math.max(1, Math.round(sourceHeight * initialScale));
+      let bestUnderTarget = "";
+
+      for (let resizeAttempt = 0; resizeAttempt < 5; resizeAttempt += 1) {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Canvas context unavailable"));
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+
+        const highestQuality = canvas.toDataURL("image/jpeg", 0.98);
+        const highestBytes = getDataUrlDecodedByteLength(highestQuality);
+        if (highestBytes <= targetBytes) {
+          resolve(highestQuality);
+          return;
+        }
+
+        let lowQuality = 0.45;
+        let highQuality = 0.98;
+        let lowCandidate = canvas.toDataURL("image/jpeg", lowQuality);
+        let lowBytes = getDataUrlDecodedByteLength(lowCandidate);
+        if (lowBytes <= targetBytes) {
+          bestUnderTarget = lowCandidate;
+          for (let qualityAttempt = 0; qualityAttempt < 8; qualityAttempt += 1) {
+            const nextQuality = (lowQuality + highQuality) / 2;
+            const candidate = canvas.toDataURL("image/jpeg", nextQuality);
+            const candidateBytes = getDataUrlDecodedByteLength(candidate);
+            if (candidateBytes <= targetBytes) {
+              bestUnderTarget = candidate;
+              lowQuality = nextQuality;
+            } else {
+              highQuality = nextQuality;
+            }
+          }
+          resolve(bestUnderTarget);
+          return;
+        }
+
+        const shrinkScale = clamp(Math.sqrt(targetBytes / Math.max(1, lowBytes)) * 0.94, 0.5, 0.9);
+        width = Math.max(1, Math.round(width * shrinkScale));
+        height = Math.max(1, Math.round(height * shrinkScale));
+        bestUnderTarget = lowCandidate;
+      }
+
+      resolve(bestUnderTarget || resizeDataUrlImage(dataUrl, maxLength, 0.72, "image/jpeg"));
+    };
+    image.onerror = () => reject(new Error("Failed to load image"));
+    image.src = dataUrl;
+  });
+}
+
 function resizeImage(file, maxLength, quality = 0.72, mimeType = "image/jpeg") {
   return new Promise((resolve, reject) => {
     const outputMimeType = resolveImageMimeType(file, mimeType) || "image/jpeg";
@@ -16252,7 +16328,7 @@ function readBlobAsDataUrl(blob) {
 
 async function loadImageFileDataUrlWithFallback(
   file,
-  { maxLength = 1280, quality = 0.72, mimeType = "image/jpeg", allowOriginalFallback = true } = {}
+  { maxLength = 1280, quality = 0.72, mimeType = "image/jpeg", allowOriginalFallback = true, targetBytes = 0 } = {}
 ) {
   const sourceFile = file instanceof File ? file : null;
   if (!sourceFile) {
@@ -16260,8 +16336,22 @@ async function loadImageFileDataUrlWithFallback(
   }
   const outputMimeType = resolveImageMimeType(sourceFile, mimeType) || normalizeImageMimeType(mimeType) || "image/jpeg";
   try {
+    if (outputMimeType === "image/jpeg" && Number(targetBytes) > 0) {
+      const originalDataUrl = normalizeImageDataUrlForUpload(await readFileAsDataUrl(sourceFile), sourceFile, outputMimeType);
+      if (!originalDataUrl) {
+        throw new Error("Unsupported image type");
+      }
+      return await resizeDataUrlImageToTargetJpeg(originalDataUrl, maxLength, Number(targetBytes));
+    }
     return await resizeImage(sourceFile, maxLength, quality, outputMimeType);
   } catch (resizeError) {
+    if (outputMimeType === "image/jpeg" && Number(targetBytes) > 0) {
+      try {
+        return await resizeImage(sourceFile, Math.min(maxLength, PHOTO_TARGET_MAX_LENGTH), 0.82, outputMimeType);
+      } catch (_fallbackResizeError) {
+        // 元画像の読込を最後に試す
+      }
+    }
     if (!allowOriginalFallback) {
       throw resizeError;
     }
