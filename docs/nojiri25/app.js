@@ -5053,8 +5053,8 @@ function resetRecordForm({ showMessage }) {
   }
   updateSpecimenNoFromParts();
 
-  recordForm.elements.occurrenceSection.value = "要";
-  recordForm.elements.occurrenceSketch.value = "要";
+  recordForm.elements.occurrenceSection.value = "無";
+  recordForm.elements.occurrenceSketch.value = "無";
   recordForm.elements.importantFlag.value = "無";
   recordForm.elements.simpleRecordFlag.value = "-";
   recordForm.elements.layerRelative.value = "";
@@ -5738,8 +5738,8 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     levelLowerCm: "",
     altitudeInputEnabled: "",
     altitudeDirectM: "",
-    occurrenceSection: "要",
-    occurrenceSketch: "要",
+    occurrenceSection: "無",
+    occurrenceSketch: "無",
     sectionDiagrams: [],
     photos: [],
     models3d: [],
@@ -7421,18 +7421,18 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
         <label>
           <span class="label-title">産出状況断面</span>
           <select name="occurrenceSection">
-            <option value="要" ${value(record?.occurrenceSection) === "否" ? "" : "selected"}>要</option>
-            <option value="否" ${value(record?.occurrenceSection) === "否" ? "selected" : ""}>否</option>
+            <option value="無" ${normalizeNeedFlag(record?.occurrenceSection) === "無" ? "selected" : ""}>無</option>
+            <option value="有" ${normalizeNeedFlag(record?.occurrenceSection) === "有" ? "selected" : ""}>有</option>
           </select>
         </label>
       `;
     case "occurrenceSketch":
       return `
         <label>
-          <span class="label-title">産状スケッチ</span>
+          <span class="label-title">専門班による産状スケッチ</span>
           <select name="occurrenceSketch">
-            <option value="要" ${value(record?.occurrenceSketch) === "否" ? "" : "selected"}>要</option>
-            <option value="否" ${value(record?.occurrenceSketch) === "否" ? "selected" : ""}>否</option>
+            <option value="無" ${normalizeNeedFlag(record?.occurrenceSketch) === "無" ? "selected" : ""}>無</option>
+            <option value="有" ${normalizeNeedFlag(record?.occurrenceSketch) === "有" ? "selected" : ""}>有</option>
           </select>
         </label>
       `;
@@ -15513,7 +15513,11 @@ function getMissingRequiredKeys(record) {
 }
 
 function normalizeNeedFlag(valueRaw) {
-  return value(valueRaw) === "否" ? "否" : "要";
+  const text = value(valueRaw);
+  if (text === "有" || text === "否") {
+    return "有";
+  }
+  return "無";
 }
 
 function normalizeHasFlag(valueRaw) {
