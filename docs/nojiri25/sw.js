@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v73-photo-target-1mb";
+const CACHE_NAME = "kaseki25-pwa-v74-restore-multipoint-delete";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
