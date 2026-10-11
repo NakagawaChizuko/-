@@ -2441,17 +2441,48 @@ async function openBrowserCamera(destination) {
       },
       audio: false,
     });
+    const cameraTrack = activeCameraStream.getVideoTracks()[0];
+    if (cameraTrack?.getCapabilities && cameraTrack?.applyConstraints) {
+      const capabilities = cameraTrack.getCapabilities();
+      const maxWidth = Number(capabilities?.width?.max);
+      const maxHeight = Number(capabilities?.height?.max);
+      if (Number.isFinite(maxWidth) && Number.isFinite(maxHeight)) {
+        try {
+          await cameraTrack.applyConstraints({
+            width: { ideal: maxWidth },
+            height: { ideal: maxHeight },
+          });
+        } catch (_constraintError) {
+          // 端末が許可する解像度でそのまま続行する。
+        }
+      }
+    }
     cameraCaptureVideo.srcObject = activeCameraStream;
     await cameraCaptureVideo.play();
     cameraCaptureShutterBtn.disabled = false;
-    cameraCaptureStatus.textContent = "映像を確認して「撮影して追加」を押してください。続けて複数枚撮影できます。";
+    const settings = cameraTrack?.getSettings?.() || {};
+    const resolutionText = settings.width && settings.height ? `（${settings.width}×${settings.height}）` : "";
+    cameraCaptureStatus.textContent = `映像${resolutionText}を確認して「撮影して追加」を押してください。続けて複数枚撮影できます。`;
   } catch (_error) {
     stopBrowserCamera();
     cameraCaptureStatus.textContent = "カメラを使用できません。ブラウザのサイト設定で、このページのカメラを「許可」にしてください。";
   }
 }
 
-function cameraFrameToFile() {
+async function cameraFrameToFile() {
+  const cameraTrack = activeCameraStream?.getVideoTracks?.()[0];
+  if (cameraTrack && typeof window.ImageCapture === "function") {
+    try {
+      const capture = new window.ImageCapture(cameraTrack);
+      const blob = await capture.takePhoto();
+      if (blob?.size) {
+        const name = `camera-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`;
+        return new File([blob], name, { type: blob.type || "image/jpeg", lastModified: Date.now() });
+      }
+    } catch (_stillCaptureError) {
+      // 静止画API非対応時は高解像度の動画フレームを使用する。
+    }
+  }
   return new Promise((resolve, reject) => {
     if (!cameraCaptureVideo?.videoWidth || !cameraCaptureVideo?.videoHeight) {
       reject(new Error("Camera image unavailable"));
