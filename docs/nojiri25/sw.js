@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v82-high-quality-storage-refresh";
+const CACHE_NAME = "kaseki25-pwa-v83-file-picker-only";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

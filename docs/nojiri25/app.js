@@ -633,13 +633,11 @@ const teamOtherInput = document.getElementById("team-other-input");
 const sectionDiagramCameraInput = document.getElementById("section-diagram-camera-input");
 const sectionDiagramInput = document.getElementById("section-diagram-input");
 const sectionDiagramList = document.getElementById("section-diagram-list");
-const photoCameraInput = document.getElementById("photo-camera-input");
 const photoInput = document.getElementById("photo-input");
 const photoList = document.getElementById("photo-list");
 const model3dInput = document.getElementById("model3d-input");
 const model3dList = document.getElementById("model3d-list");
 const sectionDiagramCameraBtn = document.getElementById("section-diagram-camera-btn");
-const photoCameraBtn = document.getElementById("photo-camera-btn");
 const cameraCaptureModal = document.getElementById("camera-capture-modal");
 const cameraCaptureVideo = document.getElementById("camera-capture-video");
 const cameraCaptureStatus = document.getElementById("camera-capture-status");
@@ -2010,7 +2008,7 @@ function bindEvents() {
     persist("断面図を削除しました");
   });
 
-  const photoInputs = [photoCameraInput, photoInput].filter(Boolean);
+  const photoInputs = [photoInput].filter(Boolean);
   photoInputs.forEach((input) => {
     input.addEventListener("change", async (event) => {
       await addPhotosFromFiles(event.target.files);
@@ -2562,13 +2560,6 @@ sectionDiagramCameraBtn?.addEventListener("click", () => {
     return;
   }
   openBrowserCamera("sectionDiagram");
-});
-photoCameraBtn?.addEventListener("click", () => {
-  if (shouldUseNativeStillCamera() && photoCameraInput instanceof HTMLInputElement) {
-    photoCameraInput.click();
-    return;
-  }
-  openBrowserCamera("photo");
 });
 cameraCaptureCloseBtn?.addEventListener("click", closeBrowserCamera);
 cameraCaptureCancelBtn?.addEventListener("click", closeBrowserCamera);

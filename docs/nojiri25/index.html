@@ -587,10 +587,8 @@
             <h3>写真添付</h3>
             <p class="hint-text">この記録に紐づける写真を追加します。</p>
             <div class="upload-picker-row">
-              <button id="photo-camera-btn" class="upload-picker-label" type="button">カメラで撮影</button>
               <label class="upload-picker-label secondary" for="photo-input">保存フォルダから選択</label>
             </div>
-            <input id="photo-camera-input" class="upload-file-input" type="file" accept="image/*,.heic,.heif" capture="environment" multiple />
             <input id="photo-input" class="upload-file-input" type="file" accept="image/*,.heic,.heif" multiple />
             <div id="photo-list" class="photo-list"></div>
             <p class="hint-text">化石・遺物カード全体が写った写真を添付してください</p>
@@ -600,7 +598,7 @@
             <h3>3Dデータ添付</h3>
             <p class="hint-text">この標本番号に紐づける3Dデータを追加します。GLBを推奨します。OBJの材質・画像はMTLやテクスチャも一緒に選択してください。</p>
             <div class="upload-picker-row">
-              <label class="upload-picker-label secondary" for="model3d-input">3Dデータを選択</label>
+              <label class="upload-picker-label secondary" for="model3d-input">保存フォルダから選択</label>
             </div>
             <input id="model3d-input" class="upload-file-input" type="file" multiple />
             <div id="model3d-list" class="model3d-list"></div>
@@ -1084,6 +1082,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261011-high-quality-storage2"></script>
+    <script src="./app.js?v=20261011-file-picker-only1"></script>
   </body>
 </html>
