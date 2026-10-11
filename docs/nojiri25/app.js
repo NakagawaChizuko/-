@@ -1010,34 +1010,12 @@ function bindEvents() {
   if (multiPointAddBtn && multiPointRows) {
     multiPointAddBtn.addEventListener("click", () => {
       multiPointRows.append(createMultiPointRowElement(createDefaultPlanMultiPoint()));
-      syncMultiPointRemoveButtonState();
       updateMultiPointCalculationResults();
     });
   }
   if (multiPointRows) {
     multiPointRows.addEventListener("input", updateMultiPointCalculationResults);
     multiPointRows.addEventListener("change", updateMultiPointCalculationResults);
-    multiPointRows.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      const removeButton = target.closest("[data-multi-point-remove]");
-      if (!(removeButton instanceof HTMLButtonElement)) {
-        return;
-      }
-      const row = removeButton.closest("[data-multi-point-row]");
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      const rows = multiPointRows.querySelectorAll("[data-multi-point-row]");
-      if (rows.length <= 1) {
-        return;
-      }
-      row.remove();
-      syncMultiPointRemoveButtonState();
-      updateMultiPointCalculationResults();
-    });
   }
 
   layerTabButtons.forEach((button) => {
@@ -3838,13 +3816,7 @@ function createMultiPointRowElement(pointRaw = {}) {
     thirdLabel = makeField("標高", "multiPointZAltitudeM", gridPoint.zAltitudeM);
   }
 
-  const removeButton = document.createElement("button");
-  removeButton.type = "button";
-  removeButton.className = "multi-point-remove";
-  removeButton.dataset.multiPointRemove = "1";
-  removeButton.textContent = "削除";
-
-  row.append(firstLabel, secondLabel, thirdLabel, removeButton);
+  row.append(firstLabel, secondLabel, thirdLabel);
   if (isTotalStation) {
     const result = document.createElement("p");
     result.className = "multi-point-calculation-result hint-text";
@@ -3865,7 +3837,6 @@ function renderMultiPointRows(pointsRaw = []) {
   source.forEach((point) => {
     multiPointRows.append(createMultiPointRowElement(point));
   });
-  syncMultiPointRemoveButtonState();
   updateMultiPointCalculationResults();
 }
 
@@ -3897,20 +3868,6 @@ function syncMultiPointCoordinateModeUi() {
     const pointsForTarget = points.length ? points : multiPointDraftsByMode[targetMode];
     renderMultiPointRows(pointsForTarget);
   }
-}
-
-function syncMultiPointRemoveButtonState() {
-  if (!multiPointRows) {
-    return;
-  }
-  const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
-  const canRemove = rows.length > 1;
-  rows.forEach((row) => {
-    const removeButton = row.querySelector("[data-multi-point-remove]");
-    if (removeButton instanceof HTMLButtonElement) {
-      removeButton.disabled = !canRemove;
-    }
-  });
 }
 
 function readMultiPointRowsFromForm({ useFallback = false } = {}) {
