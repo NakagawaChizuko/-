@@ -1266,7 +1266,7 @@ function bindEvents() {
       altitudeInputEnabled,
       altitudeDirectM,
       occurrenceSection: normalizeNeedFlag(value(formData.get("occurrenceSection"))),
-      occurrenceSketch: normalizeNeedFlag(value(formData.get("occurrenceSketch"))),
+      occurrenceSketch: normalizeOccurrenceSketchFlag(value(formData.get("occurrenceSketch"))),
       sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
       sectionDiagramHorizonChecked: normalizeChecklistChecked(formData.get("sectionDiagramHorizonChecked")),
       sectionDiagramLayerFaciesChecked: normalizeChecklistChecked(formData.get("sectionDiagramLayerFaciesChecked")),
@@ -5053,7 +5053,7 @@ function resetRecordForm({ showMessage }) {
   }
   updateSpecimenNoFromParts();
 
-  recordForm.elements.occurrenceSection.value = "無";
+  recordForm.elements.occurrenceSection.value = "要";
   recordForm.elements.occurrenceSketch.value = "無";
   recordForm.elements.importantFlag.value = "無";
   recordForm.elements.simpleRecordFlag.value = "-";
@@ -5179,7 +5179,7 @@ function populateRecordForm(record) {
     recordForm.elements.altitudeDirectM.value = value(record.altitudeDirectM);
   }
   recordForm.elements.occurrenceSection.value = normalizeNeedFlag(record.occurrenceSection);
-  recordForm.elements.occurrenceSketch.value = normalizeNeedFlag(record.occurrenceSketch);
+  recordForm.elements.occurrenceSketch.value = normalizeOccurrenceSketchFlag(record.occurrenceSketch);
   if (recordForm.elements.sectionDiagramDistanceChecked) {
     recordForm.elements.sectionDiagramDistanceChecked.checked = normalizeChecklistChecked(record.sectionDiagramDistanceChecked) === "1";
   }
@@ -5738,7 +5738,7 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     levelLowerCm: "",
     altitudeInputEnabled: "",
     altitudeDirectM: "",
-    occurrenceSection: "無",
+    occurrenceSection: "要",
     occurrenceSketch: "無",
     sectionDiagrams: [],
     photos: [],
@@ -7421,8 +7421,8 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
         <label>
           <span class="label-title">産出状況断面</span>
           <select name="occurrenceSection">
-            <option value="無" ${normalizeNeedFlag(record?.occurrenceSection) === "無" ? "selected" : ""}>無</option>
-            <option value="有" ${normalizeNeedFlag(record?.occurrenceSection) === "有" ? "selected" : ""}>有</option>
+            <option value="要" ${normalizeNeedFlag(record?.occurrenceSection) === "要" ? "selected" : ""}>要</option>
+            <option value="否" ${normalizeNeedFlag(record?.occurrenceSection) === "否" ? "selected" : ""}>否</option>
           </select>
         </label>
       `;
@@ -7431,8 +7431,8 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
         <label>
           <span class="label-title">専門班による産状スケッチ</span>
           <select name="occurrenceSketch">
-            <option value="無" ${normalizeNeedFlag(record?.occurrenceSketch) === "無" ? "selected" : ""}>無</option>
-            <option value="有" ${normalizeNeedFlag(record?.occurrenceSketch) === "有" ? "selected" : ""}>有</option>
+            <option value="無" ${normalizeOccurrenceSketchFlag(record?.occurrenceSketch) === "無" ? "selected" : ""}>無</option>
+            <option value="有" ${normalizeOccurrenceSketchFlag(record?.occurrenceSketch) === "有" ? "selected" : ""}>有</option>
           </select>
         </label>
       `;
@@ -7709,7 +7709,7 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     return { ok: true };
   }
   if (editKey === "occurrenceSketch") {
-    record.occurrenceSketch = normalizeNeedFlag(formData.get("occurrenceSketch"));
+    record.occurrenceSketch = normalizeOccurrenceSketchFlag(formData.get("occurrenceSketch"));
     return { ok: true };
   }
   if (editKey === "position") {
@@ -12813,7 +12813,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     altitudeInputEnabled: normalizeToggleFlag(value(item.altitudeInputEnabled) || (value(item.altitudeDirectM) ? "1" : "")),
     altitudeDirectM: value(item.altitudeDirectM) || value(item.altitudeInputM),
     occurrenceSection: normalizeNeedFlag(value(item.occurrenceSection) || value(item.sectionSketch)),
-    occurrenceSketch: normalizeNeedFlag(value(item.occurrenceSketch) || value(item.sectionSketch)),
+    occurrenceSketch: normalizeOccurrenceSketchFlag(value(item.occurrenceSketch) || value(item.sectionSketch)),
     sectionDiagramDistanceChecked: normalizeChecklistChecked(value(item.sectionDiagramDistanceChecked)),
     sectionDiagramHorizonChecked: normalizeChecklistChecked(value(item.sectionDiagramHorizonChecked)),
     sectionDiagramLayerFaciesChecked: normalizeChecklistChecked(value(item.sectionDiagramLayerFaciesChecked)),
@@ -15513,6 +15513,10 @@ function getMissingRequiredKeys(record) {
 }
 
 function normalizeNeedFlag(valueRaw) {
+  return value(valueRaw) === "否" ? "否" : "要";
+}
+
+function normalizeOccurrenceSketchFlag(valueRaw) {
   const text = value(valueRaw);
   if (text === "有" || text === "否") {
     return "有";
@@ -15778,8 +15782,11 @@ function normalizeDirectionValue(group, valueRaw) {
   if (group === "simpleRecordFlag") {
     return normalizeCircleDashFlag(valueRaw);
   }
-  if (group === "occurrenceSection" || group === "occurrenceSketch") {
+  if (group === "occurrenceSection") {
     return normalizeNeedFlag(valueRaw);
+  }
+  if (group === "occurrenceSketch") {
+    return normalizeOccurrenceSketchFlag(valueRaw);
   }
   if (group === "tsSetupNsDir") {
     return value(valueRaw) === "南" ? "南" : "北";
