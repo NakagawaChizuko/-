@@ -2434,7 +2434,11 @@ async function openBrowserCamera(destination) {
 
   try {
     activeCameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 4096 },
+        height: { ideal: 3072 },
+      },
       audio: false,
     });
     cameraCaptureVideo.srcObject = activeCameraStream;
@@ -2469,12 +2473,31 @@ function cameraFrameToFile() {
       }
       const name = `camera-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`;
       resolve(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.98);
   });
 }
 
-sectionDiagramCameraBtn?.addEventListener("click", () => openBrowserCamera("sectionDiagram"));
-photoCameraBtn?.addEventListener("click", () => openBrowserCamera("photo"));
+function shouldUseNativeStillCamera() {
+  const userAgent = value(navigator.userAgent);
+  const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(userAgent);
+  const isTouchIpad = /Macintosh/i.test(userAgent) && Number(navigator.maxTouchPoints) > 1;
+  return isMobileDevice || isTouchIpad;
+}
+
+sectionDiagramCameraBtn?.addEventListener("click", () => {
+  if (shouldUseNativeStillCamera() && sectionDiagramCameraInput instanceof HTMLInputElement) {
+    sectionDiagramCameraInput.click();
+    return;
+  }
+  openBrowserCamera("sectionDiagram");
+});
+photoCameraBtn?.addEventListener("click", () => {
+  if (shouldUseNativeStillCamera() && photoCameraInput instanceof HTMLInputElement) {
+    photoCameraInput.click();
+    return;
+  }
+  openBrowserCamera("photo");
+});
 cameraCaptureCloseBtn?.addEventListener("click", closeBrowserCamera);
 cameraCaptureCancelBtn?.addEventListener("click", closeBrowserCamera);
 cameraCaptureModal?.addEventListener("click", (event) => {
