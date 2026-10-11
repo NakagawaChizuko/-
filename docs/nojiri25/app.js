@@ -142,13 +142,13 @@ const REQUIRED_FIELD_LABELS = {
   kuwakuHeadB: "区画（グリッド）2番目",
   kuwakuBlock: "区画（グリッド）英字",
   kuwakuNo: "区画（グリッド）番号",
-  levelHeight: "レベル高",
+  levelHeight: "機械高",
   date: "日付",
   team: "発掘班",
   teamOther: "発掘班（その他）",
   teamLead: "班長",
   recorder: "記載係",
-  scribe: "記載者",
+  scribe: "入力者",
   specimenSerial: "標本番号",
   analysisType: "分析用試料の区分",
   nameMemo: "化石・遺物名称",
@@ -1109,6 +1109,7 @@ function bindEvents() {
         teamOther: siteTeamState.teamOther,
         teamLead: value(siteFormData.get("teamLead")),
         recorder: value(siteFormData.get("recorder")),
+        scribe: value(siteFormData.get("scribe")),
       };
       recordKuwaku = nextSiteKuwaku;
     }
@@ -1127,6 +1128,7 @@ function bindEvents() {
         teamOther: siteSnapshot.teamOther,
         teamLead: siteSnapshot.teamLead,
         recorder: siteSnapshot.recorder,
+        scribe: siteSnapshot.scribe,
         updatedAt: nowIso(),
       };
       selectedPlanKuwaku = kuwakuValueForSelect(siteSnapshot.kuwaku);
@@ -1147,12 +1149,6 @@ function bindEvents() {
       showToast("a: 分析用試料を選んだ場合は、区分を選択してください");
       return;
     }
-    const attachmentChecklistError = validateAttachmentChecklistForSave(formData);
-    if (attachmentChecklistError) {
-      showToast(attachmentChecklistError);
-      return;
-    }
-
     const nowIsoValue = new Date().toISOString();
     const editingId = editingRecordId || recordIdInput.value;
     const found = isEditTab
@@ -1412,25 +1408,11 @@ function bindEvents() {
       return;
     }
 
-    const carryForward = {
-      layerName: record.layerName,
-      unit: record.unit,
-      detail: record.detail,
-      detailSub: record.detailSub,
-      layerColor: getLayerColor(record),
-      layerLithology: getLayerLithology(record),
-      layerFacies: record.layerFacies,
-      layerRef: record.layerRef,
-      layerFromCm: record.layerFromCm,
-      layerRelative: record.layerRelative,
-    };
-
     persist("記録を保存しました");
     renderRecordTable();
     renderOutputs();
-    resetRecordForm({ showMessage: false });
-    applyCarryForwardFields(carryForward);
-    markCarryForwardSavedFields(carryForward);
+    editingRecordId = record.id;
+    recordIdInput.value = record.id;
   });
 
   recordResetBtn.addEventListener("click", () => {
@@ -2002,7 +1984,7 @@ function bindEvents() {
     });
   });
 
-  sectionDiagramList.addEventListener("input", (event) => {
+  sectionDiagramList?.addEventListener("input", (event) => {
     const input = event.target.closest("input[data-diagram-id]");
     if (!input) {
       return;
@@ -2015,7 +1997,7 @@ function bindEvents() {
     persist();
   });
 
-  sectionDiagramList.addEventListener("click", (event) => {
+  sectionDiagramList?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-remove-diagram-id]");
     if (!button) {
       return;
@@ -3567,11 +3549,24 @@ function getTotalStationMultiPointOffsetsForForm(point) {
 
 function getGridMultiPointForForm(point) {
   if (point?.coordinateMode !== "stationOffsetSouthWest" && point?.coordinateMode !== "stationPolar") {
+    const explicitNsDir = value(point?.nsDir);
+    const explicitEwDir = value(point?.ewDir);
+    if ((explicitNsDir || explicitEwDir) && (value(point?.nsCm) || value(point?.ewCm))) {
+      return {
+        nsDir: normalizeNsDir(explicitNsDir),
+        nsCm: value(point?.nsCm),
+        ewDir: normalizeEwDir(explicitEwDir),
+        ewCm: value(point?.ewCm),
+        zAltitudeM: value(point?.zAltitudeM),
+      };
+    }
     const xEastM = Number(point?.xEastM);
     const yNorthM = Number(point?.yNorthM);
     return {
-      northFromCm: Number.isFinite(yNorthM) ? formatLengthInputValue(PLAN_SIZE_CM - yNorthM * 100) : "",
-      westFromCm: Number.isFinite(xEastM) ? formatLengthInputValue(xEastM * 100) : "",
+      nsDir: "北から",
+      nsCm: Number.isFinite(yNorthM) ? formatLengthInputValue(PLAN_SIZE_CM - yNorthM * 100) : "",
+      ewDir: "西から",
+      ewCm: Number.isFinite(xEastM) ? formatLengthInputValue(xEastM * 100) : "",
       zAltitudeM: value(point?.zAltitudeM),
     };
   }
@@ -3579,8 +3574,10 @@ function getGridMultiPointForForm(point) {
     const draftRecord = buildCurrentRecordDraftForPositionPreview();
     const coord = draftRecord ? convertTotalStationPolarMultiPointToPlanCoords(draftRecord, point) : null;
     return {
-      northFromCm: coord ? formatLengthInputValue(coord.y) : "",
-      westFromCm: coord ? formatLengthInputValue(coord.x) : "",
+      nsDir: "北から",
+      nsCm: coord ? formatLengthInputValue(coord.y) : "",
+      ewDir: "西から",
+      ewCm: coord ? formatLengthInputValue(coord.x) : "",
       zAltitudeM: coord?.z == null ? "" : formatLengthInputValue(coord.z),
     };
   }
@@ -3593,12 +3590,14 @@ function getGridMultiPointForForm(point) {
     const pointX = stationX + south;
     const pointY = stationY + west;
     return {
-      northFromCm: formatLengthInputValue((pointX - gridReference.x) * 100),
-      westFromCm: formatLengthInputValue(-(pointY - gridReference.y) * 100),
+      nsDir: "北から",
+      nsCm: formatLengthInputValue((pointX - gridReference.x) * 100),
+      ewDir: "西から",
+      ewCm: formatLengthInputValue(-(pointY - gridReference.y) * 100),
       zAltitudeM: value(point?.zAltitudeM),
     };
   }
-  return { northFromCm: "", westFromCm: "", zAltitudeM: value(point?.zAltitudeM) };
+  return { nsDir: "北から", nsCm: "", ewDir: "西から", ewCm: "", zAltitudeM: value(point?.zAltitudeM) };
 }
 
 function convertTotalStationMultiPointToPlanCoords(record, point) {
@@ -3672,7 +3671,7 @@ function createDefaultPlanMultiPoint() {
   }
   return isTotalStationMeasurementSelected()
     ? { southFromStationM: "", westFromStationM: "", zAltitudeM: "", coordinateMode: "stationOffsetSouthWest" }
-    : { xEastM: "", yNorthM: "", zAltitudeM: "" };
+    : { nsDir: "北から", nsCm: "", ewDir: "西から", ewCm: "", xEastM: "", yNorthM: "", zAltitudeM: "" };
 }
 
 function normalizePlanMultiPointEntry(entryRaw) {
@@ -3718,7 +3717,15 @@ function normalizePlanMultiPointEntry(entryRaw) {
   if (!xEastM || !yNorthM || !Number.isFinite(Number(xEastM)) || !Number.isFinite(Number(yNorthM))) {
     return null;
   }
-  return { xEastM, yNorthM, zAltitudeM };
+  return {
+    xEastM,
+    yNorthM,
+    zAltitudeM,
+    nsDir: value(entry.nsDir) ? normalizeNsDir(entry.nsDir) : "北から",
+    nsCm: value(entry.nsCm) || formatLengthInputValue(PLAN_SIZE_CM - Number(yNorthM) * 100),
+    ewDir: value(entry.ewDir) ? normalizeEwDir(entry.ewDir) : "西から",
+    ewCm: value(entry.ewCm) || formatLengthInputValue(Number(xEastM) * 100),
+  };
 }
 
 function normalizePlanMultiPoints(pointsRaw) {
@@ -3786,6 +3793,31 @@ function createMultiPointRowElement(pointRaw = {}) {
     label.append(wrap);
     return label;
   };
+  const makeGridDistanceField = (labelText, directionKey, directionValue, options, distanceKey, distanceValue) => {
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    const wrap = document.createElement("div");
+    wrap.className = "multi-point-input multi-point-grid-distance-input";
+    const select = document.createElement("select");
+    select.dataset[directionKey] = "1";
+    options.forEach((optionValue) => {
+      const option = document.createElement("option");
+      option.value = optionValue;
+      option.textContent = optionValue;
+      option.selected = optionValue === directionValue;
+      select.append(option);
+    });
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "cm";
+    input.dataset[distanceKey] = "1";
+    input.value = value(distanceValue);
+    const unit = document.createElement("span");
+    unit.textContent = "cm";
+    wrap.append(select, input, unit);
+    label.append(wrap);
+    return label;
+  };
   let firstLabel;
   let secondLabel;
   let thirdLabel;
@@ -3801,12 +3833,8 @@ function createMultiPointRowElement(pointRaw = {}) {
     thirdLabel = makeField("Z　標高", "multiPointZAltitudeM", normalized.zAltitudeM);
   } else {
     const gridPoint = getGridMultiPointForForm(normalized);
-    firstLabel = makeField("北から", "multiPointNorthFromCm", gridPoint.northFromCm);
-    firstLabel.querySelector("input").placeholder = "cm";
-    firstLabel.querySelector("span").textContent = "cm";
-    secondLabel = makeField("西から", "multiPointWestFromCm", gridPoint.westFromCm);
-    secondLabel.querySelector("input").placeholder = "cm";
-    secondLabel.querySelector("span").textContent = "cm";
+    firstLabel = makeGridDistanceField("南北方向", "multiPointNsDir", gridPoint.nsDir, ["北から", "南から"], "multiPointNsCm", gridPoint.nsCm);
+    secondLabel = makeGridDistanceField("東西方向", "multiPointEwDir", gridPoint.ewDir, ["西から", "東から"], "multiPointEwCm", gridPoint.ewCm);
     thirdLabel = makeField("標高", "multiPointZAltitudeM", gridPoint.zAltitudeM);
   }
 
@@ -3850,7 +3878,7 @@ function syncMultiPointCoordinateModeUi() {
       ? "各点の斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
       : isTotalStation
         ? "各点のX（設置点から南・南が正）、Y（設置点から西・西が正）、Z（標高）をm単位で入力します。"
-        : "各点をグリッド辺からの距離（北から・西から、cm）と標高（m）で入力します。";
+        : "各点について北から／南から、西から／東からを選び、グリッド辺からの距離（cm）と標高（m）を入力します。";
   }
   const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");
   if (!firstRow) return;
@@ -3858,7 +3886,7 @@ function syncMultiPointCoordinateModeUi() {
     ? "polar"
     : firstRow.querySelector("[data-multi-point-south-from-station-m]")
       ? "offset"
-      : firstRow.querySelector("[data-multi-point-north-from-cm]")
+      : firstRow.querySelector("[data-multi-point-ns-cm]")
         ? "grid"
         : "legacyGrid";
   const rowMode = detectedRowMode;
@@ -3914,13 +3942,13 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
         coordinateMode: "stationOffsetSouthWest",
       };
     }
-    const northFromCm = value(row.querySelector("[data-multi-point-north-from-cm]")?.value);
-    const westFromCm = value(row.querySelector("[data-multi-point-west-from-cm]")?.value);
-    if (northFromCm || westFromCm) return {
-      nsDir: "北から",
-      nsCm: northFromCm,
-      ewDir: "西から",
-      ewCm: westFromCm,
+    const nsCm = value(row.querySelector("[data-multi-point-ns-cm]")?.value);
+    const ewCm = value(row.querySelector("[data-multi-point-ew-cm]")?.value);
+    if (nsCm || ewCm) return {
+      nsDir: normalizeNsDir(row.querySelector("[data-multi-point-ns-dir]")?.value),
+      nsCm,
+      ewDir: normalizeEwDir(row.querySelector("[data-multi-point-ew-dir]")?.value),
+      ewCm,
       zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
     };
     return {
@@ -7367,7 +7395,7 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
     case "altitudeM":
       return `
         <label>
-          <span class="label-title">レベル高</span>
+          <span class="label-title">機械高</span>
           <div class="inline-cm-row compact-cm-row">
             <input name="levelHeight" type="text" value="${escapeHtml(value(record?.levelHeight))}" />
             <span>m</span>
@@ -12392,6 +12420,9 @@ function renderPhotoList() {
 }
 
 function renderSectionDiagramList() {
+  if (!sectionDiagramList) {
+    return;
+  }
   if (!currentSectionDiagrams.length) {
     sectionDiagramList.innerHTML = "<p>断面図はまだありません。</p>";
     return;
@@ -13758,7 +13789,7 @@ function formatStatusTime(isoString) {
 function buildListCsv() {
   const header = [
     "区画",
-    "レベル高(m)",
+    "機械高(m)",
     "日付",
     "発掘班",
     "班長",
@@ -15216,10 +15247,10 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
     ["区画（グリッド）の番号", siteSnapshot.kuwakuNo],
     ["日付", siteSnapshot.date],
     ["発掘班", siteSnapshot.team],
-    ["記載者", siteSnapshot.scribe],
+    ["入力者", siteSnapshot.scribe],
   ];
   if (positionMethod !== "totalStation") {
-    siteRequiredFields.splice(4, 0, ["レベル高", siteSnapshot.levelHeight]);
+    siteRequiredFields.splice(4, 0, ["機械高", siteSnapshot.levelHeight]);
   }
   for (const [label, fieldValue] of siteRequiredFields) {
     if (!value(fieldValue)) {
@@ -15281,10 +15312,6 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   if (specimenPrefix === "a" && !normalizeAnalysisType(value(recordFormData.get("analysisType")))) {
     return "a: 分析用試料を選んだ場合は、区分を選択してください";
   }
-  if (normalizeNeedFlag(value(recordFormData.get("occurrenceSection"))) === "要" && currentSectionDiagrams.length === 0) {
-    return "産出状況断面が「要」の場合は、産出状況断面図添付を追加してください";
-  }
-
   return "";
 }
 
@@ -15479,31 +15506,6 @@ function getMissingRequiredKeys(record) {
     missing.add("analysisType");
   }
 
-  const sectionDiagrams = Array.isArray(record.sectionDiagrams) ? record.sectionDiagrams : [];
-  if (normalizeNeedFlag(value(record.occurrenceSection)) === "要" && !sectionDiagrams.length) {
-    missing.add("sectionDiagrams");
-  }
-  if (sectionDiagrams.length) {
-    if (normalizeChecklistChecked(record.sectionDiagramDistanceChecked) !== "1") {
-      missing.add("sectionDiagramDistanceChecked");
-    }
-    if (normalizeChecklistChecked(record.sectionDiagramHorizonChecked) !== "1") {
-      missing.add("sectionDiagramHorizonChecked");
-    }
-    if (normalizeChecklistChecked(record.sectionDiagramLayerFaciesChecked) !== "1") {
-      missing.add("sectionDiagramLayerFaciesChecked");
-    }
-  }
-  const photos = Array.isArray(record.photos) ? record.photos : [];
-  if (photos.length) {
-    if (normalizeChecklistChecked(record.photoClinometerChecked) !== "1") {
-      missing.add("photoClinometerChecked");
-    }
-    if (normalizeChecklistChecked(record.photoRulerChecked) !== "1") {
-      missing.add("photoRulerChecked");
-    }
-  }
-
   return missing;
 }
 
@@ -15533,34 +15535,6 @@ function normalizeChecklistChecked(valueRaw) {
     return "1";
   }
   return "";
-}
-
-function validateAttachmentChecklistForSave(formData) {
-  if (!(formData instanceof FormData)) {
-    return "";
-  }
-  if (currentSectionDiagrams.length > 0 && !areSectionDiagramChecklistComplete(formData)) {
-    return "産出状況断面図のチェックをすべて入れてください";
-  }
-  if (currentPhotos.length > 0 && !arePhotoChecklistComplete(formData)) {
-    return "写真添付のチェックをすべて入れてください";
-  }
-  return "";
-}
-
-function areSectionDiagramChecklistComplete(formData) {
-  return (
-    normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")) === "1" &&
-    normalizeChecklistChecked(formData.get("sectionDiagramHorizonChecked")) === "1" &&
-    normalizeChecklistChecked(formData.get("sectionDiagramLayerFaciesChecked")) === "1"
-  );
-}
-
-function arePhotoChecklistComplete(formData) {
-  return (
-    normalizeChecklistChecked(formData.get("photoClinometerChecked")) === "1" &&
-    normalizeChecklistChecked(formData.get("photoRulerChecked")) === "1"
-  );
 }
 
 function normalizeNsDir(valueRaw) {

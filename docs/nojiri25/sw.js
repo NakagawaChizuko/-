@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v70-remove-ts-legend";
+const CACHE_NAME = "kaseki25-pwa-v71-form-revision";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

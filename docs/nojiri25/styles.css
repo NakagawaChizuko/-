@@ -1976,6 +1976,14 @@ textarea {
   align-items: center;
 }
 
+.multi-point-grid-distance-input {
+  grid-template-columns: minmax(88px, auto) minmax(72px, 108px) auto;
+}
+
+.multi-point-grid-distance-input select {
+  width: 100%;
+}
+
 .multi-point-row select,
 .multi-point-row input {
   margin-top: 4px;

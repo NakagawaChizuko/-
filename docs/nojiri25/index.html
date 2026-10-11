@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260815-remove-ts-legend1" />
+    <link rel="stylesheet" href="./styles.css?v=20261011-form-revision1" />
   </head>
   <body>
     <header class="app-header">
@@ -51,7 +51,7 @@
                 <input name="kuwakuNo" type="text" inputmode="numeric" />
               </div>
             </label>
-            <label class="site-level"><span class="label-title">レベル高<span class="required">*</span></span>
+            <label class="site-level"><span class="label-title">機械高<span class="required">*</span></span>
               <div class="inline-cm-row compact-cm-row">
                 <input name="levelHeight" type="text" />
                 <span>m</span>
@@ -79,7 +79,7 @@
             <label class="site-recorder large-input"><span class="label-title">記載係</span>
               <input name="recorder" type="text" />
             </label>
-            <label class="site-recorder large-input"><span class="label-title">記載者<span class="required">*</span></span>
+            <label class="site-recorder large-input"><span class="label-title">入力者<span class="required">*</span></span>
               <input name="scribe" type="text" />
             </label>
             <div class="site-recorder large-input">
@@ -323,7 +323,7 @@
                   <strong>複数点入力</strong>
                   <button id="multi-point-add-btn" class="multi-point-add-btn" type="button">点を追加</button>
                 </div>
-                <p id="multi-point-hint" class="hint-text">各点をグリッド辺からの距離（北から・西から、cm）と標高（m）で入力します。</p>
+                <p id="multi-point-hint" class="hint-text">各点について北から／南から、西から／東からを選び、グリッド辺からの距離（cm）と標高（m）を入力します。</p>
                 <div id="multi-point-rows" class="multi-point-rows"></div>
               </div>
 
@@ -583,33 +583,6 @@
             <button class="record-save-shortcut" type="submit">記録を保存</button>
           </div>
 
-          <section class="diagram-upload-wrap">
-            <h3>産出状況断面図添付</h3>
-            <p class="hint-text">産出状況断面図を追加します。</p>
-            <div class="upload-picker-row">
-              <button id="section-diagram-camera-btn" class="upload-picker-label" type="button">カメラで撮影</button>
-              <label class="upload-picker-label secondary" for="section-diagram-input">保存フォルダから選択</label>
-            </div>
-            <input id="section-diagram-camera-input" class="upload-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" capture="environment" multiple />
-            <input id="section-diagram-input" class="upload-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple />
-            <div id="section-diagram-list" class="photo-list"></div>
-            <div class="section-diagram-checklist">
-              <label class="section-diagram-check-item">
-                <input name="sectionDiagramDistanceChecked" type="checkbox" />
-                <span>・化石と層理面や鍵層からの垂直距離を記入している</span>
-              </label>
-              <label class="section-diagram-check-item">
-                <input name="sectionDiagramHorizonChecked" type="checkbox" />
-                <span>・産出層準を記入している</span>
-              </label>
-              <label class="section-diagram-check-item">
-                <input name="sectionDiagramLayerFaciesChecked" type="checkbox" />
-                <span>・産出した地層や上下の地層の色・岩相を記入している（色，粒径，堆積構造，円磨度，淘汰など）</span>
-              </label>
-            </div>
-            <p class="checklist-warning">全てにチェックが入ると画像が保存できます</p>
-          </section>
-
           <section class="photo-upload-wrap">
             <h3>写真添付</h3>
             <p class="hint-text">この記録に紐づける写真を追加します。</p>
@@ -620,17 +593,7 @@
             <input id="photo-camera-input" class="upload-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" capture="environment" multiple />
             <input id="photo-input" class="upload-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple />
             <div id="photo-list" class="photo-list"></div>
-            <div class="section-diagram-checklist">
-              <label class="section-diagram-check-item">
-                <input name="photoClinometerChecked" type="checkbox" />
-                <span>クリノメーター（方位のわかるもの）が写っている</span>
-              </label>
-              <label class="section-diagram-check-item">
-                <input name="photoRulerChecked" type="checkbox" />
-                <span>定規（大きさがわかるもの）が写っている</span>
-              </label>
-            </div>
-            <p class="checklist-warning">全てにチェックが入ると画像が保存できます</p>
+            <p class="hint-text">化石・遺物カード全体が写った写真を添付してください</p>
           </section>
 
           <section class="model3d-upload-wrap">
@@ -1005,7 +968,7 @@
                 <input id="edit-kuwaku-no" type="text" inputmode="numeric" placeholder="4" />
               </div>
             </label>
-            <label>レベル高
+            <label>機械高
               <div class="inline-cm-row compact-cm-row">
                 <input id="edit-level-height" type="text" />
                 <span>m</span>
@@ -1120,6 +1083,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20260815-remove-ts-legend1"></script>
+    <script src="./app.js?v=20261011-form-revision1"></script>
   </body>
 </html>
