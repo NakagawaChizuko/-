@@ -12650,7 +12650,8 @@ async function initializeDurableStateBackup() {
   const durableState = await loadStateFromDurableDb();
   const localHasData = hasAnyStateData(state);
   const durableHasData = hasAnyStateData(durableState);
-  if (durableHasData && (!localHasData || getStateUpdatedAt(durableState) > getStateUpdatedAt(state))) {
+  const durableHasMoreImages = countEmbeddedStateImages(durableState) > countEmbeddedStateImages(state);
+  if (durableHasData && (!localHasData || getStateUpdatedAt(durableState) > getStateUpdatedAt(state) || durableHasMoreImages)) {
     state = normalizeState(durableState);
     hydrateSiteForm();
     resetRecordForm({ showMessage: false });
@@ -13275,6 +13276,21 @@ function findDuplicateRecordByKuwakuAndSpecimen(kuwakuRaw, specimenNoRaw, exclud
   );
 }
 
+function buildLightweightLocalStorageState(stateRaw) {
+  const source = stateRaw && typeof stateRaw === "object" ? stateRaw : createInitialState();
+  return {
+    ...source,
+    records: Array.isArray(source.records)
+      ? source.records.map((record) => ({
+          ...record,
+          photos: [],
+          sectionDiagrams: [],
+          customLargeImageDataUrl: "",
+        }))
+      : [],
+  };
+}
+
 function persist(successMessage) {
   try {
     const previousRaw = localStorage.getItem(STORAGE_KEY);
@@ -13289,8 +13305,21 @@ function persist(successMessage) {
     }
     scheduleCloudSave();
   } catch (error) {
-    void saveStateToDurableDb(state).catch(() => null);
-    void recoverFromQuotaError(successMessage, error);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buildLightweightLocalStorageState(state)));
+    } catch (_lightweightError) {
+      // localStorageが使えない場合もIndexedDBへの保存を続行する。
+    }
+    void saveStateToDurableDb(state)
+      .then(() => {
+        if (successMessage) {
+          showToast(`${successMessage}（高画質画像は端末の大容量領域に保存）`);
+        } else {
+          showToast("高画質画像を端末の大容量領域に保存しました");
+        }
+      })
+      .catch(() => recoverFromQuotaError(successMessage, error));
+    scheduleCloudSave();
   }
 }
 
@@ -13695,6 +13724,18 @@ function hasAnyStateData(candidateState) {
       value(site.recorder) ||
       value(site.scribe)
   );
+}
+
+function countEmbeddedStateImages(candidateState) {
+  if (!candidateState || !Array.isArray(candidateState.records)) {
+    return 0;
+  }
+  return candidateState.records.reduce((total, record) => {
+    const photos = Array.isArray(record?.photos) ? record.photos.length : 0;
+    const diagrams = Array.isArray(record?.sectionDiagrams) ? record.sectionDiagrams.length : 0;
+    const customImage = value(record?.customLargeImageDataUrl) ? 1 : 0;
+    return total + photos + diagrams + customImage;
+  }, 0);
 }
 
 function getStateUpdatedAt(candidateState) {
@@ -16277,7 +16318,7 @@ async function recompressImageDataUrl(dataUrlRaw, maxLength, quality) {
   return { dataUrl, changed: false };
 }
 
-const SUPPORTED_UPLOAD_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
+const SUPPORTED_UPLOAD_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/heic", "image/heif"]);
 
 function normalizeImageMimeType(mimeTypeRaw) {
   const mimeType = value(mimeTypeRaw).toLowerCase();
@@ -16297,6 +16338,12 @@ function inferImageMimeTypeFromFileName(fileNameRaw) {
   }
   if (fileName.endsWith(".png")) {
     return "image/png";
+  }
+  if (fileName.endsWith(".heic")) {
+    return "image/heic";
+  }
+  if (fileName.endsWith(".heif")) {
+    return "image/heif";
   }
   return "";
 }
