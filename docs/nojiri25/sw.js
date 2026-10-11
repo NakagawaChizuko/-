@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v79-highres-camera";
+const CACHE_NAME = "kaseki25-pwa-v80-camera-focus";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

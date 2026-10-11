@@ -643,6 +643,7 @@ const photoCameraBtn = document.getElementById("photo-camera-btn");
 const cameraCaptureModal = document.getElementById("camera-capture-modal");
 const cameraCaptureVideo = document.getElementById("camera-capture-video");
 const cameraCaptureStatus = document.getElementById("camera-capture-status");
+const cameraCaptureFocusBtn = document.getElementById("camera-capture-focus-btn");
 const cameraCaptureShutterBtn = document.getElementById("camera-capture-shutter-btn");
 const cameraCaptureCloseBtn = document.getElementById("camera-capture-close-btn");
 const cameraCaptureCancelBtn = document.getElementById("camera-capture-cancel-btn");
@@ -2382,6 +2383,9 @@ function stopBrowserCamera() {
   if (cameraCaptureShutterBtn) {
     cameraCaptureShutterBtn.disabled = true;
   }
+  if (cameraCaptureFocusBtn) {
+    cameraCaptureFocusBtn.disabled = true;
+  }
 }
 
 function bindLayerChoiceSelects() {
@@ -2442,8 +2446,10 @@ async function openBrowserCamera(destination) {
       audio: false,
     });
     const cameraTrack = activeCameraStream.getVideoTracks()[0];
+    let focusModes = [];
     if (cameraTrack?.getCapabilities && cameraTrack?.applyConstraints) {
       const capabilities = cameraTrack.getCapabilities();
+      focusModes = Array.isArray(capabilities?.focusMode) ? capabilities.focusMode : [];
       const maxWidth = Number(capabilities?.width?.max);
       const maxHeight = Number(capabilities?.height?.max);
       if (Number.isFinite(maxWidth) && Number.isFinite(maxHeight)) {
@@ -2456,16 +2462,51 @@ async function openBrowserCamera(destination) {
           // 端末が許可する解像度でそのまま続行する。
         }
       }
+      if (focusModes.includes("continuous")) {
+        try {
+          await cameraTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+        } catch (_focusError) {
+          // フォーカス制御非対応時はカメラ側の設定を使用する。
+        }
+      }
     }
     cameraCaptureVideo.srcObject = activeCameraStream;
     await cameraCaptureVideo.play();
     cameraCaptureShutterBtn.disabled = false;
+    if (cameraCaptureFocusBtn) {
+      cameraCaptureFocusBtn.disabled = !focusModes.some((mode) => mode === "single-shot" || mode === "continuous");
+    }
     const settings = cameraTrack?.getSettings?.() || {};
     const resolutionText = settings.width && settings.height ? `（${settings.width}×${settings.height}）` : "";
     cameraCaptureStatus.textContent = `映像${resolutionText}を確認して「撮影して追加」を押してください。続けて複数枚撮影できます。`;
   } catch (_error) {
     stopBrowserCamera();
     cameraCaptureStatus.textContent = "カメラを使用できません。ブラウザのサイト設定で、このページのカメラを「許可」にしてください。";
+  }
+}
+
+async function focusBrowserCamera() {
+  const cameraTrack = activeCameraStream?.getVideoTracks?.()[0];
+  if (!cameraTrack?.getCapabilities || !cameraTrack?.applyConstraints) {
+    cameraCaptureStatus.textContent = "このカメラはブラウザからフォーカスを操作できません。";
+    return;
+  }
+  const capabilities = cameraTrack.getCapabilities();
+  const focusModes = Array.isArray(capabilities?.focusMode) ? capabilities.focusMode : [];
+  const focusMode = focusModes.includes("single-shot") ? "single-shot" : focusModes.includes("continuous") ? "continuous" : "";
+  if (!focusMode) {
+    cameraCaptureStatus.textContent = "このカメラはブラウザからフォーカスを操作できません。";
+    return;
+  }
+  cameraCaptureFocusBtn.disabled = true;
+  cameraCaptureStatus.textContent = "フォーカスを合わせています…";
+  try {
+    await cameraTrack.applyConstraints({ advanced: [{ focusMode }] });
+    cameraCaptureStatus.textContent = "フォーカスを調整しました。被写体が鮮明に見えることを確認して撮影してください。";
+  } catch (_error) {
+    cameraCaptureStatus.textContent = "フォーカスを操作できませんでした。";
+  } finally {
+    cameraCaptureFocusBtn.disabled = false;
   }
 }
 
@@ -2531,6 +2572,12 @@ photoCameraBtn?.addEventListener("click", () => {
 });
 cameraCaptureCloseBtn?.addEventListener("click", closeBrowserCamera);
 cameraCaptureCancelBtn?.addEventListener("click", closeBrowserCamera);
+cameraCaptureFocusBtn?.addEventListener("click", focusBrowserCamera);
+cameraCaptureVideo?.addEventListener("click", () => {
+  if (!cameraCaptureFocusBtn?.disabled) {
+    focusBrowserCamera();
+  }
+});
 cameraCaptureModal?.addEventListener("click", (event) => {
   if (event.target === cameraCaptureModal) {
     closeBrowserCamera();
