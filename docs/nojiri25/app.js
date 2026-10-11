@@ -17087,7 +17087,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     .then(() => navigator.serviceWorker.ready)
     .then(() => {
       if (offlineStatus) {
-        offlineStatus.textContent = "オフライン利用準備完了";
+        offlineStatus.textContent = "オフライン利用準備完了（高画質保存版）";
         offlineStatus.classList.add("ready");
       }
     })

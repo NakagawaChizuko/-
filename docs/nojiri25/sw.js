@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v81-high-quality-storage";
+const CACHE_NAME = "kaseki25-pwa-v82-high-quality-storage-refresh";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
@@ -23,9 +23,14 @@ function cacheOptional(cache, url) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) =>
-    cache.addAll(REQUIRED_ASSETS).then(() => Promise.all(OPTIONAL_ASSETS.map((url) => cacheOptional(cache, url))))
-  ));
+  event.waitUntil(caches.open(CACHE_NAME).then(async (cache) => {
+    await Promise.all(REQUIRED_ASSETS.map(async (url) => {
+      const response = await fetch(url, { cache: "reload" });
+      if (!response?.ok) throw new Error(`Required asset unavailable: ${url}`);
+      await cache.put(url, response);
+    }));
+    await Promise.all(OPTIONAL_ASSETS.map((url) => cacheOptional(cache, url)));
+  }));
   self.skipWaiting();
 });
 
@@ -48,6 +53,18 @@ self.addEventListener("fetch", (event) => {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       })
+    )));
+    return;
+  }
+  const requestUrl = new URL(event.request.url);
+  const shouldRefreshAppAsset =
+    requestUrl.origin === self.location.origin && /\.(?:js|css|webmanifest)$/i.test(requestUrl.pathname);
+  if (shouldRefreshAppAsset) {
+    event.respondWith(fetch(event.request, { cache: "no-cache" }).then((response) => {
+      if (response?.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+      return response;
+    }).catch(() => caches.match(event.request, { ignoreSearch: true }).then((cached) =>
+      cached || new Response("Offline", { status: 503 })
     )));
     return;
   }
