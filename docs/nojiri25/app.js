@@ -4247,6 +4247,9 @@ async function setCustomLargeImageFromFile(file) {
     if (customLargeImageDataUrlInput) {
       customLargeImageDataUrlInput.value = normalizeCustomLargeImageDataUrl(dataUrl);
     }
+    if (recordForm?.elements?.imgUseOriginalColor instanceof HTMLInputElement) {
+      recordForm.elements.imgUseOriginalColor.checked = true;
+    }
     await updateCustomLargeImageAspectFromDataUrl(dataUrl);
     if (customLargeImageNameInput && !value(customLargeImageNameInput.value)) {
       customLargeImageNameInput.value = deriveCustomLargeImageNameFromFileName(sourceFile.name);
@@ -5363,7 +5366,10 @@ function populateRecordForm(record) {
     recordForm.elements.imgLockAspectRatio.checked = normalizeToggleFlag(record.imgLockAspectRatio) === "1";
   }
   if (recordForm.elements.imgUseOriginalColor instanceof HTMLInputElement) {
-    recordForm.elements.imgUseOriginalColor.checked = normalizeToggleFlag(record.imgUseOriginalColor) === "1";
+    const hasCustomPhoto =
+      isCustomLargeShapeType(record.largeShapeType) && Boolean(normalizeCustomLargeImageDataUrl(record.customLargeImageDataUrl));
+    recordForm.elements.imgUseOriginalColor.checked =
+      hasCustomPhoto || normalizeToggleFlag(record.imgUseOriginalColor) === "1";
   }
 
   nsDirInput.value = normalizeNsDir(record.nsDir);
@@ -11756,7 +11762,8 @@ function buildPlanDrawable(record) {
     if (!points) {
       return null;
     }
-    const useOriginalImageColor = normalizeToggleFlag(record?.imgUseOriginalColor) === "1";
+    const useOriginalImageColor =
+      isCustomLargeShapeType(resolvedImageType) || normalizeToggleFlag(record?.imgUseOriginalColor) === "1";
     const centroid = points.reduce(
       (acc, point) => ({ x: acc.x + point.x / points.length, y: acc.y + point.y / points.length }),
       { x: 0, y: 0 }
