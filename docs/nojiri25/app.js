@@ -3668,6 +3668,7 @@ function getTotalStationMultiPointOffsetsForForm(point) {
     const pointX = gridReference.x + PLAN_SIZE_CM / 100 - yNorthM;
     const pointY = gridReference.y - xEastM;
     return {
+      pointName: value(point?.pointName),
       southFromStationM: String(pointX - stationX),
       westFromStationM: String(pointY - stationY),
       zAltitudeM: value(point?.zAltitudeM),
@@ -3675,6 +3676,7 @@ function getTotalStationMultiPointOffsetsForForm(point) {
     };
   }
   return {
+    pointName: value(point?.pointName),
     southFromStationM: value(point?.southFromStationM),
     westFromStationM: value(point?.westFromStationM),
     zAltitudeM: value(point?.zAltitudeM),
@@ -3688,6 +3690,7 @@ function getGridMultiPointForForm(point) {
     const explicitEwDir = value(point?.ewDir);
     if ((explicitNsDir || explicitEwDir) && (value(point?.nsCm) || value(point?.ewCm))) {
       return {
+        pointName: value(point?.pointName),
         nsDir: normalizeNsDir(explicitNsDir),
         nsCm: value(point?.nsCm),
         ewDir: normalizeEwDir(explicitEwDir),
@@ -3698,6 +3701,7 @@ function getGridMultiPointForForm(point) {
     const xEastM = Number(point?.xEastM);
     const yNorthM = Number(point?.yNorthM);
     return {
+      pointName: value(point?.pointName),
       nsDir: "北から",
       nsCm: Number.isFinite(yNorthM) ? formatLengthInputValue(PLAN_SIZE_CM - yNorthM * 100) : "",
       ewDir: "西から",
@@ -3709,6 +3713,7 @@ function getGridMultiPointForForm(point) {
     const draftRecord = buildCurrentRecordDraftForPositionPreview();
     const coord = draftRecord ? convertTotalStationPolarMultiPointToPlanCoords(draftRecord, point) : null;
     return {
+      pointName: value(point?.pointName),
       nsDir: "北から",
       nsCm: coord ? formatLengthInputValue(coord.y) : "",
       ewDir: "西から",
@@ -3725,6 +3730,7 @@ function getGridMultiPointForForm(point) {
     const pointX = stationX + south;
     const pointY = stationY + west;
     return {
+      pointName: value(point?.pointName),
       nsDir: "北から",
       nsCm: formatLengthInputValue((pointX - gridReference.x) * 100),
       ewDir: "西から",
@@ -3732,7 +3738,7 @@ function getGridMultiPointForForm(point) {
       zAltitudeM: value(point?.zAltitudeM),
     };
   }
-  return { nsDir: "北から", nsCm: "", ewDir: "西から", ewCm: "", zAltitudeM: value(point?.zAltitudeM) };
+  return { pointName: value(point?.pointName), nsDir: "北から", nsCm: "", ewDir: "西から", ewCm: "", zAltitudeM: value(point?.zAltitudeM) };
 }
 
 function convertTotalStationMultiPointToPlanCoords(record, point) {
@@ -3800,13 +3806,14 @@ function convertTotalStationPolarMultiPointToPlanCoords(record, point) {
 function createDefaultPlanMultiPoint() {
   if (isTotalStationPolarMeasurementSelected()) {
     return {
+      pointName: "",
       slopeDistanceM: "", inclinationDeg: "", inclinationMin: "0", inclinationSec: "0",
       directionDeg: "", directionMin: "0", directionSec: "0", coordinateMode: "stationPolar",
     };
   }
   return isTotalStationMeasurementSelected()
-    ? { southFromStationM: "", westFromStationM: "", zAltitudeM: "", coordinateMode: "stationOffsetSouthWest" }
-    : { nsDir: "北から", nsCm: "", ewDir: "西から", ewCm: "", xEastM: "", yNorthM: "", zAltitudeM: "" };
+    ? { pointName: "", southFromStationM: "", westFromStationM: "", zAltitudeM: "", coordinateMode: "stationOffsetSouthWest" }
+    : { pointName: "", nsDir: "北から", nsCm: "", ewDir: "西から", ewCm: "", xEastM: "", yNorthM: "", zAltitudeM: "" };
 }
 
 function normalizePlanMultiPointEntry(entryRaw) {
@@ -3814,6 +3821,7 @@ function normalizePlanMultiPointEntry(entryRaw) {
   const coordinateMode = value(entry.coordinateMode);
   if (coordinateMode === "stationPolar" || value(entry.slopeDistanceM)) {
     const normalized = {
+      pointName: value(entry.pointName),
       slopeDistanceM: value(entry.slopeDistanceM),
       inclinationDeg: value(entry.inclinationDeg),
       inclinationMin: value(entry.inclinationMin),
@@ -3836,7 +3844,7 @@ function normalizePlanMultiPointEntry(entryRaw) {
     if (!southFromStationM || !westFromStationM || !Number.isFinite(Number(southFromStationM)) || !Number.isFinite(Number(westFromStationM))) {
       return null;
     }
-    return { southFromStationM, westFromStationM, zAltitudeM, coordinateMode: "stationOffsetSouthWest" };
+    return { pointName: value(entry.pointName), southFromStationM, westFromStationM, zAltitudeM, coordinateMode: "stationOffsetSouthWest" };
   }
   let xEastM = value(entry.xEastM);
   let yNorthM = value(entry.yNorthM);
@@ -3853,6 +3861,7 @@ function normalizePlanMultiPointEntry(entryRaw) {
     return null;
   }
   return {
+    pointName: value(entry.pointName),
     xEastM,
     yNorthM,
     zAltitudeM,
@@ -3873,10 +3882,10 @@ function normalizePlanMultiPoints(pointsRaw) {
       return;
     }
     const key = entry.coordinateMode === "stationPolar"
-      ? `polar|${entry.slopeDistanceM}|${entry.inclinationDeg}|${entry.inclinationMin}|${entry.inclinationSec}|${entry.directionDeg}|${entry.directionMin}|${entry.directionSec}`
+      ? `polar|${entry.pointName}|${entry.slopeDistanceM}|${entry.inclinationDeg}|${entry.inclinationMin}|${entry.inclinationSec}|${entry.directionDeg}|${entry.directionMin}|${entry.directionSec}`
       : entry.coordinateMode === "stationOffsetSouthWest"
-        ? `ts|${entry.southFromStationM}|${entry.westFromStationM}|${entry.zAltitudeM}`
-        : `grid|${entry.xEastM}|${entry.yNorthM}|${entry.zAltitudeM}`;
+        ? `ts|${entry.pointName}|${entry.southFromStationM}|${entry.westFromStationM}|${entry.zAltitudeM}`
+        : `grid|${entry.pointName}|${entry.xEastM}|${entry.yNorthM}|${entry.zAltitudeM}`;
     if (seen.has(key)) {
       return;
     }
@@ -3894,6 +3903,16 @@ function createMultiPointRowElement(pointRaw = {}) {
   row.className = "multi-point-row";
   row.dataset.multiPointRow = "1";
   row.dataset.multiPointFallback = JSON.stringify(normalized);
+
+  const pointNameLabel = document.createElement("label");
+  pointNameLabel.className = "multi-point-name-field";
+  pointNameLabel.textContent = "ポイント名";
+  const pointNameInput = document.createElement("input");
+  pointNameInput.type = "text";
+  pointNameInput.placeholder = "自由入力";
+  pointNameInput.dataset.multiPointName = "1";
+  pointNameInput.value = value(normalized.pointName);
+  pointNameLabel.append(pointNameInput);
 
   const makeField = (labelText, dataKey, fieldValue) => {
     const label = document.createElement("label");
@@ -3979,7 +3998,7 @@ function createMultiPointRowElement(pointRaw = {}) {
   removeButton.dataset.multiPointRemove = "1";
   removeButton.textContent = "削除";
 
-  row.append(firstLabel, secondLabel, thirdLabel, removeButton);
+  row.append(pointNameLabel, firstLabel, secondLabel, thirdLabel, removeButton);
   if (isTotalStation) {
     const result = document.createElement("p");
     result.className = "multi-point-calculation-result hint-text";
@@ -4010,10 +4029,10 @@ function syncMultiPointCoordinateModeUi() {
   const hint = document.getElementById("multi-point-hint");
   if (hint) {
     hint.textContent = isPolar
-      ? "各点の斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
+      ? "ポイント名は自由入力です。各点の斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
       : isTotalStation
-        ? "各点のX（設置点から南・南が正）、Y（設置点から西・西が正）、Z（標高）をm単位で入力します。"
-        : "各点について北から／南から、西から／東からを選び、グリッド辺からの距離（cm）と標高（m）を入力します。";
+        ? "ポイント名は自由入力です。各点のX（設置点から南・南が正）、Y（設置点から西・西が正）、Z（標高）をm単位で入力します。"
+        : "ポイント名は自由入力です。各点について北から／南から、西から／東からを選び、グリッド辺からの距離（cm）と標高（m）を入力します。";
   }
   const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");
   if (!firstRow) return;
@@ -4054,9 +4073,11 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
   }
   const rows = [...multiPointRows.querySelectorAll("[data-multi-point-row]")];
   const points = rows.map((row) => {
+    const pointName = value(row.querySelector("[data-multi-point-name]")?.value);
     const slopeField = row.querySelector("[data-multi-point-slope-distance-m]");
     if (slopeField) {
       return {
+        pointName,
         slopeDistanceM: value(slopeField.value),
         inclinationDeg: value(row.querySelector("[data-multi-point-inclination-deg]")?.value),
         inclinationMin: value(row.querySelector("[data-multi-point-inclination-min]")?.value),
@@ -4071,6 +4092,7 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
     const westField = row.querySelector("[data-multi-point-west-from-station-m]");
     if (southField || westField) {
       return {
+        pointName,
         southFromStationM: value(southField?.value),
         westFromStationM: value(westField?.value),
         zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
@@ -4080,6 +4102,7 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
     const nsCm = value(row.querySelector("[data-multi-point-ns-cm]")?.value);
     const ewCm = value(row.querySelector("[data-multi-point-ew-cm]")?.value);
     if (nsCm || ewCm) return {
+      pointName,
       nsDir: normalizeNsDir(row.querySelector("[data-multi-point-ns-dir]")?.value),
       nsCm,
       ewDir: normalizeEwDir(row.querySelector("[data-multi-point-ew-dir]")?.value),
@@ -4087,6 +4110,7 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
       zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
     };
     return {
+      pointName,
       xEastM: value(row.querySelector("[data-multi-point-x-east-m]")?.value),
       yNorthM: value(row.querySelector("[data-multi-point-y-north-m]")?.value),
       zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
@@ -4095,7 +4119,8 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
   const resolvedPoints = points.map((point, index) => {
     if (normalizePlanMultiPointEntry(point) || !useFallback) return point;
     try {
-      return JSON.parse(rows[index]?.dataset?.multiPointFallback || "null") || point;
+      const fallback = JSON.parse(rows[index]?.dataset?.multiPointFallback || "null");
+      return fallback ? { ...fallback, pointName: value(point.pointName) || value(fallback.pointName) } : point;
     } catch (_error) {
       return point;
     }
@@ -4105,9 +4130,11 @@ function readMultiPointRowsFromForm({ useFallback = false } = {}) {
 
 function readMultiPointRowFromElement(row) {
   if (!(row instanceof Element)) return null;
+  const pointName = value(row.querySelector("[data-multi-point-name]")?.value);
   const slopeField = row.querySelector("[data-multi-point-slope-distance-m]");
   if (slopeField) {
     return normalizePlanMultiPointEntry({
+      pointName,
       slopeDistanceM: value(slopeField.value),
       inclinationDeg: value(row.querySelector("[data-multi-point-inclination-deg]")?.value),
       inclinationMin: value(row.querySelector("[data-multi-point-inclination-min]")?.value),
@@ -4122,6 +4149,7 @@ function readMultiPointRowFromElement(row) {
   const westField = row.querySelector("[data-multi-point-west-from-station-m]");
   if (southField || westField) {
     return normalizePlanMultiPointEntry({
+      pointName,
       southFromStationM: value(southField?.value),
       westFromStationM: value(westField?.value),
       zAltitudeM: value(row.querySelector("[data-multi-point-z-altitude-m]")?.value),
