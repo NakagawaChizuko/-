@@ -727,6 +727,7 @@ async function initialize() {
     recordForm.setAttribute("aria-busy", "true");
   }
   await initializeDurableStateBackup();
+  initializeNumericMeasurementKeypads();
   bindEvents();
   initializeTotalStationGridPointSelectors();
   renderLargeShapeImageButtons();
@@ -747,6 +748,34 @@ async function initialize() {
     recordForm.inert = false;
     recordForm.removeAttribute("aria-busy");
   }
+}
+
+function initializeNumericMeasurementKeypads() {
+  const configure = (root) => {
+    const inputs = [];
+    if (root instanceof HTMLInputElement) inputs.push(root);
+    if (root instanceof Element || root instanceof Document) {
+      inputs.push(...root.querySelectorAll("input"));
+    }
+    inputs.forEach((input) => {
+      if (!(input instanceof HTMLInputElement) || input.type !== "text") return;
+      const fieldName = value(input.name);
+      const isMeasurement = /(?:Cm|M|Deg|Min|Sec|Height)$/.test(fieldName) || input.id === "edit-level-height";
+      if (!isMeasurement) return;
+      input.inputMode = "decimal";
+      input.enterKeyHint = "next";
+    });
+  };
+
+  configure(document);
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof Element) configure(node);
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 function bindEvents() {
