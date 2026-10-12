@@ -1813,6 +1813,14 @@ textarea {
   gap: 4px;
 }
 
+.level-altitude-preview {
+  display: block;
+  color: #1f5d85;
+  font-size: 0.84rem;
+  font-weight: 700;
+  min-height: 1.25em;
+}
+
 .level-altitude-item {
   align-content: end;
 }

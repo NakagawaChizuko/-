@@ -898,6 +898,9 @@ function bindEvents() {
   recordForm.addEventListener("input", handleRecordFormFieldEdit);
   recordForm.addEventListener("change", handleRecordFormFieldEdit);
   recordForm.addEventListener("input", (event) => {
+    if (event.target instanceof HTMLInputElement && ["levelUpperCm", "levelLowerCm"].includes(event.target.name)) {
+      syncLevelAltitudePreviews();
+    }
     if (event.target instanceof Element && event.target.matches('[name="nameType"], [name="namePart"]')) {
       syncSpecimenNameMemoFromParts();
       syncSpecimenNameChoiceSelects();
@@ -996,6 +999,10 @@ function bindEvents() {
   siteForm.elements.date.addEventListener("change", () => {
     applyTeamRosterAutofill();
   });
+  if (siteForm.elements.levelHeight instanceof HTMLInputElement) {
+    siteForm.elements.levelHeight.addEventListener("input", syncLevelAltitudePreviews);
+    siteForm.elements.levelHeight.addEventListener("change", syncLevelAltitudePreviews);
+  }
   ["kuwakuHeadA", "kuwakuHeadB", "kuwakuBlock", "kuwakuNo"].forEach((name) => {
     const input = siteForm.elements[name];
     if (!(input instanceof Element)) {
@@ -2756,6 +2763,26 @@ function hydrateSiteForm() {
   if (siteForm.elements.scribe) {
     siteForm.elements.scribe.value = state.site.scribe || "";
   }
+  syncLevelAltitudePreviews();
+}
+
+function syncLevelAltitudePreviews() {
+  const levelHeightM = parseDistanceToCm(siteForm?.elements?.levelHeight?.value);
+  const update = (readingFieldName, outputId) => {
+    const output = document.getElementById(outputId);
+    if (!(output instanceof HTMLOutputElement)) return;
+    const readingCm = parseDistanceToCm(recordForm?.elements?.[readingFieldName]?.value);
+    if (levelHeightM == null || readingCm == null) {
+      output.value = "標高：— m";
+      return;
+    }
+    const altitudeM = levelHeightM - readingCm / 100;
+    output.value = Number.isFinite(altitudeM)
+      ? `標高：${altitudeM.toFixed(3).replace(/\.?0+$/, "")} m`
+      : "標高：— m";
+  };
+  update("levelUpperCm", "level-upper-altitude-preview");
+  update("levelLowerCm", "level-lower-altitude-preview");
 }
 
 async function loadTeamRosterFromDefaultFile() {
@@ -5199,6 +5226,7 @@ async function syncImageFrameSizeFromAspectLock(triggerFieldName = "") {
 
 function resetRecordForm({ showMessage }) {
   recordForm.reset();
+  syncLevelAltitudePreviews();
   isOverwriteMode = false;
   overwriteOriginalRecord = null;
   editingRecordId = null;
@@ -5334,6 +5362,7 @@ function populateRecordForm(record) {
   recordForm.elements.identifier.value = record.identifier || "";
   recordForm.elements.levelUpperCm.value = record.levelUpperCm || "";
   recordForm.elements.levelLowerCm.value = record.levelLowerCm || "";
+  syncLevelAltitudePreviews();
   if (recordForm.elements.altitudeInputEnabled instanceof HTMLInputElement) {
     recordForm.elements.altitudeInputEnabled.checked = normalizeToggleFlag(record.altitudeInputEnabled) === "1";
   }
