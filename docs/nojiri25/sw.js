@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v85-custom-photo-color";
+const CACHE_NAME = "kaseki25-pwa-v86-list-photo-edit";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

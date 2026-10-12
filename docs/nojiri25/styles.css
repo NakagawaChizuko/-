@@ -829,6 +829,21 @@ main {
   border-color: #b45309;
 }
 
+.cell-edit-photo-picker {
+  display: flex;
+  justify-content: center;
+}
+
+.cell-edit-photo-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cell-edit-photo-list .photo-card img {
+  max-height: 260px;
+  object-fit: contain;
+}
+
 .plan-map-svg {
   width: 100%;
   height: 100%;

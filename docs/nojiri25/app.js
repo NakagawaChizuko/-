@@ -114,6 +114,7 @@ const OUTPUT_CELL_EDIT_LABELS = {
   occurrenceSketch: "産状スケッチ",
   position: "平面位置",
   notes: "備考",
+  photos: "写真添付",
 };
 const OUTPUT_LIST_COLUMN_DEFS = [
   { key: "kuwaku", label: "区画" },
@@ -134,6 +135,7 @@ const OUTPUT_LIST_COLUMN_DEFS = [
   { key: "occurrenceSketch", label: "産状スケッチ" },
   { key: "position", label: "平面位置" },
   { key: "notes", label: "備考" },
+  { key: "photos", label: "写真添付" },
   { key: "actions", label: "操作" },
 ];
 const CUSTOM_LARGE_SHAPE_TYPE = "カスタム画像";
@@ -421,6 +423,7 @@ let outputFilterMemory = {
 };
 let outputListColumnVisibility = createInitialOutputColumnVisibilityMap();
 let activeOutputCellEdit = null;
+let activeOutputCellEditPhotos = [];
 let selectedPlanKuwaku = "";
 let selectedPlanCategory = EXPORT_CATEGORY_ALL_VALUE;
 let selectedPlanUnit = "";
@@ -7304,11 +7307,15 @@ function openOutputCellEditModal(recordId, editKey, recordIndexRaw = "") {
     recordIndex: String(parseRecordIndex(recordIndexRaw)),
     recordSnapshot: buildCellEditRecordSnapshot(record),
   };
+  activeOutputCellEditPhotos = editKey === "photos" ? clonePhotos(record.photos) : [];
   cellEditTitle.textContent = `${label}を編集`;
   cellEditMeta.textContent = `標本番号 ${record.specimenNo || "-"} / 区画 ${getRecordKuwaku(record) || "-"}`;
   cellEditFields.innerHTML = fieldsHtml;
   cellEditModal.classList.remove("hidden");
   bindOutputCellEditDynamicFields(editKey);
+  if (editKey === "photos") {
+    renderOutputCellEditPhotoDraft();
+  }
   const focusTarget = cellEditFields.querySelector("input, select, textarea");
   if (focusTarget instanceof HTMLElement) {
     focusTarget.focus();
@@ -7325,6 +7332,7 @@ function closeOutputCellEditModal() {
   cellEditModal.classList.add("hidden");
   cellEditFields.innerHTML = "";
   activeOutputCellEdit = null;
+  activeOutputCellEditPhotos = [];
 }
 
 function buildOutputCellEditFieldsHtml(record, editKey) {
@@ -7574,6 +7582,14 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
           <textarea name="notes" rows="4">${escapeHtml(value(record?.notes))}</textarea>
         </label>
       `;
+    case "photos":
+      return `
+        <div class="cell-edit-photo-picker">
+          <label class="upload-picker-label secondary" for="cell-edit-photo-input">保存フォルダから選択</label>
+          <input id="cell-edit-photo-input" class="upload-file-input" type="file" accept="image/*,.heic,.heif" multiple />
+        </div>
+        <div class="cell-edit-photo-list" data-cell-edit-photo-list></div>
+      `;
     default:
       return "";
   }
@@ -7633,6 +7649,31 @@ function bindOutputCellEditDynamicFields(editKey) {
       });
     });
   }
+  if (editKey === "photos") {
+    const photoInput = cellEditFields.querySelector("#cell-edit-photo-input");
+    if (photoInput instanceof HTMLInputElement) {
+      photoInput.addEventListener("change", async () => {
+        photoInput.disabled = true;
+        await addOutputCellEditPhotosFromFiles(photoInput.files);
+        photoInput.value = "";
+        photoInput.disabled = false;
+      });
+    }
+    cellEditFields.addEventListener("input", (event) => {
+      const input = event.target.closest("input[data-cell-edit-photo-caption]");
+      if (!(input instanceof HTMLInputElement)) return;
+      const photo = activeOutputCellEditPhotos.find((item) => item.id === input.dataset.cellEditPhotoCaption);
+      if (photo) photo.caption = input.value;
+    });
+    cellEditFields.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-remove-cell-edit-photo-id]");
+      if (!(button instanceof HTMLButtonElement)) return;
+      activeOutputCellEditPhotos = activeOutputCellEditPhotos.filter(
+        (item) => item.id !== button.dataset.removeCellEditPhotoId
+      );
+      renderOutputCellEditPhotoDraft();
+    });
+  }
   if (editKey === "altitudeM") {
     const check = cellEditFields.querySelector("[data-cell-edit-altitude-check]");
     const directRow = cellEditFields.querySelector("[data-cell-edit-altitude-direct]");
@@ -7650,6 +7691,52 @@ function bindOutputCellEditDynamicFields(editKey) {
       };
       check.addEventListener("change", toggle);
       toggle();
+    }
+  }
+}
+
+function renderOutputCellEditPhotoDraft() {
+  const list = cellEditFields?.querySelector("[data-cell-edit-photo-list]");
+  if (!(list instanceof HTMLElement)) return;
+  if (!activeOutputCellEditPhotos.length) {
+    list.innerHTML = '<p class="hint-text">写真はまだありません。</p>';
+    return;
+  }
+  list.innerHTML = activeOutputCellEditPhotos
+    .map(
+      (photo) => `<article class="photo-card">
+        <img src="${escapeHtml(photo.dataUrl)}" alt="${escapeHtml(photo.name || "photo")}" />
+        <input data-cell-edit-photo-caption="${escapeHtml(photo.id)}" type="text" placeholder="写真キャプション" value="${escapeHtml(
+          photo.caption || ""
+        )}" />
+        <div class="panel-actions">
+          <button class="danger" type="button" data-remove-cell-edit-photo-id="${escapeHtml(photo.id)}">写真削除</button>
+        </div>
+      </article>`
+    )
+    .join("");
+}
+
+async function addOutputCellEditPhotosFromFiles(fileList) {
+  const files = Array.from(fileList || []);
+  for (const file of files) {
+    try {
+      const dataUrl = await loadImageFileDataUrlWithFallback(file, {
+        maxLength: PHOTO_TARGET_MAX_LENGTH,
+        quality: 0.98,
+        mimeType: "image/jpeg",
+        targetBytes: PHOTO_TARGET_JPEG_BYTES,
+      });
+      activeOutputCellEditPhotos.push({
+        id: newId("photo"),
+        name: file.name || "photo.jpg",
+        dataUrl,
+        caption: "",
+        createdAt: nowIso(),
+      });
+      renderOutputCellEditPhotoDraft();
+    } catch (_error) {
+      showToast(`写真追加に失敗: ${file.name}`);
     }
   }
 }
@@ -7827,6 +7914,10 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
   }
   if (editKey === "notes") {
     record.notes = value(formData.get("notes"));
+    return { ok: true };
+  }
+  if (editKey === "photos") {
+    record.photos = clonePhotos(activeOutputCellEditPhotos);
     return { ok: true };
   }
   return { ok: false, message: "このセルは直接編集に対応していません" };
@@ -8062,6 +8153,7 @@ function renderListOutput() {
         <td data-col-key="occurrenceSketch" data-cell-edit-key="occurrenceSketch" class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
         <td data-col-key="position" data-cell-edit-key="position" class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
         <td data-col-key="notes" data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
+        <td data-col-key="photos" data-cell-edit-key="photos">${normalizePhotos(record.photos).length ? "添付済み" : "添付なし"}</td>
         <td data-col-key="actions">
           <div class="row-actions">
             <button type="button" data-action="insert-row" data-id="${record.id}" data-kuwaku="${escapeHtml(
@@ -8187,6 +8279,9 @@ function compareOutputRecordsForList(a, b) {
       break;
     case "notes":
       compared = compareSortText(a?.notes, b?.notes);
+      break;
+    case "photos":
+      compared = normalizePhotos(a?.photos).length - normalizePhotos(b?.photos).length;
       break;
     default:
       compared = compareRecordsByKuwakuThenSpecimen(a, b);
