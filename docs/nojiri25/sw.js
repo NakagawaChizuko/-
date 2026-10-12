@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v89-multi-point-names";
+const CACHE_NAME = "kaseki25-pwa-v90-multi-point-no-altitude";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

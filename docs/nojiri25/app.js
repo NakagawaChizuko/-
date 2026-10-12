@@ -3909,7 +3909,6 @@ function createMultiPointRowElement(pointRaw = {}) {
   pointNameLabel.textContent = "ポイント名";
   const pointNameInput = document.createElement("input");
   pointNameInput.type = "text";
-  pointNameInput.placeholder = "自由入力";
   pointNameInput.dataset.multiPointName = "1";
   pointNameInput.value = value(normalized.pointName);
   pointNameLabel.append(pointNameInput);
@@ -3984,12 +3983,10 @@ function createMultiPointRowElement(pointRaw = {}) {
     const offsets = getTotalStationMultiPointOffsetsForForm(normalized);
     firstLabel = makeField("X　設置点から南へ（南が正）", "multiPointSouthFromStationM", offsets.southFromStationM);
     secondLabel = makeField("Y　設置点から西へ（西が正）", "multiPointWestFromStationM", offsets.westFromStationM);
-    thirdLabel = makeField("Z　標高", "multiPointZAltitudeM", normalized.zAltitudeM);
   } else {
     const gridPoint = getGridMultiPointForForm(normalized);
     firstLabel = makeGridDistanceField("南北方向", "multiPointNsDir", gridPoint.nsDir, ["北から", "南から"], "multiPointNsCm", gridPoint.nsCm);
     secondLabel = makeGridDistanceField("東西方向", "multiPointEwDir", gridPoint.ewDir, ["西から", "東から"], "multiPointEwCm", gridPoint.ewCm);
-    thirdLabel = makeField("標高", "multiPointZAltitudeM", gridPoint.zAltitudeM);
   }
 
   const removeButton = document.createElement("button");
@@ -3998,7 +3995,9 @@ function createMultiPointRowElement(pointRaw = {}) {
   removeButton.dataset.multiPointRemove = "1";
   removeButton.textContent = "削除";
 
-  row.append(pointNameLabel, firstLabel, secondLabel, thirdLabel, removeButton);
+  row.append(pointNameLabel, firstLabel, secondLabel);
+  if (thirdLabel) row.append(thirdLabel);
+  row.append(removeButton);
   if (isTotalStation) {
     const result = document.createElement("p");
     result.className = "multi-point-calculation-result hint-text";
@@ -4029,10 +4028,10 @@ function syncMultiPointCoordinateModeUi() {
   const hint = document.getElementById("multi-point-hint");
   if (hint) {
     hint.textContent = isPolar
-      ? "ポイント名は自由入力です。各点の斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
+      ? "各点のポイント名、斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
       : isTotalStation
-        ? "ポイント名は自由入力です。各点のX（設置点から南・南が正）、Y（設置点から西・西が正）、Z（標高）をm単位で入力します。"
-        : "ポイント名は自由入力です。各点について北から／南から、西から／東からを選び、グリッド辺からの距離（cm）と標高（m）を入力します。";
+        ? "各点のポイント名、X（設置点から南・南が正）、Y（設置点から西・西が正）を入力します。"
+        : "各点のポイント名と、グリッド辺からの距離（cm）を入力します。";
   }
   const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");
   if (!firstRow) return;
