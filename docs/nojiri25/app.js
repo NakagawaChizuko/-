@@ -716,9 +716,14 @@ const planLargeShapeImageCache = new Map();
 const planLargeShapeTintedCanvasCache = new Map();
 const planLargeShapeTintedDataUrlCache = new Map();
 
-initialize();
+void initialize();
 
-function initialize() {
+async function initialize() {
+  if (recordForm) {
+    recordForm.inert = true;
+    recordForm.setAttribute("aria-busy", "true");
+  }
+  await initializeDurableStateBackup();
   bindEvents();
   initializeTotalStationGridPointSelectors();
   renderLargeShapeImageButtons();
@@ -735,7 +740,10 @@ function initialize() {
   void loadLargeShapeImageManifest();
   void loadTeamRosterFromDefaultFile();
   void bootstrapCloudSync();
-  void initializeDurableStateBackup();
+  if (recordForm) {
+    recordForm.inert = false;
+    recordForm.removeAttribute("aria-busy");
+  }
 }
 
 function bindEvents() {
@@ -12641,19 +12649,22 @@ async function initializeDurableStateBackup() {
   const durableState = await loadStateFromDurableDb();
   const localHasData = hasAnyStateData(state);
   const durableHasData = hasAnyStateData(durableState);
-  const durableHasMoreImages = countEmbeddedStateImages(durableState) > countEmbeddedStateImages(state);
-  if (durableHasData && (!localHasData || getStateUpdatedAt(durableState) > getStateUpdatedAt(state) || durableHasMoreImages)) {
-    state = normalizeState(durableState);
-    hydrateSiteForm();
-    resetRecordForm({ showMessage: false });
-    renderRecordTable();
-    renderOutputs();
+  if (durableHasData) {
+    state = localHasData ? mergeLocalAndDurableStates(state, durableState) : normalizeState(durableState);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (_error) {
-      // IndexedDBからは復元済み。
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(buildLightweightLocalStorageState(state)));
+      } catch (_lightweightError) {
+        // IndexedDBからは復元済み。
+      }
     }
-    showToast("端末バックアップから保存データを復元しました");
+    try {
+      await saveStateToDurableDb(state);
+    } catch (_error) {
+      // 照合済みのデータはメモリとlocalStorageで維持する。
+    }
     return;
   }
   if (localHasData) {
@@ -12663,6 +12674,46 @@ async function initializeDurableStateBackup() {
       // localStorage保存は維持する。
     }
   }
+}
+
+function mergeLocalAndDurableStates(localStateRaw, durableStateRaw) {
+  const localState = normalizeState(localStateRaw);
+  const durableState = normalizeState(durableStateRaw);
+  const mergedSite = mergeSiteForCloud(durableState.site, localState.site);
+  const localById = new Map(localState.records.map((record) => [value(record.id), record]));
+  const durableById = new Map(durableState.records.map((record) => [value(record.id), record]));
+  const recordIds = [...localById.keys(), ...[...durableById.keys()].filter((id) => !localById.has(id))];
+
+  const records = recordIds.map((recordId) => {
+    const localRecord = localById.get(recordId);
+    const durableRecord = durableById.get(recordId);
+    if (!localRecord) return durableRecord;
+    if (!durableRecord) return localRecord;
+
+    const localMs = getRecordUpdatedAtMs(localRecord);
+    const durableMs = getRecordUpdatedAtMs(durableRecord);
+    const localIsNewer = !Number.isFinite(durableMs) || (Number.isFinite(localMs) && localMs >= durableMs);
+    const newer = localIsNewer ? localRecord : durableRecord;
+    const older = localIsNewer ? durableRecord : localRecord;
+    const newerPhotos = normalizePhotos(newer.photos);
+    const newerDiagrams = normalizePhotos(newer.sectionDiagrams);
+
+    return {
+      ...older,
+      ...newer,
+      photos: newerPhotos.length ? newerPhotos : normalizePhotos(older.photos),
+      sectionDiagrams: newerDiagrams.length ? newerDiagrams : normalizePhotos(older.sectionDiagrams),
+      customLargeImageDataUrl:
+        value(newer.customLargeImageDataUrl) || value(older.customLargeImageDataUrl),
+      customLargeImageName:
+        value(newer.customLargeImageName) || value(older.customLargeImageName),
+      customLargeImageAspect:
+        value(newer.customLargeImageAspect) || value(older.customLargeImageAspect),
+      history: mergeRecordHistoryEntries(localRecord.history, durableRecord.history),
+    };
+  });
+
+  return normalizeState({ site: mergedSite, records });
 }
 
 async function putModel3dData(modelRaw) {
