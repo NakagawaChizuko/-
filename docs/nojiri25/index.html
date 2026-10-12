@@ -311,11 +311,11 @@
             </fieldset>
 
             <fieldset class="inline-fieldset span-3">
-              <legend>平面位置（大きなもの・画像利用）</legend>
-              <div class="dir-tabs" role="tablist" aria-label="大きなもの設定">
+              <legend>平面位置（画像利用）</legend>
+              <div class="dir-tabs" role="tablist" aria-label="画像利用設定">
                 <button class="dir-tab active" data-group="planSizeMode" data-value="通常" type="button">通常（1点）</button>
                 <button class="dir-tab" data-group="planSizeMode" data-value="複数点" type="button">複数点</button>
-                <button class="dir-tab" data-group="planSizeMode" data-value="大きなもの" type="button">大きなもの・画像利用</button>
+                <button class="dir-tab" data-group="planSizeMode" data-value="大きなもの" type="button">画像利用</button>
               </div>
               <input id="plan-size-mode-input" name="planSizeMode" type="hidden" value="通常" />
               <div id="multi-point-section" class="multi-point-section hidden">
@@ -328,10 +328,7 @@
               </div>
 
               <div id="large-shape-section" class="large-shape-section hidden">
-                <div class="dir-tabs" role="tablist" aria-label="大きなもの形状">
-                  <button class="dir-tab" data-group="largeShapeType" data-value="直線状" type="button">直線状</button>
-                  <button class="dir-tab" data-group="largeShapeType" data-value="長方形" type="button">長方形</button>
-                  <button class="dir-tab" data-group="largeShapeType" data-value="楕円" type="button">楕円</button>
+                <div class="dir-tabs" role="tablist" aria-label="画像アップロード">
                   <div id="large-shape-image-buttons" class="image-shape-tabs"></div>
                 </div>
                 <input id="large-shape-type-input" name="largeShapeType" type="hidden" value="" />
@@ -1083,6 +1080,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261012-numeric-keypads1"></script>
+    <script src="./app.js?v=20261012-image-upload-only1"></script>
   </body>
 </html>

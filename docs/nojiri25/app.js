@@ -4357,7 +4357,7 @@ function renderLargeShapeImageButtons() {
   if (!largeShapeImageButtons) {
     return;
   }
-  const labels = Array.from(new Set([...Array.from(largeShapeImagePathMap.keys()).filter((label) => value(label)), CUSTOM_LARGE_SHAPE_TYPE]));
+  const labels = [CUSTOM_LARGE_SHAPE_TYPE];
   largeShapeImageButtons.innerHTML = labels
     .map(
       (label) => {
@@ -4527,7 +4527,7 @@ function syncLargeShapeSectionFromForm() {
   }
 
   const shapeTypeRaw = normalizeLargeShapeType(largeShapeTypeInput?.value);
-  const shapeType = shapeTypeRaw || "直線状";
+  const shapeType = shapeTypeRaw || CUSTOM_LARGE_SHAPE_TYPE;
   const isImageShape = isLargeShapeImageType(shapeType);
   const isCustomImageShape = isCustomLargeShapeType(shapeType);
   const isLineShape = shapeType === "直線状";
