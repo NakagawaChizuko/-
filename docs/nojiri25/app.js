@@ -9,6 +9,9 @@ const CLOUD_ENDPOINT_KEY = "nojiri-kaseki-cloud-endpoint-localonly-v1";
 const CLOUD_CLIENT_ID_KEY = "nojiri-kaseki-cloud-client-id-localonly-v1";
 const TOTAL_STATION_SETUP_KEY = "nojiri-total-station-setup-v1";
 const DEFAULT_CLOUD_ENDPOINT = "";
+const PUBLIC_APP_URL = "https://nakagawachizuko.github.io/-/nojiri25/";
+const PUBLIC_APP_ORIGIN = new URL(PUBLIC_APP_URL).origin;
+const SAVED_HTML_TRANSFER_PARAM = "savedHtmlTransfer";
 const CLOUD_PULL_INTERVAL_MS = 20000;
 const CLOUD_SAVE_DEBOUNCE_MS = 900;
 const CLOUD_AUTO_PULL_ENABLED = false;
@@ -469,6 +472,8 @@ let exportJsonDateSelectionInitialized = false;
 let exportJsonSelectedRecordIds = new Set();
 let exportJsonSelectionInitialized = false;
 let savedHtmlFullJsonExportCompleted = false;
+let savedHtmlTransferInProgress = false;
+let savedHtmlTransferCompleted = false;
 let outputListSortKey = "kuwaku";
 let outputListSortDirection = "asc";
 let isOverwriteMode = false;
@@ -754,6 +759,7 @@ async function initialize() {
   resetRecordForm({ showMessage: false });
   renderRecordTable();
   renderOutputs();
+  initializeSavedHtmlTransferReceiver();
   void loadLargeShapeImageManifest();
   void loadTeamRosterFromDefaultFile();
   void bootstrapCloudSync();
@@ -17616,37 +17622,225 @@ function setOfflineStatus(text, className = "") {
   if (className) offlineStatus.classList.add(className);
 }
 
+function createSavedHtmlTransferToken() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = new Uint32Array(4);
+  globalThis.crypto?.getRandomValues?.(bytes);
+  return Array.from(bytes, (item) => item.toString(16).padStart(8, "0")).join("") ||
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getSavedHtmlTransferDuplicateKey(recordRaw) {
+  const record = recordRaw && typeof recordRaw === "object" ? recordRaw : {};
+  const kuwaku = normalizeKuwakuText(getRecordKuwaku(record));
+  const specimenNo = parseSpecimenNo(
+    record.specimenNo,
+    record.specimenPrefix,
+    record.specimenSerial
+  ).specimenNo;
+  return kuwaku && specimenNo ? `${kuwaku}::${specimenNo}` : "";
+}
+
+function describeSavedHtmlTransferRecord(recordRaw) {
+  const record = recordRaw && typeof recordRaw === "object" ? recordRaw : {};
+  const kuwaku = normalizeKuwakuText(getRecordKuwaku(record)) || "区画未設定";
+  const specimenNo = parseSpecimenNo(
+    record.specimenNo,
+    record.specimenPrefix,
+    record.specimenSerial
+  ).specimenNo || "標本番号未設定";
+  const date = getRecordDate(record) || "日付未設定";
+  const name = [value(record.nameType), value(record.namePart)].filter(Boolean).join("・") || "種類・部位未設定";
+  return `${kuwaku} / ${specimenNo} / ${date} / ${name}`;
+}
+
+function resolveSavedHtmlTransferConflicts(currentStateRaw, importedStateRaw) {
+  const currentState = normalizeState(currentStateRaw);
+  const importedState = normalizeState(importedStateRaw);
+  const records = [...currentState.records];
+  let duplicateCount = 0;
+  let keptFromSavedHtml = 0;
+  let keptFromLatest = 0;
+
+  importedState.records.forEach((incomingRecord) => {
+    const incomingId = value(incomingRecord.id);
+    const incomingKey = getSavedHtmlTransferDuplicateKey(incomingRecord);
+    const duplicateIndexes = [];
+    records.forEach((existingRecord, index) => {
+      const sameId = incomingId && value(existingRecord.id) === incomingId;
+      const sameSpecimen = incomingKey && getSavedHtmlTransferDuplicateKey(existingRecord) === incomingKey;
+      if (sameId || sameSpecimen) duplicateIndexes.push(index);
+    });
+
+    if (!duplicateIndexes.length) {
+      records.push(incomingRecord);
+      return;
+    }
+
+    duplicateCount += 1;
+    const existingRecord = records[duplicateIndexes[0]];
+    const keepSavedHtml = window.confirm(
+      `重複するデータがあります。\n\n` +
+      `保存HTML側：${describeSavedHtmlTransferRecord(incomingRecord)}\n` +
+      `最新版側：${describeSavedHtmlTransferRecord(existingRecord)}\n\n` +
+      `「OK」：保存HTML側を残す\n` +
+      `「キャンセル」：最新版側を残す`
+    );
+    if (keepSavedHtml) {
+      duplicateIndexes.sort((a, b) => b - a).forEach((index) => records.splice(index, 1));
+      records.push(incomingRecord);
+      keptFromSavedHtml += 1;
+    } else {
+      keptFromLatest += 1;
+    }
+  });
+
+  const mergedSite = mergeStatesForCloud(currentState, {
+    site: importedState.site,
+    records: [],
+  }).site;
+  return {
+    state: normalizeState({ site: mergedSite, records }),
+    duplicateCount,
+    keptFromSavedHtml,
+    keptFromLatest,
+  };
+}
+
+async function startSavedHtmlTransfer() {
+  if (savedHtmlTransferInProgress) return;
+  const token = createSavedHtmlTransferToken();
+  const targetUrl = new URL(PUBLIC_APP_URL);
+  targetUrl.searchParams.set(SAVED_HTML_TRANSFER_PARAM, token);
+  targetUrl.searchParams.set("v", "20261013-auto-transfer1");
+  const targetWindow = window.open(targetUrl.href, "_blank");
+  if (!targetWindow) {
+    setOfflineStatus("最新版を開けませんでした。ポップアップを許可してください", "error");
+    return;
+  }
+
+  savedHtmlTransferInProgress = true;
+  setOfflineStatus(`保存HTMLのデータ${state.records.length}件を引き継ぎ準備中…`);
+  let timeoutId = 0;
+  let transferState = null;
+
+  const cleanup = () => {
+    window.removeEventListener("message", handleMessage);
+    if (timeoutId) window.clearTimeout(timeoutId);
+    savedHtmlTransferInProgress = false;
+  };
+  const fail = (message) => {
+    cleanup();
+    setOfflineStatus(message, "error");
+  };
+  const handleMessage = async (event) => {
+    if (event.origin !== PUBLIC_APP_ORIGIN || event.source !== targetWindow) return;
+    if (event.data?.token !== token) return;
+    if (event.data?.type === "nojiri-saved-html-transfer-ready") {
+      try {
+        setOfflineStatus(`写真・3Dデータを含む${state.records.length}件を送信中…`);
+        transferState ||= await buildJsonExportState(state.records);
+        targetWindow.postMessage(
+          { type: "nojiri-saved-html-transfer-data", token, state: transferState },
+          PUBLIC_APP_ORIGIN
+        );
+      } catch (_error) {
+        fail("データの引き継ぎ準備に失敗しました。JSON書き出しをご利用ください");
+      }
+      return;
+    }
+    if (event.data?.type === "nojiri-saved-html-transfer-complete") {
+      cleanup();
+      savedHtmlTransferCompleted = true;
+      setOfflineStatus(`引き継ぎ完了（${Number(event.data.recordCount) || state.records.length}件）`, "ready");
+      showToast("最新版へのデータ引き継ぎが完了しました");
+      return;
+    }
+    if (event.data?.type === "nojiri-saved-html-transfer-error") {
+      fail("最新版への引き継ぎに失敗しました。保存HTMLのデータは残っています");
+    }
+  };
+
+  window.addEventListener("message", handleMessage);
+  timeoutId = window.setTimeout(() => {
+    fail("引き継ぎを確認できませんでした。保存HTMLのデータは残っています");
+  }, 120000);
+}
+
+function initializeSavedHtmlTransferReceiver() {
+  if (location.protocol === "file:" || window.opener == null) return;
+  const token = value(new URLSearchParams(location.search).get(SAVED_HTML_TRANSFER_PARAM));
+  if (!token) return;
+  let received = false;
+
+  const handleMessage = async (event) => {
+    if (received || event.source !== window.opener) return;
+    if (event.data?.type !== "nojiri-saved-html-transfer-data" || event.data?.token !== token) return;
+    received = true;
+    try {
+      const imported = event.data.state;
+      if (!imported || !Array.isArray(imported.records)) throw new Error("Invalid transfer data");
+      setOfflineStatus(`保存HTMLのデータ${imported.records.length}件を保存中…`);
+      await importEmbeddedModels3d(imported);
+      const resolved = resolveSavedHtmlTransferConflicts(state, imported);
+      state = resolved.state;
+      hydrateSiteForm();
+      resetRecordForm({ showMessage: false });
+      renderRecordTable();
+      renderOutputs();
+      persist();
+      await saveStateToDurableDb(state);
+      const cleanUrl = new URL(location.href);
+      cleanUrl.searchParams.delete(SAVED_HTML_TRANSFER_PARAM);
+      cleanUrl.searchParams.delete("v");
+      history.replaceState(null, "", cleanUrl.href);
+      setOfflineStatus("データ引き継ぎ完了・オフライン利用可", "ready");
+      const duplicateResult = resolved.duplicateCount
+        ? `（重複${resolved.duplicateCount}件：保存HTML側${resolved.keptFromSavedHtml}件、最新版側${resolved.keptFromLatest}件を保持）`
+        : "";
+      showToast(`保存HTMLからデータを引き継ぎました${duplicateResult}`);
+      window.opener.postMessage(
+        {
+          type: "nojiri-saved-html-transfer-complete",
+          token,
+          recordCount: imported.records.length,
+          duplicateCount: resolved.duplicateCount,
+          keptFromSavedHtml: resolved.keptFromSavedHtml,
+          keptFromLatest: resolved.keptFromLatest,
+        },
+        "*"
+      );
+    } catch (_error) {
+      received = false;
+      setOfflineStatus("データ引き継ぎに失敗しました", "error");
+      window.opener?.postMessage({ type: "nojiri-saved-html-transfer-error", token }, "*");
+    }
+  };
+
+  window.addEventListener("message", handleMessage);
+  window.opener.postMessage({ type: "nojiri-saved-html-transfer-ready", token }, "*");
+}
+
 function renderSavedHtmlStatus() {
   if (!offlineStatus) return;
   if (!navigator.onLine) {
     setOfflineStatus("オフライン利用中（保存HTML版）", "ready");
     return;
   }
+  if (savedHtmlTransferInProgress || savedHtmlTransferCompleted) return;
   const hasRecordsToMove = state.records.length > 0;
-  const canOpenLatest = !hasRecordsToMove || savedHtmlFullJsonExportCompleted;
   setOfflineStatus(
-    canOpenLatest
-      ? (hasRecordsToMove ? "全件JSON書き出し済み " : "オンライン接続中・保存HTMLを表示中 ")
-      : `保存HTMLにデータ${state.records.length}件あり `,
-    canOpenLatest ? "ready" : "error"
+    hasRecordsToMove ? `保存HTMLにデータ${state.records.length}件あり ` : "オンライン接続中・保存HTMLを表示中 ",
+    "ready"
   );
   const link = document.createElement("a");
-  link.href = canOpenLatest ? "https://nakagawachizuko.github.io/-/nojiri25/" : "#export-json-record-list";
-  link.textContent = canOpenLatest ? "最新版を開く" : `先に全${state.records.length}件をJSON書き出し`;
-  if (!canOpenLatest) {
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      exportJsonSelectedDates = new Set(state.records.map((record) => getRecordDate(record)));
-      exportJsonSelectedRecordIds = new Set(state.records.map((record) => value(record.id)).filter(Boolean));
-      exportJsonDateSelectionInitialized = true;
-      exportJsonSelectionInitialized = true;
-      setActiveTab("export-tab");
-      renderJsonExportControls();
-      updateExportButtonAvailability();
-      document.getElementById("export-json-record-list")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      showToast("データ移行のため、全件をJSON書き出ししてください");
-    });
-  }
+  link.href = PUBLIC_APP_URL;
+  link.textContent = hasRecordsToMove ? "最新版を開いてデータを引き継ぐ" : "最新版を開く";
+  link.addEventListener("click", (event) => {
+    if (!hasRecordsToMove) return;
+    event.preventDefault();
+    void startSavedHtmlTransfer();
+  });
   offlineStatus.append(link);
 }
 

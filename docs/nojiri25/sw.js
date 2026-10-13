@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v105-safe-data-migration";
+const CACHE_NAME = "kaseki25-pwa-v107-transfer-conflicts";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
