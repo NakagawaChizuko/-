@@ -4077,6 +4077,7 @@ function createMultiPointRowElement(pointRaw = {}) {
     wrap.className = "multi-point-input";
     const input = document.createElement("input");
     input.type = "text";
+    input.inputMode = "decimal";
     input.placeholder = "m";
     input.dataset[dataKey] = "1";
     input.value = value(fieldValue);
@@ -4140,6 +4141,7 @@ function createMultiPointRowElement(pointRaw = {}) {
     const offsets = getTotalStationMultiPointOffsetsForForm(normalized);
     firstLabel = makeField("X　設置点から南へ（南が正）", "multiPointSouthFromStationM", offsets.southFromStationM);
     secondLabel = makeField("Y　設置点から西へ（西が正）", "multiPointWestFromStationM", offsets.westFromStationM);
+    thirdLabel = makeField("Z　標高", "multiPointZAltitudeM", offsets.zAltitudeM);
   } else {
     const gridPoint = getGridMultiPointForForm(normalized);
     firstLabel = makeGridDistanceField("南北方向", "multiPointNsDir", gridPoint.nsDir, ["北から", "南から"], "multiPointNsCm", gridPoint.nsCm);
@@ -4187,7 +4189,7 @@ function syncMultiPointCoordinateModeUi() {
     hint.textContent = isPolar
       ? "各点のポイント名、斜距離、傾斜（度・分・秒）、方向角（度・分・秒）を入力します。"
       : isTotalStation
-        ? "各点のポイント名、X（設置点から南・南が正）、Y（設置点から西・西が正）を入力します。"
+        ? "各点のポイント名、X（設置点から南・南が正）、Y（設置点から西・西が正）、Z（標高）を入力します。"
         : "各点のポイント名と、グリッド辺からの距離（cm）を入力します。";
   }
   const firstRow = multiPointRows?.querySelector("[data-multi-point-row]");
@@ -15929,6 +15931,16 @@ function validateInputRequiredFields(siteSnapshot, recordFormData) {
   if (selectedPlanSizeMode === "複数点" && !readMultiPointRowsFromForm().length) {
     return "複数点の平面位置を入力してください";
   }
+  if (
+    selectedPlanSizeMode === "複数点" &&
+    positionMethod === "totalStation" &&
+    value(recordFormData.get("tsObservationMode")) !== "polar"
+  ) {
+    const missingZ = [...(multiPointRows?.querySelectorAll("[data-multi-point-row]") || [])].some((row) =>
+      !value(row.querySelector("[data-multi-point-z-altitude-m]")?.value)
+    );
+    if (missingZ) return "複数点の各点にZ（標高）を入力してください";
+  }
   for (const [label, fieldValue] of recordRequiredFields) {
     if (!value(fieldValue)) {
       return `${label}を入力してください`;
@@ -17549,6 +17561,8 @@ function syncPositionMeasurementUi() {
     return;
   }
   const method = normalizePositionMethod(new FormData(recordForm).get("positionMethod"));
+  const positionInputLegend = document.getElementById("position-input-legend");
+  if (positionInputLegend) positionInputLegend.textContent = method === "totalStation" ? "位置" : "平面位置";
   document.getElementById("grid-position-fields")?.classList.toggle("hidden", method !== "grid");
   document.getElementById("total-station-section")?.classList.toggle("hidden", method !== "totalStation");
   document.getElementById("ts-specimen-position-section")?.classList.toggle("hidden", method !== "totalStation");
