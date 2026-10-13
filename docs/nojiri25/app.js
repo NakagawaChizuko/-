@@ -468,6 +468,7 @@ let exportJsonSelectedDates = new Set();
 let exportJsonDateSelectionInitialized = false;
 let exportJsonSelectedRecordIds = new Set();
 let exportJsonSelectionInitialized = false;
+let savedHtmlFullJsonExportCompleted = false;
 let outputListSortKey = "kuwaku";
 let outputListSortDirection = "asc";
 let isOverwriteMode = false;
@@ -2219,6 +2220,10 @@ function bindEvents() {
       const exportState = await buildJsonExportState(selectedRecords);
       const json = JSON.stringify(exportState, null, 2);
       downloadFile(buildJsonExportFileName(selectedRecords), json, "application/json");
+      if (location.protocol === "file:" && selectedRecords.length === state.records.length) {
+        savedHtmlFullJsonExportCompleted = true;
+        renderSavedHtmlStatus();
+      }
       showToast("JSONを書き出しました");
     } catch (_error) {
       showToast("JSON書き出しに失敗しました");
@@ -17617,10 +17622,31 @@ function renderSavedHtmlStatus() {
     setOfflineStatus("オフライン利用中（保存HTML版）", "ready");
     return;
   }
-  setOfflineStatus("オンライン接続中・保存HTMLを表示中 ", "error");
+  const hasRecordsToMove = state.records.length > 0;
+  const canOpenLatest = !hasRecordsToMove || savedHtmlFullJsonExportCompleted;
+  setOfflineStatus(
+    canOpenLatest
+      ? (hasRecordsToMove ? "全件JSON書き出し済み " : "オンライン接続中・保存HTMLを表示中 ")
+      : `保存HTMLにデータ${state.records.length}件あり `,
+    canOpenLatest ? "ready" : "error"
+  );
   const link = document.createElement("a");
-  link.href = "https://nakagawachizuko.github.io/-/nojiri25/";
-  link.textContent = "最新版を開く";
+  link.href = canOpenLatest ? "https://nakagawachizuko.github.io/-/nojiri25/" : "#export-json-record-list";
+  link.textContent = canOpenLatest ? "最新版を開く" : `先に全${state.records.length}件をJSON書き出し`;
+  if (!canOpenLatest) {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      exportJsonSelectedDates = new Set(state.records.map((record) => getRecordDate(record)));
+      exportJsonSelectedRecordIds = new Set(state.records.map((record) => value(record.id)).filter(Boolean));
+      exportJsonDateSelectionInitialized = true;
+      exportJsonSelectionInitialized = true;
+      setActiveTab("export-tab");
+      renderJsonExportControls();
+      updateExportButtonAvailability();
+      document.getElementById("export-json-record-list")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      showToast("データ移行のため、全件をJSON書き出ししてください");
+    });
+  }
   offlineStatus.append(link);
 }
 
