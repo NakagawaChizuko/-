@@ -130,7 +130,7 @@ const OUTPUT_LIST_COLUMN_DEFS = [
   { key: "discoverer", label: "発見者" },
   { key: "identifier", label: "判定者" },
   { key: "levelRead", label: "レベル読値" },
-  { key: "altitudeM", label: "標高(m)" },
+  { key: "altitudeM", label: "標高(上面/下底)(m)" },
   { key: "occurrenceSection", label: "産出状況断面" },
   { key: "occurrenceSketch", label: "産状スケッチ" },
   { key: "position", label: "平面位置" },
@@ -2476,6 +2476,11 @@ async function buildJsonExportState(recordsRaw = state.records) {
   const exportSource = { ...state, records };
   const exportState = typeof structuredClone === "function" ? structuredClone(exportSource) : JSON.parse(JSON.stringify(exportSource));
   for (const record of exportState.records || []) {
+    const upperAltitudeM = getRecordUpperAltitudeMValue(record);
+    const lowerAltitudeM = getRecordLowerAltitudeMValue(record);
+    record.altitudeUpperM = upperAltitudeM;
+    record.altitudeLowerM = lowerAltitudeM;
+    record.altitudeM = lowerAltitudeM;
     const models = normalizeModels3d(record.models3d);
     record.models3d = await Promise.all(
       models.map(async (metadata) => {
@@ -16408,27 +16413,43 @@ function formatLevelRead(record) {
   return `${formatCmValue(upper, "-")} / ${formatCmValue(lower, "-")}`;
 }
 
-function getRecordAltitudeMValue(record) {
-  const useDirectAltitude = normalizeToggleFlag(record?.altitudeInputEnabled) === "1";
-  if (useDirectAltitude) {
-    const directAltitudeM = parseDistanceToCm(record?.altitudeDirectM);
-    return directAltitudeM != null ? directAltitudeM : null;
-  }
+function calculateRecordAltitudeM(record, readingCmRaw) {
   const levelHeightM = parseDistanceToCm(getRecordLevelHeight(record));
-  const lowerCm = parseDistanceToCm(record?.levelLowerCm);
-  if (levelHeightM == null || lowerCm == null) {
+  const readingCm = parseDistanceToCm(readingCmRaw);
+  if (levelHeightM == null || readingCm == null) {
     return null;
   }
-  const altitudeM = levelHeightM - lowerCm / 100;
+  const altitudeM = levelHeightM - readingCm / 100;
   return Number.isFinite(altitudeM) ? altitudeM : null;
 }
 
+function getRecordUpperAltitudeMValue(record) {
+  return calculateRecordAltitudeM(record, record?.levelUpperCm);
+}
+
+function getRecordLowerAltitudeMValue(record) {
+  const directAltitudeM = parseDistanceToCm(record?.altitudeDirectM);
+  if (directAltitudeM != null) {
+    return directAltitudeM;
+  }
+  return calculateRecordAltitudeM(record, record?.levelLowerCm);
+}
+
+function getRecordAltitudeMValue(record) {
+  return getRecordLowerAltitudeMValue(record);
+}
+
+function formatAltitudeMValue(altitudeM) {
+  return altitudeM == null ? "" : altitudeM.toFixed(3).replace(/\.?0+$/, "");
+}
+
 function formatRecordAltitudeM(record) {
-  const altitudeM = getRecordAltitudeMValue(record);
-  if (altitudeM == null) {
+  const upperAltitudeM = getRecordUpperAltitudeMValue(record);
+  const lowerAltitudeM = getRecordLowerAltitudeMValue(record);
+  if (upperAltitudeM == null && lowerAltitudeM == null) {
     return "";
   }
-  return altitudeM.toFixed(3).replace(/\.?0+$/, "");
+  return `${formatAltitudeMValue(upperAltitudeM) || "-"} / ${formatAltitudeMValue(lowerAltitudeM) || "-"}`;
 }
 
 function formatLayerPosition(record) {
