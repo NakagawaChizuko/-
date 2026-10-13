@@ -7870,6 +7870,7 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
           <select name="occurrenceSketch">
             <option value="無" ${normalizeOccurrenceSketchFlag(record?.occurrenceSketch) === "無" ? "selected" : ""}>無</option>
             <option value="有" ${normalizeOccurrenceSketchFlag(record?.occurrenceSketch) === "有" ? "selected" : ""}>有</option>
+            <option value="判定待ち" ${normalizeOccurrenceSketchFlag(record?.occurrenceSketch) === "判定待ち" ? "selected" : ""}>判定待ち</option>
           </select>
         </label>
       `;
@@ -16170,6 +16171,9 @@ function normalizeNeedFlag(valueRaw) {
 
 function normalizeOccurrenceSketchFlag(valueRaw) {
   const text = value(valueRaw);
+  if (text === "判定待ち") {
+    return "判定待ち";
+  }
   if (text === "有" || text === "否") {
     return "有";
   }

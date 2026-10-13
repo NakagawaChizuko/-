@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v111-important-pending";
+const CACHE_NAME = "kaseki25-pwa-v112-sketch-pending";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
