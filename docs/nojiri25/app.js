@@ -1,5 +1,6 @@
 const STORAGE_KEY = "nojiri-kaseki-mobile-localonly-v1";
 const STORAGE_BACKUP_KEY = "nojiri-kaseki-mobile-localonly-v1-backup";
+const STORAGE_PRE_RESTORE_KEY = "nojiri-kaseki-mobile-localonly-v1-before-restore";
 const DURABLE_DB_NAME = "nojiri-kaseki-mobile-durable-v1";
 const DURABLE_DB_VERSION = 1;
 const DURABLE_STATE_STORE = "stateBackups";
@@ -2262,18 +2263,33 @@ function bindEvents() {
     }
   });
   restoreBackupBtn?.addEventListener("click", async () => {
-    const backup = await loadBestDurableStateBackup();
+    const backupInfo = await loadBestDurableStateBackupInfo();
+    const backup = backupInfo?.state;
     if (!backup || !hasAnyStateData(backup)) {
       showToast("復元できる端末バックアップがありません");
       return;
     }
-    if (!window.confirm("端末バックアップのデータで現在の画面を復元しますか？")) return;
-    state = normalizeState(backup);
+    const backupDate = formatHistoryDateTime(backupInfo.savedAt || getStateUpdatedAt(backup));
+    const shouldRestore = window.confirm(
+      `端末バックアップを現在のデータと統合しますか？\n\n` +
+      `現在のデータ：${state.records.length}件\n` +
+      `バックアップ：${backup.records.length}件\n` +
+      `バックアップ日時：${backupDate}\n\n` +
+      `現在のデータは自動退避され、重複がある場合は残す方を選択できます。`
+    );
+    if (!shouldRestore) return;
+    await savePreRestoreState(state);
+    const resolved = resolveBackupRestoreConflicts(state, backup);
+    state = resolved.state;
     hydrateSiteForm();
     resetRecordForm({ showMessage: false });
     renderRecordTable();
     renderOutputs();
-    persist("端末バックアップから復元しました");
+    persist(
+      resolved.duplicateCount
+        ? `端末バックアップを統合しました（重複${resolved.duplicateCount}件を選択）`
+        : "端末バックアップを統合しました"
+    );
   });
 }
 
@@ -13112,12 +13128,104 @@ async function loadStateFromDurableDb() {
 }
 
 async function loadBestDurableStateBackup() {
-  const indexedBackup = await loadStateFromDurableDb();
+  const info = await loadBestDurableStateBackupInfo();
+  return info?.state || null;
+}
+
+async function loadBestDurableStateBackupInfo() {
+  let indexedEntry = null;
+  try {
+    indexedEntry = await durableDbGet(DURABLE_STATE_STORE, DURABLE_STATE_KEY);
+  } catch (_error) {
+    indexedEntry = null;
+  }
+  const indexedBackup = indexedEntry?.state ? normalizeState(indexedEntry.state) : null;
   const localBackupRaw = parseStoredState(localStorage.getItem(STORAGE_BACKUP_KEY));
   const localBackup = localBackupRaw ? normalizeState(localBackupRaw) : null;
-  if (!indexedBackup) return localBackup;
-  if (!localBackup) return indexedBackup;
-  return getStateUpdatedAt(indexedBackup) >= getStateUpdatedAt(localBackup) ? indexedBackup : localBackup;
+  if (!indexedBackup && !localBackup) return null;
+  if (!indexedBackup) {
+    return { state: localBackup, savedAt: getStateUpdatedAt(localBackup), source: "localStorage" };
+  }
+  if (!localBackup) {
+    return { state: indexedBackup, savedAt: value(indexedEntry?.savedAt) || getStateUpdatedAt(indexedBackup), source: "indexedDB" };
+  }
+  const useIndexed = getStateUpdatedAt(indexedBackup) >= getStateUpdatedAt(localBackup);
+  return useIndexed
+    ? { state: indexedBackup, savedAt: value(indexedEntry?.savedAt) || getStateUpdatedAt(indexedBackup), source: "indexedDB" }
+    : { state: localBackup, savedAt: getStateUpdatedAt(localBackup), source: "localStorage" };
+}
+
+async function savePreRestoreState(stateRaw) {
+  const snapshot = normalizeState(stateRaw);
+  const savedAt = nowIso();
+  try {
+    localStorage.setItem(STORAGE_PRE_RESTORE_KEY, JSON.stringify(snapshot));
+  } catch (_error) {
+    // IndexedDB側への退避を続行する。
+  }
+  try {
+    await durableDbPut(DURABLE_STATE_STORE, { savedAt, state: snapshot }, "beforeRestore");
+  } catch (_error) {
+    // localStorage側に保存できていれば復元操作は続行できる。
+  }
+}
+
+function recordsMatchForBackupRestore(recordA, recordB) {
+  try {
+    return JSON.stringify(normalizeRecord(recordA)) === JSON.stringify(normalizeRecord(recordB));
+  } catch (_error) {
+    return false;
+  }
+}
+
+function resolveBackupRestoreConflicts(currentStateRaw, backupStateRaw) {
+  const currentState = normalizeState(currentStateRaw);
+  const backupState = normalizeState(backupStateRaw);
+  const records = [...currentState.records];
+  let duplicateCount = 0;
+  let keptCurrent = 0;
+  let keptBackup = 0;
+
+  backupState.records.forEach((backupRecord) => {
+    const backupId = value(backupRecord.id);
+    const backupKey = getSavedHtmlTransferDuplicateKey(backupRecord);
+    const duplicateIndexes = [];
+    records.forEach((currentRecord, index) => {
+      const sameId = backupId && value(currentRecord.id) === backupId;
+      const sameSpecimen = backupKey && getSavedHtmlTransferDuplicateKey(currentRecord) === backupKey;
+      if (sameId || sameSpecimen) duplicateIndexes.push(index);
+    });
+    if (!duplicateIndexes.length) {
+      records.push(backupRecord);
+      return;
+    }
+    const currentRecord = records[duplicateIndexes[0]];
+    if (duplicateIndexes.length === 1 && recordsMatchForBackupRestore(currentRecord, backupRecord)) return;
+
+    duplicateCount += 1;
+    const keepBackup = window.confirm(
+      `重複する記録があります。\n\n` +
+      `現在側：${describeSavedHtmlTransferRecord(currentRecord)}\n` +
+      `バックアップ側：${describeSavedHtmlTransferRecord(backupRecord)}\n\n` +
+      `「OK」：バックアップ側を残す\n` +
+      `「キャンセル」：現在側を残す`
+    );
+    if (keepBackup) {
+      duplicateIndexes.sort((a, b) => b - a).forEach((index) => records.splice(index, 1));
+      records.push(backupRecord);
+      keptBackup += 1;
+    } else {
+      keptCurrent += 1;
+    }
+  });
+
+  const mergedSite = mergeStatesForCloud(currentState, { site: backupState.site, records: [] }).site;
+  return {
+    state: normalizeState({ site: mergedSite, records }),
+    duplicateCount,
+    keptCurrent,
+    keptBackup,
+  };
 }
 
 async function initializeDurableStateBackup() {
