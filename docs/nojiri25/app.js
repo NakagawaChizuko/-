@@ -17611,6 +17611,19 @@ function setOfflineStatus(text, className = "") {
   if (className) offlineStatus.classList.add(className);
 }
 
+function renderSavedHtmlStatus() {
+  if (!offlineStatus) return;
+  if (!navigator.onLine) {
+    setOfflineStatus("オフライン利用中（保存HTML版）", "ready");
+    return;
+  }
+  setOfflineStatus("オンライン接続中・保存HTMLを表示中 ", "error");
+  const link = document.createElement("a");
+  link.href = "https://nakagawachizuko.github.io/-/nojiri25/";
+  link.textContent = "最新版を開く";
+  offlineStatus.append(link);
+}
+
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   let offlineStatusSettled = false;
   const markOfflineReady = () => {
@@ -17642,7 +17655,9 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     })
     .catch(markOfflineError);
 } else if (location.protocol === "file:") {
-  setOfflineStatus("保存HTMLは更新不可—オンラインで公開版を開いてください", "error");
+  renderSavedHtmlStatus();
+  window.addEventListener("online", renderSavedHtmlStatus);
+  window.addEventListener("offline", renderSavedHtmlStatus);
 } else {
   setOfflineStatus("このブラウザはオフライン利用非対応", "error");
 }

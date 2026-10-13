@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v103-offline-ready";
+const CACHE_NAME = "kaseki25-pwa-v104-saved-html-status";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

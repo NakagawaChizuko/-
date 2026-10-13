@@ -3155,6 +3155,12 @@ th.sortable-header.sort-desc::after {
   background: #fee2e2;
   color: #991b1b;
 }
+.offline-status a {
+  margin-left: 5px;
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+}
 @media (max-width: 720px) {
   .grid-position-fields {
     grid-template-columns: 1fr;
