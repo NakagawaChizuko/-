@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v114-image-fields";
+const CACHE_NAME = "kaseki25-pwa-v115-image-center-label";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
