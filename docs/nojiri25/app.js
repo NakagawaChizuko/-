@@ -636,6 +636,8 @@ const teamOtherInput = document.getElementById("team-other-input");
 const sectionDiagramCameraInput = document.getElementById("section-diagram-camera-input");
 const sectionDiagramInput = document.getElementById("section-diagram-input");
 const sectionDiagramList = document.getElementById("section-diagram-list");
+const photoCameraBtn = document.getElementById("photo-camera-btn");
+const photoCameraInput = document.getElementById("photo-camera-input");
 const photoInput = document.getElementById("photo-input");
 const photoList = document.getElementById("photo-list");
 const model3dInput = document.getElementById("model3d-input");
@@ -2055,7 +2057,7 @@ function bindEvents() {
     persist("断面図を削除しました");
   });
 
-  const photoInputs = [photoInput].filter(Boolean);
+  const photoInputs = [photoCameraInput, photoInput].filter(Boolean);
   photoInputs.forEach((input) => {
     input.addEventListener("change", async (event) => {
       await addPhotosFromFiles(event.target.files);
@@ -2226,6 +2228,12 @@ async function addSectionDiagramsFromFiles(fileList) {
   persist();
 }
 
+function jpegPhotoFileName(fileNameRaw) {
+  const fileName = value(fileNameRaw) || "photo";
+  const baseName = fileName.replace(/\.[^.]+$/, "") || "photo";
+  return `${baseName}.jpg`;
+}
+
 async function addPhotosFromFiles(fileList) {
   const files = Array.from(fileList || []);
   if (!files.length) {
@@ -2243,7 +2251,7 @@ async function addPhotosFromFiles(fileList) {
       });
       currentPhotos.push({
         id: newId("photo"),
-        name: file.name || "photo.jpg",
+        name: jpegPhotoFileName(file.name),
         dataUrl,
         caption: "",
         createdAt: new Date().toISOString(),
@@ -2607,6 +2615,13 @@ sectionDiagramCameraBtn?.addEventListener("click", () => {
     return;
   }
   openBrowserCamera("sectionDiagram");
+});
+photoCameraBtn?.addEventListener("click", () => {
+  if (shouldUseNativeStillCamera() && photoCameraInput instanceof HTMLInputElement) {
+    photoCameraInput.click();
+    return;
+  }
+  openBrowserCamera("photo");
 });
 cameraCaptureCloseBtn?.addEventListener("click", closeBrowserCamera);
 cameraCaptureCancelBtn?.addEventListener("click", closeBrowserCamera);
@@ -7814,7 +7829,7 @@ async function addOutputCellEditPhotosFromFiles(fileList) {
       });
       activeOutputCellEditPhotos.push({
         id: newId("photo"),
-        name: file.name || "photo.jpg",
+        name: jpegPhotoFileName(file.name),
         dataUrl,
         caption: "",
         createdAt: nowIso(),
