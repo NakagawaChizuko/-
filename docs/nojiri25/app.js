@@ -4491,7 +4491,7 @@ async function setCustomLargeImageFromFile(file) {
     syncCustomLargeImageStatus();
     syncLargeShapeImagePreviewForCurrentForm();
   } catch (_error) {
-    showToast("画像アップロードに失敗しました");
+    showToast("画像の読み込みに失敗しました");
   }
 }
 
@@ -4560,7 +4560,7 @@ function renderLargeShapeImageButtons() {
   largeShapeImageButtons.innerHTML = labels
     .map(
       (label) => {
-        const buttonLabel = label === CUSTOM_LARGE_SHAPE_TYPE ? "画像アップロード" : label;
+        const buttonLabel = label === CUSTOM_LARGE_SHAPE_TYPE ? "画像を選択" : label;
         return `<button class="dir-tab" data-group="largeShapeType" data-value="${escapeHtml(label)}" type="button">${escapeHtml(
           buttonLabel
         )}</button>`;

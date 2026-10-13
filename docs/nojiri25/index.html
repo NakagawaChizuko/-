@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261013-important-pending1" />
+    <link rel="stylesheet" href="./styles.css?v=20261013-image-fields1" />
   </head>
   <body>
     <header class="app-header">
@@ -340,9 +340,6 @@
               </div>
 
               <div id="large-shape-section" class="large-shape-section hidden">
-                <div class="dir-tabs" role="tablist" aria-label="画像アップロード">
-                  <div id="large-shape-image-buttons" class="image-shape-tabs"></div>
-                </div>
                 <input id="large-shape-type-input" name="largeShapeType" type="hidden" value="" />
                 <div id="large-shape-image-preview" class="large-shape-image-preview hidden" aria-live="polite">
                   <p id="large-shape-image-preview-title" class="large-shape-image-preview-title"></p>
@@ -377,31 +374,6 @@
                   </div>
                   <input id="large-axis-plunge-dir-input" name="largeAxisPlungeDir8" type="hidden" value="" />
                 </div>
-                <div id="plane-attitude-row" class="plane-attitude-row hidden">
-                  <label class="plane-attitude-field">面の走向
-                    <input id="plane-strike-input" name="planeStrikeDirection" type="text" placeholder="例：N30E" />
-                  </label>
-                  <label class="plane-attitude-field">面の傾斜
-                    <div class="inline-degree-row">
-                      <input id="plane-dip-input" name="planeDipDeg" type="text" placeholder="例：20" />
-                      <span>°</span>
-                    </div>
-                  </label>
-                  <label class="plane-attitude-field plane-dip-dir-field">面の傾斜方向（8方位）
-                    <div class="dir-tabs eight-dir-tabs" role="tablist" aria-label="面の傾斜方向（8方位）">
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="北" type="button">北</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="北東" type="button">北東</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="東" type="button">東</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="南東" type="button">南東</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="南" type="button">南</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="南西" type="button">南西</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="西" type="button">西</button>
-                      <button class="dir-tab" data-group="planeDipDir8" data-value="北西" type="button">北西</button>
-                    </div>
-                    <input id="plane-dip-dir-input" name="planeDipDir8" type="hidden" value="" />
-                  </label>
-                </div>
-
                 <section class="large-shape-panel hidden" data-large-shape-panel="直線状">
                   <div class="large-size-grid">
                     <label>長さ
@@ -452,9 +424,6 @@
                 <section class="large-shape-panel hidden" data-large-shape-panel="__IMAGE__">
                   <p class="hint-text">画像を回転・反転・変形して現地形状に合わせ、外枠サイズを入力します</p>
                   <div id="custom-large-image-controls" class="custom-large-image-controls hidden">
-                    <label>画像名
-                      <input id="custom-large-image-name-input" name="customLargeImageName" type="text" placeholder="例：掌状角A" />
-                    </label>
                     <label>画像ファイル
                       <input id="custom-large-image-file-input" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
                     </label>
@@ -495,6 +464,30 @@
                           <input name="imgSkewYDeg" type="text" placeholder="例：0" />
                           <span>°</span>
                         </div>
+                      </label>
+                    </div>
+                    <div id="plane-attitude-row" class="plane-attitude-row hidden">
+                      <label class="plane-attitude-field">面の走向
+                        <input id="plane-strike-input" name="planeStrikeDirection" type="text" placeholder="例：N30E" />
+                      </label>
+                      <label class="plane-attitude-field">面の傾斜
+                        <div class="inline-degree-row">
+                          <input id="plane-dip-input" name="planeDipDeg" type="text" placeholder="例：20" />
+                          <span>°</span>
+                        </div>
+                      </label>
+                      <label class="plane-attitude-field plane-dip-dir-field">面の傾斜方向
+                        <div class="dir-tabs eight-dir-tabs" role="tablist" aria-label="面の傾斜方向（8方位）">
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="北" type="button">北</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="北東" type="button">北東</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="東" type="button">東</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="南東" type="button">南東</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="南" type="button">南</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="南西" type="button">南西</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="西" type="button">西</button>
+                          <button class="dir-tab" data-group="planeDipDir8" data-value="北西" type="button">北西</button>
+                        </div>
+                        <input id="plane-dip-dir-input" name="planeDipDir8" type="hidden" value="" />
                       </label>
                     </div>
                     <div class="image-toggle-grid">
@@ -1106,6 +1099,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261013-sketch-pending1"></script>
+    <script src="./app.js?v=20261013-image-fields1"></script>
   </body>
 </html>

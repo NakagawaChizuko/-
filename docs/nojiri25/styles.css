@@ -2196,6 +2196,10 @@ textarea {
   gap: 10px 14px;
 }
 
+.image-transform-grid .plane-attitude-row {
+  grid-column: 1 / -1;
+}
+
 .plane-attitude-field {
   display: grid;
   gap: 4px;
