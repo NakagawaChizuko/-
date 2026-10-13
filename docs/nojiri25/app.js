@@ -5393,7 +5393,7 @@ function resetRecordForm({ showMessage }) {
 
   recordForm.elements.occurrenceSection.value = "要";
   recordForm.elements.occurrenceSketch.value = "無";
-  recordForm.elements.importantFlag.value = "無";
+  recordForm.elements.importantFlag.value = "判定待ち";
   recordForm.elements.simpleRecordFlag.value = "-";
   recordForm.elements.layerRelative.value = "";
   if (recordForm.elements.altitudeInputEnabled instanceof HTMLInputElement) {
@@ -6157,7 +6157,7 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     customLargeImageName: "",
     customLargeImageDataUrl: "",
     customLargeImageAspect: "",
-    importantFlag: "無",
+    importantFlag: "判定待ち",
     simpleRecordFlag: "-",
     layerName: DEFAULT_LAYER_NAME,
     detail: "",
@@ -8189,7 +8189,7 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     return { ok: true };
   }
   if (editKey === "importantFlag") {
-    record.importantFlag = normalizeHasFlag(formData.get("importantFlag")) || "無";
+    record.importantFlag = normalizeHasFlag(formData.get("importantFlag")) || "判定待ち";
     return { ok: true };
   }
   if (editKey === "unit") {
@@ -16439,7 +16439,7 @@ function normalizeDirectionValue(group, valueRaw) {
     return normalizeEwDir(valueRaw);
   }
   if (group === "importantFlag") {
-    return normalizeHasFlag(valueRaw) || "無";
+    return normalizeHasFlag(valueRaw) || "判定待ち";
   }
   if (group === "simpleRecordFlag") {
     return normalizeCircleDashFlag(valueRaw);
