@@ -766,6 +766,9 @@ async function initialize() {
     recordForm.inert = false;
     recordForm.removeAttribute("aria-busy");
   }
+  if (location.protocol === "file:") {
+    renderSavedHtmlStatus();
+  }
 }
 
 function initializeNumericMeasurementKeypads() {
@@ -17822,12 +17825,7 @@ function initializeSavedHtmlTransferReceiver() {
 
 function renderSavedHtmlStatus() {
   if (!offlineStatus) return;
-  const recordCountText = state.records.length ? `・データ${state.records.length}件` : "";
-  if (!navigator.onLine) {
-    setOfflineStatus(`保存HTML版・オフライン利用中${recordCountText}`, "ready");
-    return;
-  }
-  setOfflineStatus(`保存HTML版・この画面を再読み込みすると更新${recordCountText}`, "ready");
+  setOfflineStatus("保存HTML版・オフライン利用可能", "ready");
 }
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
@@ -17861,7 +17859,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     })
     .catch(markOfflineError);
 } else if (location.protocol === "file:") {
-  renderSavedHtmlStatus();
+  setOfflineStatus("更新中");
   window.addEventListener("online", renderSavedHtmlStatus);
   window.addEventListener("offline", renderSavedHtmlStatus);
 } else {
