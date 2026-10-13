@@ -1862,6 +1862,17 @@ textarea {
   color: #7a8696;
 }
 
+.altitude-direct-fields {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  align-items: center;
+  gap: 10px;
+}
+
+.altitude-direct-row {
+  grid-template-columns: auto minmax(62px, 96px) auto;
+}
+
 .altitude-direct-hint {
   font-size: 0.76rem;
 }
