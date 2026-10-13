@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v99-altitude-export";
+const CACHE_NAME = "kaseki25-pwa-v100-direct-altitude-offline";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",

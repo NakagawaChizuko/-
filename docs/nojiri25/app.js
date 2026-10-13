@@ -1287,7 +1287,8 @@ function bindEvents() {
     const ellipseLongRadiusCm = value(formData.get("ellipseLongRadiusCm"));
     const ellipseShortRadiusCm = value(formData.get("ellipseShortRadiusCm"));
     const altitudeInputEnabled = normalizeToggleFlag(formData.get("altitudeInputEnabled"));
-    const altitudeDirectM = altitudeInputEnabled === "1" ? value(formData.get("altitudeDirectM")) : "";
+    const altitudeDirectUpperM = altitudeInputEnabled === "1" ? value(formData.get("altitudeDirectUpperM")) : "";
+    const altitudeDirectLowerM = altitudeInputEnabled === "1" ? value(formData.get("altitudeDirectLowerM")) : "";
     const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
     const isLargeImageShape = planSizeMode === "大きなもの" && isLargeShapeImageType(largeShapeType);
     const isCustomLargeImageShape = isLargeImageShape && isCustomLargeShapeType(largeShapeType);
@@ -1321,7 +1322,9 @@ function bindEvents() {
       levelUpperCm: positionMethod === "totalStation" ? "" : value(formData.get("levelUpperCm")),
       levelLowerCm: positionMethod === "totalStation" ? "" : value(formData.get("levelLowerCm")),
       altitudeInputEnabled,
-      altitudeDirectM,
+      altitudeDirectUpperM,
+      altitudeDirectLowerM,
+      altitudeDirectM: altitudeDirectLowerM,
       occurrenceSection: normalizeNeedFlag(value(formData.get("occurrenceSection"))),
       occurrenceSketch: normalizeOccurrenceSketchFlag(value(formData.get("occurrenceSketch"))),
       sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
@@ -5068,15 +5071,18 @@ function clearLayerSavedTabState() {
 
 function syncAltitudeDirectInputUi({ clearWhenDisabled = false } = {}) {
   const altitudeToggleField = recordForm?.elements?.altitudeInputEnabled;
-  const altitudeInputField = recordForm?.elements?.altitudeDirectM;
-  if (!(altitudeInputField instanceof HTMLInputElement)) {
+  const altitudeInputFields = [
+    recordForm?.elements?.altitudeDirectUpperM,
+    recordForm?.elements?.altitudeDirectLowerM,
+  ].filter((field) => field instanceof HTMLInputElement);
+  if (!altitudeInputFields.length) {
     return;
   }
   const isEnabled = altitudeToggleField instanceof HTMLInputElement ? altitudeToggleField.checked : false;
-  altitudeInputField.disabled = !isEnabled;
-  if (!isEnabled && clearWhenDisabled) {
-    altitudeInputField.value = "";
-  }
+  altitudeInputFields.forEach((field) => {
+    field.disabled = !isEnabled;
+    if (!isEnabled && clearWhenDisabled) field.value = "";
+  });
 }
 
 function handleRecordFormFieldEdit(event) {
@@ -5371,9 +5377,8 @@ function resetRecordForm({ showMessage }) {
   if (recordForm.elements.altitudeInputEnabled instanceof HTMLInputElement) {
     recordForm.elements.altitudeInputEnabled.checked = false;
   }
-  if (recordForm.elements.altitudeDirectM instanceof HTMLInputElement) {
-    recordForm.elements.altitudeDirectM.value = "";
-  }
+  if (recordForm.elements.altitudeDirectUpperM instanceof HTMLInputElement) recordForm.elements.altitudeDirectUpperM.value = "";
+  if (recordForm.elements.altitudeDirectLowerM instanceof HTMLInputElement) recordForm.elements.altitudeDirectLowerM.value = "";
   if (recordForm.elements.planSizeMode) {
     recordForm.elements.planSizeMode.value = "通常";
   }
@@ -5486,8 +5491,11 @@ function populateRecordForm(record) {
   if (recordForm.elements.altitudeInputEnabled instanceof HTMLInputElement) {
     recordForm.elements.altitudeInputEnabled.checked = normalizeToggleFlag(record.altitudeInputEnabled) === "1";
   }
-  if (recordForm.elements.altitudeDirectM instanceof HTMLInputElement) {
-    recordForm.elements.altitudeDirectM.value = value(record.altitudeDirectM);
+  if (recordForm.elements.altitudeDirectUpperM instanceof HTMLInputElement) {
+    recordForm.elements.altitudeDirectUpperM.value = value(record.altitudeDirectUpperM);
+  }
+  if (recordForm.elements.altitudeDirectLowerM instanceof HTMLInputElement) {
+    recordForm.elements.altitudeDirectLowerM.value = value(record.altitudeDirectLowerM) || value(record.altitudeDirectM);
   }
   recordForm.elements.occurrenceSection.value = normalizeNeedFlag(record.occurrenceSection);
   recordForm.elements.occurrenceSketch.value = normalizeOccurrenceSketchFlag(record.occurrenceSketch);
@@ -5777,8 +5785,12 @@ function buildCurrentEditDraftRecord() {
     levelUpperCm: value(formData.get("levelUpperCm")),
     levelLowerCm: value(formData.get("levelLowerCm")),
     altitudeInputEnabled: normalizeToggleFlag(formData.get("altitudeInputEnabled")),
+    altitudeDirectUpperM:
+      normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1" ? value(formData.get("altitudeDirectUpperM")) : "",
+    altitudeDirectLowerM:
+      normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1" ? value(formData.get("altitudeDirectLowerM")) : "",
     altitudeDirectM:
-      normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1" ? value(formData.get("altitudeDirectM")) : "",
+      normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1" ? value(formData.get("altitudeDirectLowerM")) : "",
     occurrenceSection: value(formData.get("occurrenceSection")),
     occurrenceSketch: value(formData.get("occurrenceSketch")),
     sectionDiagramDistanceChecked: normalizeChecklistChecked(formData.get("sectionDiagramDistanceChecked")),
@@ -6051,6 +6063,8 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     levelUpperCm: "",
     levelLowerCm: "",
     altitudeInputEnabled: "",
+    altitudeDirectUpperM: "",
+    altitudeDirectLowerM: "",
     altitudeDirectM: "",
     occurrenceSection: "要",
     occurrenceSketch: "無",
@@ -7616,7 +7630,7 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
   const specimenPrefix = normalizeSpecimenPrefix(parsedSpecimen.prefix);
   const analysisHiddenClass = specimenPrefix === "a" ? "" : " hidden";
   const analysisType = normalizeAnalysisType(record?.analysisType);
-  const altitudeDirectEnabled = normalizeToggleFlag(record?.altitudeInputEnabled) === "1";
+  const altitudeDirectEnabled = normalizeToggleFlag(record?.altitudeInputEnabled) === "1" || Boolean(value(record?.altitudeDirectUpperM) || value(record?.altitudeDirectLowerM) || value(record?.altitudeDirectM));
   const altitudeDirectHiddenClass = altitudeDirectEnabled ? "" : " hidden";
 
   switch (editKey) {
@@ -7794,12 +7808,19 @@ function buildOutputCellEditFieldsHtml(record, editKey) {
         </label>
         <label class="level-altitude-toggle">
           <input name="altitudeInputEnabled" type="checkbox" value="1" ${altitudeDirectEnabled ? "checked" : ""} data-cell-edit-altitude-check />
-          標高（下底）を直接入力
+          標高（上面・下底）を直接入力
+        </label>
+        <label data-cell-edit-altitude-direct class="${altitudeDirectHiddenClass}">
+          <span class="label-title">標高（上面）</span>
+          <div class="inline-cm-row compact-cm-row">
+            <input name="altitudeDirectUpperM" type="text" inputmode="decimal" value="${escapeHtml(value(record?.altitudeDirectUpperM))}" />
+            <span>m</span>
+          </div>
         </label>
         <label data-cell-edit-altitude-direct class="${altitudeDirectHiddenClass}">
           <span class="label-title">標高（下底）</span>
           <div class="inline-cm-row compact-cm-row">
-            <input name="altitudeDirectM" type="text" value="${escapeHtml(value(record?.altitudeDirectM))}" />
+            <input name="altitudeDirectLowerM" type="text" inputmode="decimal" value="${escapeHtml(value(record?.altitudeDirectLowerM) || value(record?.altitudeDirectM))}" />
             <span>m</span>
           </div>
         </label>
@@ -7950,18 +7971,18 @@ function bindOutputCellEditDynamicFields(editKey) {
   }
   if (editKey === "altitudeM") {
     const check = cellEditFields.querySelector("[data-cell-edit-altitude-check]");
-    const directRow = cellEditFields.querySelector("[data-cell-edit-altitude-direct]");
-    const directInput = directRow?.querySelector("input[name='altitudeDirectM']");
-    if (check instanceof HTMLInputElement && directRow instanceof HTMLElement) {
+    const directRows = [...cellEditFields.querySelectorAll("[data-cell-edit-altitude-direct]")];
+    if (check instanceof HTMLInputElement && directRows.length) {
       const toggle = () => {
         const enabled = check.checked;
-        directRow.classList.toggle("hidden", !enabled);
-        if (directInput instanceof HTMLInputElement) {
-          directInput.disabled = !enabled;
-          if (!enabled) {
-            directInput.value = "";
+        directRows.forEach((directRow) => {
+          directRow.classList.toggle("hidden", !enabled);
+          const directInput = directRow.querySelector("input");
+          if (directInput instanceof HTMLInputElement) {
+            directInput.disabled = !enabled;
+            if (!enabled) directInput.value = "";
           }
-        }
+        });
       };
       check.addEventListener("change", toggle);
       toggle();
@@ -8168,7 +8189,9 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
     record.levelHeight = value(formData.get("levelHeight"));
     const useDirectAltitude = normalizeToggleFlag(formData.get("altitudeInputEnabled")) === "1";
     record.altitudeInputEnabled = useDirectAltitude ? "1" : "";
-    record.altitudeDirectM = useDirectAltitude ? value(formData.get("altitudeDirectM")) : "";
+    record.altitudeDirectUpperM = useDirectAltitude ? value(formData.get("altitudeDirectUpperM")) : "";
+    record.altitudeDirectLowerM = useDirectAltitude ? value(formData.get("altitudeDirectLowerM")) : "";
+    record.altitudeDirectM = record.altitudeDirectLowerM;
     return { ok: true };
   }
   if (editKey === "occurrenceSection") {
@@ -13337,8 +13360,10 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     identifier: value(item.identifier),
     levelUpperCm: value(item.levelUpperCm) || value(item.levelRead) || value(item.levelError),
     levelLowerCm: value(item.levelLowerCm),
-    altitudeInputEnabled: normalizeToggleFlag(value(item.altitudeInputEnabled) || (value(item.altitudeDirectM) ? "1" : "")),
-    altitudeDirectM: value(item.altitudeDirectM) || value(item.altitudeInputM),
+    altitudeInputEnabled: normalizeToggleFlag(value(item.altitudeInputEnabled) || ((value(item.altitudeDirectUpperM) || value(item.altitudeDirectLowerM) || value(item.altitudeDirectM) || value(item.altitudeInputM)) ? "1" : "")),
+    altitudeDirectUpperM: value(item.altitudeDirectUpperM),
+    altitudeDirectLowerM: value(item.altitudeDirectLowerM) || value(item.altitudeDirectM) || value(item.altitudeInputM),
+    altitudeDirectM: value(item.altitudeDirectLowerM) || value(item.altitudeDirectM) || value(item.altitudeInputM),
     occurrenceSection: normalizeNeedFlag(value(item.occurrenceSection) || value(item.sectionSketch)),
     occurrenceSketch: normalizeOccurrenceSketchFlag(value(item.occurrenceSketch) || value(item.sectionSketch)),
     sectionDiagramDistanceChecked: normalizeChecklistChecked(value(item.sectionDiagramDistanceChecked)),
@@ -16424,11 +16449,13 @@ function calculateRecordAltitudeM(record, readingCmRaw) {
 }
 
 function getRecordUpperAltitudeMValue(record) {
+  const directAltitudeM = parseDistanceToCm(record?.altitudeDirectUpperM);
+  if (directAltitudeM != null) return directAltitudeM;
   return calculateRecordAltitudeM(record, record?.levelUpperCm);
 }
 
 function getRecordLowerAltitudeMValue(record) {
-  const directAltitudeM = parseDistanceToCm(record?.altitudeDirectM);
+  const directAltitudeM = parseDistanceToCm(value(record?.altitudeDirectLowerM) || value(record?.altitudeDirectM));
   if (directAltitudeM != null) {
     return directAltitudeM;
   }
@@ -17465,7 +17492,7 @@ function applyTotalStationPosition() {
   recordForm.elements.nsCm.value = formatLengthInputValue(result.yPlanCm);
   recordForm.elements.ewCm.value = formatLengthInputValue(result.xPlanCm);
   const altitudeToggle = recordForm.elements.altitudeInputEnabled;
-  const altitudeField = recordForm.elements.altitudeDirectM;
+  const altitudeField = recordForm.elements.altitudeDirectLowerM;
   if (result.altitudeM != null) {
     if (altitudeToggle instanceof HTMLInputElement) {
       altitudeToggle.checked = true;
@@ -17531,20 +17558,45 @@ if (recordForm) {
   syncPositionMeasurementUi();
 }
 
+const offlineStatus = document.getElementById("offline-status");
+function setOfflineStatus(text, className = "") {
+  if (!offlineStatus) return;
+  offlineStatus.textContent = text;
+  offlineStatus.classList.remove("ready", "error");
+  if (className) offlineStatus.classList.add(className);
+}
+
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  const offlineStatus = document.getElementById("offline-status");
+  let offlineStatusSettled = false;
+  const markOfflineReady = () => {
+    offlineStatusSettled = true;
+    setOfflineStatus("オフライン利用準備完了", "ready");
+  };
+  const markOfflineError = () => {
+    offlineStatusSettled = true;
+    setOfflineStatus("オフライン準備に失敗（オンラインで再読込）", "error");
+  };
   navigator.serviceWorker.register("./sw.js")
-    .then(() => navigator.serviceWorker.ready)
-    .then(() => {
-      if (offlineStatus) {
-        offlineStatus.textContent = "オフライン利用準備完了（高画質保存版）";
-        offlineStatus.classList.add("ready");
+    .then((registration) => {
+      if (registration.active || registration.waiting) {
+        markOfflineReady();
+        return;
       }
+      const worker = registration.installing;
+      if (worker) {
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "activated" || worker.state === "installed") markOfflineReady();
+          if (worker.state === "redundant" && !offlineStatusSettled) markOfflineError();
+        });
+      }
+      navigator.serviceWorker.ready.then(markOfflineReady).catch(markOfflineError);
+      window.setTimeout(() => {
+        if (!offlineStatusSettled) markOfflineError();
+      }, 15000);
     })
-    .catch(() => {
-      if (offlineStatus) {
-        offlineStatus.textContent = "オフライン利用の準備に失敗";
-        offlineStatus.classList.add("error");
-      }
-    });
+    .catch(markOfflineError);
+} else if (location.protocol === "file:") {
+  setOfflineStatus("オフライン準備はWeb公開版で有効", "error");
+} else {
+  setOfflineStatus("このブラウザはオフライン利用非対応", "error");
 }

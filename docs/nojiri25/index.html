@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261013-json-selection1" />
+    <link rel="stylesheet" href="./styles.css?v=20261013-direct-altitude1" />
   </head>
   <body>
     <header class="app-header">
@@ -241,12 +241,18 @@
                   <output id="level-lower-altitude-preview" class="level-altitude-preview">標高：— m</output>
                 </label>
                 <div class="level-read-item level-altitude-item">
-                  <label class="level-altitude-toggle"><input name="altitudeInputEnabled" type="checkbox" value="1" /> 標高（下底）を入力</label>
+                  <label class="level-altitude-toggle"><input name="altitudeInputEnabled" type="checkbox" value="1" /> 標高（上面・下底）を直接入力</label>
                   <div class="inline-cm-row compact-cm-row altitude-direct-row">
-                    <input name="altitudeDirectM" type="text" disabled />
+                    <span>上面</span>
+                    <input name="altitudeDirectUpperM" type="text" inputmode="decimal" disabled />
                     <span>m</span>
                   </div>
-                  <p class="hint-text altitude-direct-hint">チェック時は標高（下底）入力を優先</p>
+                  <div class="inline-cm-row compact-cm-row altitude-direct-row">
+                    <span>下底</span>
+                    <input name="altitudeDirectLowerM" type="text" inputmode="decimal" disabled />
+                    <span>m</span>
+                  </div>
+                  <p class="hint-text altitude-direct-hint">直接入力値がある面は、計算値より優先します</p>
                 </div>
               </div>
             </fieldset>
@@ -1096,6 +1102,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261013-altitude-export1"></script>
+    <script src="./app.js?v=20261013-direct-altitude-offline1"></script>
   </body>
 </html>
