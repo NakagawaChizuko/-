@@ -320,12 +320,12 @@
 
             <fieldset class="inline-fieldset span-3">
               <legend>平面位置（画像利用）</legend>
-              <div class="dir-tabs" role="tablist" aria-label="画像利用設定">
+              <div class="dir-tabs" role="tablist" aria-label="平面位置の入力方式">
                 <button class="dir-tab active" data-group="planSizeMode" data-value="通常" type="button">通常（1点）</button>
                 <button class="dir-tab" data-group="planSizeMode" data-value="複数点" type="button">複数点</button>
-                <button class="dir-tab" data-group="planSizeMode" data-value="大きなもの" type="button">画像利用</button>
               </div>
               <input id="plan-size-mode-input" name="planSizeMode" type="hidden" value="通常" />
+              <label class="level-altitude-toggle"><input id="plan-image-enabled-input" name="planImageEnabled" type="checkbox" value="1" /> 画像利用を併用する</label>
               <div id="multi-point-section" class="multi-point-section hidden">
                 <div class="multi-point-header">
                   <strong>複数点入力</strong>
@@ -1102,6 +1102,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261013-direct-altitude-offline1"></script>
+    <script src="./app.js?v=20261013-combined-plan-image1"></script>
   </body>
 </html>

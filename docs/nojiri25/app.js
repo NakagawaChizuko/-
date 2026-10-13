@@ -603,6 +603,7 @@ const occurrenceSectionInput = document.getElementById("occurrence-section-input
 const occurrenceSketchInput = document.getElementById("occurrence-sketch-input");
 const layerRelativeInput = document.getElementById("layer-relative-input");
 const planSizeModeInput = document.getElementById("plan-size-mode-input");
+const planImageEnabledInput = document.getElementById("plan-image-enabled-input");
 const largeShapeTypeInput = document.getElementById("large-shape-type-input");
 const largeAxisDirectionInput = document.getElementById("large-axis-direction-input");
 const largeAxisPlungeInput = document.getElementById("large-axis-plunge-input");
@@ -942,6 +943,10 @@ function bindEvents() {
       input.value = "";
     });
   }
+  planImageEnabledInput?.addEventListener("change", () => {
+    syncLargeShapeSectionFromForm();
+    updateEditMissingRequiredHighlights();
+  });
   if (customLargeImageClearBtn) {
     customLargeImageClearBtn.addEventListener("click", () => {
       clearCustomLargeImageFields();
@@ -1263,24 +1268,25 @@ function bindEvents() {
     const positionMethod = normalizePositionMethod(formData.get("positionMethod"));
     const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
     const planMultiPoints = planSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
+    const planImageEnabled = normalizeToggleFlag(formData.get("planImageEnabled")) === "1";
     const rawLargeShapeType = value(formData.get("largeShapeType"));
     const largeShapeType =
-      planSizeMode === "大きなもの"
+      planImageEnabled
         ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType)
         : "";
     const isLineShape = largeShapeType === "直線状";
     const usesAxisDirection = isLineShape || largeShapeType === "長方形" || largeShapeType === "楕円";
-    const largeAxisDirection = planSizeMode === "大きなもの" ? normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))) : "";
+    const largeAxisDirection = planImageEnabled ? normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))) : "";
     const largeAxisPlungeDeg =
-      planSizeMode === "大きなもの" ? normalizeLargeAxisPlungeDeg(value(formData.get("largeAxisPlungeDeg"))) : "";
+      planImageEnabled ? normalizeLargeAxisPlungeDeg(value(formData.get("largeAxisPlungeDeg"))) : "";
     const largeAxisPlungeDir8 =
-      planSizeMode === "大きなもの" ? normalizeCompass8Direction(value(formData.get("largeAxisPlungeDir8"))) : "";
+      planImageEnabled ? normalizeCompass8Direction(value(formData.get("largeAxisPlungeDir8"))) : "";
     const planeStrikeDirection =
-      planSizeMode === "大きなもの"
+      planImageEnabled
         ? normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection")) || (usesAxisDirection ? largeAxisDirection : ""))
         : "";
-    const planeDipDeg = planSizeMode === "大きなもの" ? normalizePlaneDipDeg(value(formData.get("planeDipDeg"))) : "";
-    const planeDipDir8 = planSizeMode === "大きなもの" ? normalizeCompass8Direction(value(formData.get("planeDipDir8"))) : "";
+    const planeDipDeg = planImageEnabled ? normalizePlaneDipDeg(value(formData.get("planeDipDeg"))) : "";
+    const planeDipDir8 = planImageEnabled ? normalizeCompass8Direction(value(formData.get("planeDipDir8"))) : "";
     const lineLengthCm = value(formData.get("lineLengthCm"));
     const rectSide1Cm = value(formData.get("rectSide1Cm"));
     const rectSide2Cm = value(formData.get("rectSide2Cm"));
@@ -1290,9 +1296,9 @@ function bindEvents() {
     const altitudeDirectUpperM = altitudeInputEnabled === "1" ? value(formData.get("altitudeDirectUpperM")) : "";
     const altitudeDirectLowerM = altitudeInputEnabled === "1" ? value(formData.get("altitudeDirectLowerM")) : "";
     const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
-    const isLargeImageShape = planSizeMode === "大きなもの" && isLargeShapeImageType(largeShapeType);
+    const isLargeImageShape = planImageEnabled && isLargeShapeImageType(largeShapeType);
     const isCustomLargeImageShape = isLargeImageShape && isCustomLargeShapeType(largeShapeType);
-    const keepImageCornerFields = planSizeMode === "大きなもの";
+    const keepImageCornerFields = planImageEnabled;
     const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
     const customLargeImageName = isCustomLargeImageShape
       ? normalizeCustomLargeImageName(value(formData.get("customLargeImageName")))
@@ -1362,6 +1368,7 @@ function bindEvents() {
       tsDirectionSec: value(formData.get("tsDirectionSec")),
       multiPoints: planMultiPoints,
       planSizeMode,
+      planImageEnabled: planImageEnabled ? "1" : "",
       largeShapeType,
       largeAxisDirection: isLargeImageShape || !usesAxisDirection ? "" : largeAxisDirection,
       largeAxisPlungeDeg: isLargeImageShape || !isLineShape ? "" : largeAxisPlungeDeg,
@@ -1369,7 +1376,7 @@ function bindEvents() {
       planeStrikeDirection: isLineShape ? "" : planeStrikeDirection,
       planeDipDeg: isLineShape ? "" : planeDipDeg,
       planeDipDir8: isLineShape ? "" : planeDipDir8,
-      lineLengthCm: planSizeMode === "大きなもの" && largeShapeType === "直線状" ? lineLengthCm : "",
+      lineLengthCm: planImageEnabled && largeShapeType === "直線状" ? lineLengthCm : "",
       line1NsDir: "",
       line1NsCm: "",
       line1EwDir: "",
@@ -1378,10 +1385,10 @@ function bindEvents() {
       line2NsCm: "",
       line2EwDir: "",
       line2EwCm: "",
-      rectSide1Cm: planSizeMode === "大きなもの" && largeShapeType === "長方形" ? rectSide1Cm : "",
-      rectSide2Cm: planSizeMode === "大きなもの" && largeShapeType === "長方形" ? rectSide2Cm : "",
-      ellipseLongRadiusCm: planSizeMode === "大きなもの" && largeShapeType === "楕円" ? ellipseLongRadiusCm : "",
-      ellipseShortRadiusCm: planSizeMode === "大きなもの" && largeShapeType === "楕円" ? ellipseShortRadiusCm : "",
+      rectSide1Cm: planImageEnabled && largeShapeType === "長方形" ? rectSide1Cm : "",
+      rectSide2Cm: planImageEnabled && largeShapeType === "長方形" ? rectSide2Cm : "",
+      ellipseLongRadiusCm: planImageEnabled && largeShapeType === "楕円" ? ellipseLongRadiusCm : "",
+      ellipseShortRadiusCm: planImageEnabled && largeShapeType === "楕円" ? ellipseShortRadiusCm : "",
       imgP1NsDir: keepImageCornerFields ? imageCornerFields.imgP1NsDir : "",
       imgP1NsCm: keepImageCornerFields ? imageCornerFields.imgP1NsCm : "",
       imgP1EwDir: keepImageCornerFields ? imageCornerFields.imgP1EwDir : "",
@@ -4645,7 +4652,7 @@ function syncLargeShapeSectionFromForm() {
   if (planSizeModeInput) {
     planSizeModeInput.value = mode;
   }
-  const isLarge = mode === "大きなもの";
+  const isLarge = Boolean(planImageEnabledInput?.checked);
   const isMultiPoint = mode === "複数点";
   if (largeShapeSection) {
     largeShapeSection.classList.toggle("hidden", !isLarge);
@@ -5305,9 +5312,9 @@ async function syncImageFrameSizeFromAspectLock(triggerFieldName = "") {
   if (!recordForm?.elements) {
     return;
   }
-  const planSizeMode = normalizePlanSizeMode(recordForm.elements.planSizeMode?.value);
+  const planImageEnabled = normalizeToggleFlag(recordForm.elements.planImageEnabled?.value) === "1";
   const shapeType = normalizeLargeShapeType(recordForm.elements.largeShapeType?.value);
-  if (planSizeMode !== "大きなもの" || !isCustomLargeShapeType(shapeType)) {
+  if (!planImageEnabled || !isCustomLargeShapeType(shapeType)) {
     return;
   }
   const lockInput = recordForm.elements.imgLockAspectRatio;
@@ -5382,6 +5389,7 @@ function resetRecordForm({ showMessage }) {
   if (recordForm.elements.planSizeMode) {
     recordForm.elements.planSizeMode.value = "通常";
   }
+  if (planImageEnabledInput) planImageEnabledInput.checked = false;
   multiPointDraftsByMode = { grid: [], offset: [], polar: [] };
   renderMultiPointRows([]);
   if (recordForm.elements.largeShapeType) {
@@ -5519,8 +5527,9 @@ function populateRecordForm(record) {
   recordForm.elements.simpleRecordFlag.value = normalizeCircleDashFlag(record.simpleRecordFlag);
   recordForm.elements.layerRelative.value = normalizeLayerRelative(record.layerRelative);
   if (recordForm.elements.planSizeMode) {
-    recordForm.elements.planSizeMode.value = normalizePlanSizeMode(record.planSizeMode);
+    recordForm.elements.planSizeMode.value = normalizePlanSizeMode(record.planSizeMode) === "大きなもの" ? "通常" : normalizePlanSizeMode(record.planSizeMode);
   }
+  if (planImageEnabledInput) planImageEnabledInput.checked = isRecordPlanImageEnabled(record);
   if (recordForm.elements.largeShapeType) {
     recordForm.elements.largeShapeType.value = normalizeLargeShapeType(record.largeShapeType);
   }
@@ -5747,12 +5756,13 @@ function buildCurrentEditDraftRecord() {
   const formData = new FormData(recordForm);
   const teamState = normalizeTeamState(value(editTeamInput?.value), value(editTeamOtherInput?.value));
   const draftPlanSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+  const draftPlanImageEnabled = normalizeToggleFlag(formData.get("planImageEnabled")) === "1";
   const draftMultiPoints = draftPlanSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
   const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
   const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
   const draftRawShapeType = value(formData.get("largeShapeType"));
-  const draftShapeType = normalizeLargeShapeType(draftRawShapeType) || normalizeLargeShapeLabel(draftRawShapeType);
-  const draftIsImageShape = isLargeShapeImageType(draftShapeType);
+  const draftShapeType = draftPlanImageEnabled ? normalizeLargeShapeType(draftRawShapeType) || normalizeLargeShapeLabel(draftRawShapeType) : "";
+  const draftIsImageShape = draftPlanImageEnabled && isLargeShapeImageType(draftShapeType);
   const draftIsCustomImageShape = draftIsImageShape && isCustomLargeShapeType(draftShapeType);
   const draftIsLineShape = draftShapeType === "直線状";
   const draftUsesAxisDirection = draftIsLineShape || draftShapeType === "長方形" || draftShapeType === "楕円";
@@ -5828,6 +5838,7 @@ function buildCurrentEditDraftRecord() {
     tsDirectionSec: value(formData.get("tsDirectionSec")),
     multiPoints: draftMultiPoints,
     planSizeMode: draftPlanSizeMode,
+    planImageEnabled: draftPlanImageEnabled ? "1" : "",
     largeShapeType: draftShapeType,
     largeAxisDirection:
       draftIsImageShape || !draftUsesAxisDirection ? "" : normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
@@ -6082,6 +6093,7 @@ function insertRowFromList(recordId, preferredKuwaku = "", recordRaw = null) {
     ewCm: "",
     multiPoints: [],
     planSizeMode: "通常",
+    planImageEnabled: "",
     largeShapeType: "",
     largeAxisDirection: "",
     largeAxisPlungeDeg: "",
@@ -8647,6 +8659,7 @@ function formatPlanPosition(record) {
     base = nsPart || ewPart;
   }
   const planSizeMode = normalizePlanSizeMode(record?.planSizeMode);
+  const planImageEnabled = isRecordPlanImageEnabled(record);
   if (planSizeMode === "複数点") {
     const multiPointCoords = collectPlanMultiPointCoords(record);
     const multiPointCount = multiPointCoords.length;
@@ -8655,12 +8668,15 @@ function formatPlanPosition(record) {
         const details = multiPointCoords.map((coord, index) =>
           formatGridEdgeCalculationResult(coord, { prefix: `${index + 1}: ` })
         );
-        return `複数点(${multiPointCount}点) / ${details.join(" / ")}`;
+        if (!planImageEnabled) return `複数点(${multiPointCount}点) / ${details.join(" / ")}`;
+        base = `複数点(${multiPointCount}点) / ${details.join(" / ")}`;
+      } else {
+        if (!planImageEnabled) return base ? `複数点(${multiPointCount}点) / ${base}` : `複数点(${multiPointCount}点)`;
+        base = base ? `複数点(${multiPointCount}点) / ${base}` : `複数点(${multiPointCount}点)`;
       }
-      return base ? `複数点(${multiPointCount}点) / ${base}` : `複数点(${multiPointCount}点)`;
     }
   }
-  if (planSizeMode !== "大きなもの") {
+  if (!planImageEnabled) {
     return base;
   }
   const axisDirection = normalizeLargeAxisDirection(record?.largeAxisDirection);
@@ -8673,6 +8689,7 @@ function formatPlanPosition(record) {
   const planeAttitudeText =
     planeStrike && planeDip ? `走向傾斜:${planeStrike}/${planeDip}${planeDipDir8 ? `(${planeDipDir8})` : ""}` : "";
   const shapeType = normalizeLargeShapeType(record?.largeShapeType);
+  const imageText = isLargeShapeImageType(shapeType) ? "画像利用" : "";
   const lineLength = shapeType === "直線状" ? formatCmValue(record?.lineLengthCm) : "";
   if (!base) {
     if (shapeType === "直線状") {
@@ -8683,7 +8700,7 @@ function formatPlanPosition(record) {
         .filter(Boolean)
         .join(" / ");
     }
-    return [planeAttitudeText].filter(Boolean).join(" / ");
+    return [imageText, planeAttitudeText].filter(Boolean).join(" / ");
   }
   if (shapeType === "直線状") {
     if (axisDirection && lineLength) {
@@ -8697,12 +8714,12 @@ function formatPlanPosition(record) {
     }
   }
   if (shapeType !== "直線状" && planeAttitudeText) {
-    return [base, planeAttitudeText].filter(Boolean).join(" / ");
+    return [base, imageText, planeAttitudeText].filter(Boolean).join(" / ");
   }
   if (axisDirection || plungeText) {
     return [base, axisDirection ? `方位:${axisDirection}` : "", plungeText].filter(Boolean).join(" / ");
   }
-  return base;
+  return [base, imageText].filter(Boolean).join(" / ");
 }
 
 function renderCardOutput() {
@@ -9148,10 +9165,11 @@ function buildCurrentRecordDraftForPositionPreview() {
   const specimenPrefix = normalizeSpecimenPrefix(value(formData.get("specimenPrefix")));
   const specimenSerial = compactNoSpaceValue(formData.get("specimenSerial"));
   const planSizeMode = normalizePlanSizeMode(value(formData.get("planSizeMode")));
+  const planImageEnabled = normalizeToggleFlag(formData.get("planImageEnabled")) === "1";
   const draftMultiPoints = planSizeMode === "複数点" ? readMultiPointRowsFromForm() : [];
   const rawLargeShapeType = value(formData.get("largeShapeType"));
   const largeShapeType =
-    planSizeMode === "大きなもの" ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType) : "";
+    planImageEnabled ? normalizeLargeShapeType(rawLargeShapeType) || normalizeLargeShapeLabel(rawLargeShapeType) : "";
   const imageCornerFields = extractImageCornerFieldsFromFormData(formData);
   const imageTransformFields = extractImageTransformFieldsFromFormData(formData);
   const isImageShape = isLargeShapeImageType(largeShapeType);
@@ -9188,6 +9206,7 @@ function buildCurrentRecordDraftForPositionPreview() {
     tsPointCoordinateMode: "stationOffsetSouthWest",
     multiPoints: draftMultiPoints,
     planSizeMode,
+    planImageEnabled: planImageEnabled ? "1" : "",
     largeShapeType,
     largeAxisDirection: normalizeLargeAxisDirection(value(formData.get("largeAxisDirection"))),
     planeStrikeDirection: normalizePlaneStrikeDirection(value(formData.get("planeStrikeDirection"))),
@@ -12017,6 +12036,8 @@ function buildPlanDrawable(record) {
   const meta = buildPlanDrawableMeta(record);
 
   const planSizeMode = normalizePlanSizeMode(record.planSizeMode);
+  const planImageEnabled = isRecordPlanImageEnabled(record);
+  let imageCenterOverride = null;
   if (planSizeMode === "複数点") {
     const multiPoints = collectPlanMultiPointCoords(record);
     const fallbackCenter = convertPositionToPlanCoords(record?.nsDir, record?.nsCm, record?.ewDir, record?.ewCm);
@@ -12035,14 +12056,17 @@ function buildPlanDrawable(record) {
       (acc, point) => ({ x: acc.x + point.x / points.length, y: acc.y + point.y / points.length }),
       { x: 0, y: 0 }
     );
-    return {
-      type: "multipoint",
-      points,
-      hull: buildHullPointsFromSource(points),
-      x: centroid.x,
-      y: centroid.y,
-      ...meta,
-    };
+    if (!planImageEnabled) {
+      return {
+        type: "multipoint",
+        points,
+        hull: buildHullPointsFromSource(points),
+        x: centroid.x,
+        y: centroid.y,
+        ...meta,
+      };
+    }
+    imageCenterOverride = centroid;
   }
 
   const shapeType = normalizeLargeShapeType(record.largeShapeType);
@@ -12051,7 +12075,7 @@ function buildPlanDrawable(record) {
   const isImageShape = isLargeShapeImageType(shapeType);
   const hasMappedImageType = largeShapeImagePathMap.has(normalizedShapeLabel);
   const rawImageCorners = collectImageCornerPoints(record);
-  let center = convertPositionToPlanCoords(record.nsDir, record.nsCm, record.ewDir, record.ewCm);
+  let center = imageCenterOverride || convertPositionToPlanCoords(record.nsDir, record.nsCm, record.ewDir, record.ewCm);
   if (!center && (isImageShape || rawImageCorners.length)) {
     if (rawImageCorners.length) {
       center = rawImageCorners.reduce(
@@ -12066,14 +12090,14 @@ function buildPlanDrawable(record) {
 
   const resolvedImageType = isImageShape ? shapeType : hasMappedImageType ? normalizedShapeLabel : "";
   const shouldUseImageQuad =
-    planSizeMode === "大きなもの" && (isImageShape || (resolvedImageType && rawImageCorners.length > 0));
+    planImageEnabled && (isImageShape || (resolvedImageType && rawImageCorners.length > 0));
   const orientationAzimuth =
     shapeType === "直線状"
       ? parseLargeAxisAzimuth(record.largeAxisDirection)
       : parseLargeAxisAzimuth(record.planeStrikeDirection) ?? parseLargeAxisAzimuth(record.largeAxisDirection);
   const axisAzimuth = shouldUseImageQuad ? null : orientationAzimuth;
 
-  if (planSizeMode !== "大きなもの" || !shapeType) {
+  if (!planImageEnabled || !shapeType) {
     return {
       type: "point",
       x: center.x,
@@ -13400,7 +13424,8 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     tsDirectionMin: value(item.tsDirectionMin),
     tsDirectionSec: value(item.tsDirectionSec),
     multiPoints: normalizePlanMultiPoints(item.multiPoints),
-    planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)),
+    planSizeMode: normalizePlanSizeMode(value(item.planSizeMode)) === "大きなもの" ? "通常" : normalizePlanSizeMode(value(item.planSizeMode)),
+    planImageEnabled: normalizeToggleFlag(value(item.planImageEnabled) || (normalizePlanSizeMode(value(item.planSizeMode)) === "大きなもの" ? "1" : "") || (value(item.customLargeImageDataUrl) ? "1" : "")),
     largeShapeType: normalizedLargeShapeType,
     largeAxisDirection: normalizeLargeAxisDirection(value(item.largeAxisDirection)),
     largeAxisPlungeDeg: normalizeLargeAxisPlungeDeg(value(item.largeAxisPlungeDeg)),
@@ -16015,7 +16040,7 @@ function getMissingRequiredKeys(record) {
     }
   }
 
-  if (planSizeMode === "大きなもの") {
+  if (isRecordPlanImageEnabled(record)) {
     const largeShapeType = normalizeLargeShapeType(value(record.largeShapeType));
     const isImageShape = isLargeShapeImageType(largeShapeType);
     if (!largeShapeType) {
@@ -16239,6 +16264,12 @@ function normalizePlanSizeMode(valueRaw) {
     return "大きなもの";
   }
   return "通常";
+}
+
+function isRecordPlanImageEnabled(record) {
+  return normalizeToggleFlag(record?.planImageEnabled) === "1" ||
+    normalizePlanSizeMode(record?.planSizeMode) === "大きなもの" ||
+    Boolean(normalizeCustomLargeImageDataUrl(record?.customLargeImageDataUrl));
 }
 
 function normalizeLargeShapeType(valueRaw) {
