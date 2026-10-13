@@ -17615,7 +17615,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   let offlineStatusSettled = false;
   const markOfflineReady = () => {
     offlineStatusSettled = true;
-    setOfflineStatus("オフライン利用準備完了", "ready");
+    setOfflineStatus("オフライン利用可", "ready");
   };
   const markOfflineError = () => {
     offlineStatusSettled = true;
@@ -17623,25 +17623,26 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   };
   navigator.serviceWorker.register("./sw.js")
     .then((registration) => {
-      if (registration.active || registration.waiting) {
-        markOfflineReady();
-        return;
-      }
       const worker = registration.installing;
       if (worker) {
+        setOfflineStatus("最新版を読み込み中");
         worker.addEventListener("statechange", () => {
           if (worker.state === "activated" || worker.state === "installed") markOfflineReady();
           if (worker.state === "redundant" && !offlineStatusSettled) markOfflineError();
         });
+      } else if (registration.active || registration.waiting) {
+        markOfflineReady();
+        return;
+      } else {
+        navigator.serviceWorker.ready.then(markOfflineReady).catch(markOfflineError);
       }
-      navigator.serviceWorker.ready.then(markOfflineReady).catch(markOfflineError);
       window.setTimeout(() => {
         if (!offlineStatusSettled) markOfflineError();
       }, 15000);
     })
     .catch(markOfflineError);
 } else if (location.protocol === "file:") {
-  setOfflineStatus("オフライン準備はWeb公開版で有効", "error");
+  setOfflineStatus("保存HTMLは更新不可—オンラインで公開版を開いてください", "error");
 } else {
   setOfflineStatus("このブラウザはオフライン利用非対応", "error");
 }
