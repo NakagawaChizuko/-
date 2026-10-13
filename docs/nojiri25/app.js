@@ -5308,10 +5308,10 @@ function resetRecordForm({ showMessage }) {
     recordForm.elements.imgFlipV.checked = false;
   }
   if (recordForm.elements.imgLockAspectRatio instanceof HTMLInputElement) {
-    recordForm.elements.imgLockAspectRatio.checked = false;
+    recordForm.elements.imgLockAspectRatio.checked = true;
   }
   if (recordForm.elements.imgUseOriginalColor instanceof HTMLInputElement) {
-    recordForm.elements.imgUseOriginalColor.checked = false;
+    recordForm.elements.imgUseOriginalColor.checked = true;
   }
   clearImageCornerCmFields();
   setDefaultImageCornerDirections();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v92-level-altitude-preview";
+const CACHE_NAME = "kaseki25-pwa-v93-image-defaults";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
