@@ -759,7 +759,6 @@ async function initialize() {
   resetRecordForm({ showMessage: false });
   renderRecordTable();
   renderOutputs();
-  initializeSavedHtmlTransferReceiver();
   void loadLargeShapeImageManifest();
   void loadTeamRosterFromDefaultFile();
   void bootstrapCloudSync();
@@ -17823,25 +17822,12 @@ function initializeSavedHtmlTransferReceiver() {
 
 function renderSavedHtmlStatus() {
   if (!offlineStatus) return;
+  const recordCountText = state.records.length ? `・データ${state.records.length}件` : "";
   if (!navigator.onLine) {
-    setOfflineStatus("オフライン利用中（保存HTML版）", "ready");
+    setOfflineStatus(`保存HTML版・オフライン利用中${recordCountText}`, "ready");
     return;
   }
-  if (savedHtmlTransferInProgress || savedHtmlTransferCompleted) return;
-  const hasRecordsToMove = state.records.length > 0;
-  setOfflineStatus(
-    hasRecordsToMove ? `保存HTMLにデータ${state.records.length}件あり ` : "オンライン接続中・保存HTMLを表示中 ",
-    "ready"
-  );
-  const link = document.createElement("a");
-  link.href = PUBLIC_APP_URL;
-  link.textContent = hasRecordsToMove ? "最新版を開いてデータを引き継ぐ" : "最新版を開く";
-  link.addEventListener("click", (event) => {
-    if (!hasRecordsToMove) return;
-    event.preventDefault();
-    void startSavedHtmlTransfer();
-  });
-  offlineStatus.append(link);
+  setOfflineStatus(`保存HTML版・この画面を再読み込みすると更新${recordCountText}`, "ready");
 }
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
