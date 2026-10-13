@@ -13,7 +13,7 @@
     <title>第25次野尻湖湖底発掘　化石・遺物 入力フォーム</title>
     <link rel="manifest" href="./manifest.webmanifest?v=20260807-offline1" />
     <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261012-level-altitude-preview1" />
+    <link rel="stylesheet" href="./styles.css?v=20261013-json-selection1" />
   </head>
   <body>
     <header class="app-header">
@@ -944,6 +944,17 @@
         <section class="panel">
           <h2>データ入出力（JSON）</h2>
           <p class="hint-text">3Dデータを添付した記録は、3Dファイル本体をBase64化してJSON内に含めます。</p>
+          <div class="json-export-controls">
+            <label>日付を指定
+              <select id="export-json-date-select"></select>
+            </label>
+            <div class="json-export-selection-actions">
+              <button id="export-json-select-all-btn" class="secondary" type="button">表示中をすべて選択</button>
+              <button id="export-json-clear-btn" class="secondary" type="button">表示中の選択を解除</button>
+            </div>
+            <div id="export-json-record-list" class="json-export-record-list"></div>
+            <p id="export-json-summary" class="muted">選択: 0件</p>
+          </div>
           <div class="export-button-grid">
             <button id="export-json-btn" type="button">JSON書き出し</button>
             <label class="import-label" for="import-json-input">JSON読み込み</label>
@@ -1084,6 +1095,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261013-photo-status-fix1"></script>
+    <script src="./app.js?v=20261013-json-selection1"></script>
   </body>
 </html>

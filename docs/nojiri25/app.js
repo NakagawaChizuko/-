@@ -464,6 +464,9 @@ let exportPlanModeDetailSubValues = new Set();
 let exportPlanModeUnitTouched = false;
 let exportPlanModeDetailTouched = false;
 let exportPlanModeDetailSubTouched = false;
+let exportJsonDate = "";
+let exportJsonSelectedRecordIds = new Set();
+let exportJsonSelectionInitialized = false;
 let outputListSortKey = "kuwaku";
 let outputListSortDirection = "asc";
 let isOverwriteMode = false;
@@ -660,6 +663,11 @@ const exportListPdfBtn = document.getElementById("export-list-pdf-btn");
 const exportCardPdfBtn = document.getElementById("export-card-pdf-btn");
 const exportPlanPdfBtn = document.getElementById("export-plan-pdf-btn");
 const exportJsonBtn = document.getElementById("export-json-btn");
+const exportJsonDateSelect = document.getElementById("export-json-date-select");
+const exportJsonSelectAllBtn = document.getElementById("export-json-select-all-btn");
+const exportJsonClearBtn = document.getElementById("export-json-clear-btn");
+const exportJsonRecordList = document.getElementById("export-json-record-list");
+const exportJsonSummary = document.getElementById("export-json-summary");
 const importJsonInput = document.getElementById("import-json-input");
 const restoreBackupBtn = document.getElementById("restore-backup-btn");
 const cloudEndpointInput = document.getElementById("cloud-endpoint-input");
@@ -2141,13 +2149,50 @@ function bindEvents() {
     });
   }
 
+  exportJsonDateSelect?.addEventListener("change", () => {
+    exportJsonDate = value(exportJsonDateSelect.value);
+    exportJsonSelectedRecordIds = new Set(getJsonExportVisibleRecords().map((record) => value(record.id)).filter(Boolean));
+    exportJsonSelectionInitialized = true;
+    renderJsonExportControls();
+    updateExportButtonAvailability();
+  });
+  exportJsonSelectAllBtn?.addEventListener("click", () => {
+    getJsonExportVisibleRecords().forEach((record) => {
+      if (value(record.id)) exportJsonSelectedRecordIds.add(value(record.id));
+    });
+    exportJsonSelectionInitialized = true;
+    renderJsonExportControls();
+    updateExportButtonAvailability();
+  });
+  exportJsonClearBtn?.addEventListener("click", () => {
+    getJsonExportVisibleRecords().forEach((record) => exportJsonSelectedRecordIds.delete(value(record.id)));
+    exportJsonSelectionInitialized = true;
+    renderJsonExportControls();
+    updateExportButtonAvailability();
+  });
+  exportJsonRecordList?.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("input[data-json-export-record-id]");
+    if (!(checkbox instanceof HTMLInputElement)) return;
+    const recordId = value(checkbox.dataset.jsonExportRecordId);
+    if (checkbox.checked) exportJsonSelectedRecordIds.add(recordId);
+    else exportJsonSelectedRecordIds.delete(recordId);
+    exportJsonSelectionInitialized = true;
+    renderJsonExportSummary();
+    updateExportButtonAvailability();
+  });
+
   exportJsonBtn.addEventListener("click", async () => {
+    const selectedRecords = getJsonExportSelectedRecords();
+    if (!selectedRecords.length) {
+      showToast("JSON書き出し対象を選択してください");
+      return;
+    }
     exportJsonBtn.disabled = true;
     showToast("3Dデータを含むJSONを準備しています…");
     try {
-      const exportState = await buildJsonExportState();
+      const exportState = await buildJsonExportState(selectedRecords);
       const json = JSON.stringify(exportState, null, 2);
-      downloadFile(`nojiri-kaseki-${timestamp()}.json`, json, "application/json");
+      downloadFile(buildJsonExportFileName(selectedRecords), json, "application/json");
       showToast("JSONを書き出しました");
     } catch (_error) {
       showToast("JSON書き出しに失敗しました");
@@ -2409,8 +2454,10 @@ async function persistCurrentModels3d() {
   return model3dMetadata(currentModels3d);
 }
 
-async function buildJsonExportState() {
-  const exportState = typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+async function buildJsonExportState(recordsRaw = state.records) {
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  const exportSource = { ...state, records };
+  const exportState = typeof structuredClone === "function" ? structuredClone(exportSource) : JSON.parse(JSON.stringify(exportSource));
   for (const record of exportState.records || []) {
     const models = normalizeModels3d(record.models3d);
     record.models3d = await Promise.all(
@@ -2425,6 +2472,29 @@ async function buildJsonExportState() {
     );
   }
   return exportState;
+}
+
+function sanitizeJsonExportFilePart(valueRaw, fallback = "none") {
+  const sanitized = value(valueRaw)
+    .normalize("NFKC")
+    .replace(/[^0-9A-Za-z_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return sanitized || fallback;
+}
+
+function buildJsonExportFileName(recordsRaw) {
+  const records = Array.isArray(recordsRaw) ? [...recordsRaw] : [];
+  const dates = [...new Set(records.map((record) => getRecordDate(record)).filter(Boolean))].sort();
+  const datePart = dates.length === 1
+    ? dates[0].replaceAll("-", "")
+    : dates.length > 1
+      ? `${dates[0].replaceAll("-", "")}-${dates[dates.length - 1].replaceAll("-", "")}`
+      : "date-none";
+  const specimenSorted = records.sort(compareRecordsBySpecimenNo);
+  const firstSpecimen = sanitizeJsonExportFilePart(specimenSorted[0]?.specimenNo, "no-none");
+  const lastSpecimen = sanitizeJsonExportFilePart(specimenSorted[specimenSorted.length - 1]?.specimenNo, firstSpecimen);
+  const specimenPart = firstSpecimen === lastSpecimen ? firstSpecimen : `${firstSpecimen}-to-${lastSpecimen}`;
+  return `nojiri-kaseki-${datePart}-${specimenPart}-${timestamp()}.json`;
 }
 
 async function importEmbeddedModels3d(importedStateRaw) {
@@ -6493,7 +6563,63 @@ function renderExportOutput() {
   renderExportListRangeControls();
   renderExportCardRangeControls();
   renderExportPlanControls();
+  renderJsonExportControls();
   updateExportButtonAvailability();
+}
+
+function getJsonExportVisibleRecords() {
+  return [...state.records]
+    .filter((record) => !exportJsonDate || getRecordDate(record) === exportJsonDate)
+    .sort(compareRecordsByKuwakuThenSpecimen);
+}
+
+function getJsonExportSelectedRecords() {
+  return [...state.records]
+    .filter((record) => exportJsonSelectedRecordIds.has(value(record.id)))
+    .sort(compareRecordsByKuwakuThenSpecimen);
+}
+
+function renderJsonExportControls() {
+  const existingIds = new Set(state.records.map((record) => value(record.id)).filter(Boolean));
+  exportJsonSelectedRecordIds = new Set([...exportJsonSelectedRecordIds].filter((id) => existingIds.has(id)));
+  if (!exportJsonSelectionInitialized) {
+    exportJsonSelectedRecordIds = new Set(existingIds);
+    exportJsonSelectionInitialized = true;
+  }
+  const dates = [...new Set(state.records.map((record) => getRecordDate(record)).filter(Boolean))].sort();
+  if (exportJsonDate && !dates.includes(exportJsonDate)) exportJsonDate = "";
+  if (exportJsonDateSelect) {
+    exportJsonDateSelect.innerHTML = [
+      `<option value="">すべての日付（${state.records.length}件）</option>`,
+      ...dates.map((date) => {
+        const count = state.records.filter((record) => getRecordDate(record) === date).length;
+        return `<option value="${escapeHtml(date)}" ${date === exportJsonDate ? "selected" : ""}>${escapeHtml(date)}（${count}件）</option>`;
+      }),
+    ].join("");
+  }
+  const visibleRecords = getJsonExportVisibleRecords();
+  if (exportJsonRecordList) {
+    exportJsonRecordList.innerHTML = visibleRecords.length
+      ? visibleRecords
+          .map((record) => {
+            const recordId = value(record.id);
+            const checked = exportJsonSelectedRecordIds.has(recordId) ? "checked" : "";
+            const photos = normalizePhotos(record.photos).length;
+            const label = `${getRecordDate(record) || "日付なし"} / ${getRecordKuwaku(record) || "区画なし"} / ${value(record.specimenNo) || "標本番号なし"} / ${value(record.nameMemo) || "名称なし"} / 写真${photos}枚`;
+            return `<label class="json-export-record-item"><input type="checkbox" data-json-export-record-id="${escapeHtml(recordId)}" ${checked} /><span>${escapeHtml(label)}</span></label>`;
+          })
+          .join("")
+      : '<p class="hint-text">指定した日付の記録はありません。</p>';
+  }
+  renderJsonExportSummary();
+}
+
+function renderJsonExportSummary() {
+  if (!exportJsonSummary) return;
+  const selectedRecords = getJsonExportSelectedRecords();
+  const photoCount = selectedRecords.reduce((sum, record) => sum + normalizePhotos(record.photos).length, 0);
+  exportJsonSummary.textContent = `選択: ${selectedRecords.length}件 / 写真: ${photoCount}枚`;
+  setAvailabilityClass(exportJsonSummary, selectedRecords.length > 0);
 }
 
 function renderExportListRangeControls() {
@@ -6759,6 +6885,9 @@ function updateExportButtonAvailability() {
   }
   if (exportPlanPdfBtn) {
     exportPlanPdfBtn.disabled = planRecordCount === 0;
+  }
+  if (exportJsonBtn) {
+    exportJsonBtn.disabled = getJsonExportSelectedRecords().length === 0;
   }
 }
 

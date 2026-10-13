@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaseki25-pwa-v95-photo-status-fix";
+const CACHE_NAME = "kaseki25-pwa-v96-json-selection";
 const REQUIRED_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js",
   "./vendor/three.min.js", "./vendor/OrbitControls.js", "./grid_reference_data.js",
