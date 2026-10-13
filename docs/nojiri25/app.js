@@ -2075,7 +2075,7 @@ function bindEvents() {
       return;
     }
     target.caption = input.value;
-    persist();
+    if (!syncCurrentPhotosToOpenRecord()) persist();
   });
 
   photoList.addEventListener("click", (event) => {
@@ -2085,7 +2085,7 @@ function bindEvents() {
     }
     currentPhotos = currentPhotos.filter((photo) => photo.id !== button.dataset.removePhotoId);
     renderPhotoList();
-    persist("写真を削除しました");
+    if (!syncCurrentPhotosToOpenRecord("写真を削除しました")) persist("写真を削除しました");
   });
 
   if (model3dInput) {
@@ -2266,7 +2266,20 @@ async function addPhotosFromFiles(fileList) {
     return;
   }
   renderPhotoList();
-  persist();
+  if (!syncCurrentPhotosToOpenRecord("写真を保存しました")) persist();
+}
+
+function syncCurrentPhotosToOpenRecord(successMessage = "") {
+  const openRecordId = value(editingRecordId || recordIdInput?.value);
+  if (!openRecordId) return false;
+  const record = findRecord(openRecordId);
+  if (!record) return false;
+  record.photos = clonePhotos(currentPhotos);
+  record.updatedAt = nowIso();
+  persist(successMessage);
+  renderRecordTable();
+  renderOutputs();
+  return true;
 }
 
 async function addModels3dFromFiles(fileList) {
