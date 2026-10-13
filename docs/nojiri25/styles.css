@@ -2373,6 +2373,30 @@ button.upload-picker-label {
   margin: 12px 0;
 }
 
+.json-export-date-fieldset {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.json-export-date-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.json-export-date-item {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 7px 12px;
+  border: 2px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+
 .json-export-selection-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2399,13 +2423,26 @@ button.upload-picker-label {
   grid-template-columns: auto 1fr;
   gap: 8px;
   align-items: start;
-  padding: 7px 8px;
+  min-height: 48px;
+  padding: 9px 10px;
+  border: 2px solid transparent;
   border-radius: 7px;
   background: #fff;
 }
 
-.json-export-record-item input {
-  margin-top: 3px;
+.json-export-record-item input,
+.json-export-date-item input {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.json-export-record-item.is-selected,
+.json-export-date-item.is-selected {
+  border-color: var(--primary);
+  background: #dbeafe;
 }
 
 .camera-capture-modal {

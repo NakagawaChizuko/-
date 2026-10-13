@@ -464,7 +464,8 @@ let exportPlanModeDetailSubValues = new Set();
 let exportPlanModeUnitTouched = false;
 let exportPlanModeDetailTouched = false;
 let exportPlanModeDetailSubTouched = false;
-let exportJsonDate = "";
+let exportJsonSelectedDates = new Set();
+let exportJsonDateSelectionInitialized = false;
 let exportJsonSelectedRecordIds = new Set();
 let exportJsonSelectionInitialized = false;
 let outputListSortKey = "kuwaku";
@@ -663,7 +664,7 @@ const exportListPdfBtn = document.getElementById("export-list-pdf-btn");
 const exportCardPdfBtn = document.getElementById("export-card-pdf-btn");
 const exportPlanPdfBtn = document.getElementById("export-plan-pdf-btn");
 const exportJsonBtn = document.getElementById("export-json-btn");
-const exportJsonDateSelect = document.getElementById("export-json-date-select");
+const exportJsonDateList = document.getElementById("export-json-date-list");
 const exportJsonSelectAllBtn = document.getElementById("export-json-select-all-btn");
 const exportJsonClearBtn = document.getElementById("export-json-clear-btn");
 const exportJsonRecordList = document.getElementById("export-json-record-list");
@@ -2150,9 +2151,22 @@ function bindEvents() {
     });
   }
 
-  exportJsonDateSelect?.addEventListener("change", () => {
-    exportJsonDate = value(exportJsonDateSelect.value);
-    exportJsonSelectedRecordIds = new Set(getJsonExportVisibleRecords().map((record) => value(record.id)).filter(Boolean));
+  exportJsonDateList?.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("input[data-json-export-date]");
+    if (!(checkbox instanceof HTMLInputElement)) return;
+    const date = value(checkbox.dataset.jsonExportDate);
+    const recordsOnDate = state.records.filter((record) => getRecordDate(record) === date);
+    if (checkbox.checked) {
+      exportJsonSelectedDates.add(date);
+      recordsOnDate.forEach((record) => {
+        if (value(record.id)) exportJsonSelectedRecordIds.add(value(record.id));
+      });
+    } else {
+      exportJsonSelectedDates.delete(date);
+      recordsOnDate.forEach((record) => exportJsonSelectedRecordIds.delete(value(record.id)));
+    }
+    exportJsonDateSelectionInitialized = true;
+    checkbox.closest("label")?.classList.toggle("is-selected", checkbox.checked);
     exportJsonSelectionInitialized = true;
     renderJsonExportControls();
     updateExportButtonAvailability();
@@ -2177,6 +2191,7 @@ function bindEvents() {
     const recordId = value(checkbox.dataset.jsonExportRecordId);
     if (checkbox.checked) exportJsonSelectedRecordIds.add(recordId);
     else exportJsonSelectedRecordIds.delete(recordId);
+    checkbox.closest("label")?.classList.toggle("is-selected", checkbox.checked);
     exportJsonSelectionInitialized = true;
     renderJsonExportSummary();
     updateExportButtonAvailability();
@@ -6571,7 +6586,7 @@ function renderExportOutput() {
 
 function getJsonExportVisibleRecords() {
   return [...state.records]
-    .filter((record) => !exportJsonDate || getRecordDate(record) === exportJsonDate)
+    .filter((record) => exportJsonSelectedDates.has(getRecordDate(record)))
     .sort(compareRecordsByKuwakuThenSpecimen);
 }
 
@@ -6588,16 +6603,26 @@ function renderJsonExportControls() {
     exportJsonSelectedRecordIds = new Set(existingIds);
     exportJsonSelectionInitialized = true;
   }
-  const dates = [...new Set(state.records.map((record) => getRecordDate(record)).filter(Boolean))].sort();
-  if (exportJsonDate && !dates.includes(exportJsonDate)) exportJsonDate = "";
-  if (exportJsonDateSelect) {
-    exportJsonDateSelect.innerHTML = [
-      `<option value="">すべての日付（${state.records.length}件）</option>`,
-      ...dates.map((date) => {
-        const count = state.records.filter((record) => getRecordDate(record) === date).length;
-        return `<option value="${escapeHtml(date)}" ${date === exportJsonDate ? "selected" : ""}>${escapeHtml(date)}（${count}件）</option>`;
-      }),
-    ].join("");
+  const dates = [...new Set(state.records.map((record) => getRecordDate(record)))].sort((a, b) => {
+    if (!a) return 1;
+    if (!b) return -1;
+    return a.localeCompare(b);
+  });
+  const availableDates = new Set(dates);
+  exportJsonSelectedDates = new Set([...exportJsonSelectedDates].filter((date) => availableDates.has(date)));
+  if (!exportJsonDateSelectionInitialized) {
+    exportJsonSelectedDates = new Set(dates);
+    exportJsonDateSelectionInitialized = true;
+  }
+  if (exportJsonDateList) {
+    exportJsonDateList.innerHTML = dates.length
+      ? dates.map((date) => {
+          const count = state.records.filter((record) => getRecordDate(record) === date).length;
+          const checked = exportJsonSelectedDates.has(date);
+          const label = date || "日付なし";
+          return `<label class="json-export-date-item ${checked ? "is-selected" : ""}"><input type="checkbox" data-json-export-date="${escapeHtml(date)}" ${checked ? "checked" : ""} /><span>${escapeHtml(label)}（${count}件）</span></label>`;
+        }).join("")
+      : '<p class="hint-text">記録がありません。</p>';
   }
   const visibleRecords = getJsonExportVisibleRecords();
   if (exportJsonRecordList) {
@@ -6608,7 +6633,7 @@ function renderJsonExportControls() {
             const checked = exportJsonSelectedRecordIds.has(recordId) ? "checked" : "";
             const photos = getRecordPhotoAttachmentCount(record);
             const label = `${getRecordDate(record) || "日付なし"} / ${getRecordKuwaku(record) || "区画なし"} / ${value(record.specimenNo) || "標本番号なし"} / ${value(record.nameMemo) || "名称なし"} / 写真${photos}枚`;
-            return `<label class="json-export-record-item"><input type="checkbox" data-json-export-record-id="${escapeHtml(recordId)}" ${checked} /><span>${escapeHtml(label)}</span></label>`;
+            return `<label class="json-export-record-item ${checked ? "is-selected" : ""}"><input type="checkbox" data-json-export-record-id="${escapeHtml(recordId)}" ${checked} /><span>${escapeHtml(label)}</span></label>`;
           })
           .join("")
       : '<p class="hint-text">指定した日付の記録はありません。</p>';

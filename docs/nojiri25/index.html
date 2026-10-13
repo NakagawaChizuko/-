@@ -945,9 +945,10 @@
           <h2>データ入出力（JSON）</h2>
           <p class="hint-text">3Dデータを添付した記録は、3Dファイル本体をBase64化してJSON内に含めます。</p>
           <div class="json-export-controls">
-            <label>日付を指定
-              <select id="export-json-date-select"></select>
-            </label>
+            <fieldset class="json-export-date-fieldset">
+              <legend>表示する日付（複数選択可）</legend>
+              <div id="export-json-date-list" class="json-export-date-list"></div>
+            </fieldset>
             <div class="json-export-selection-actions">
               <button id="export-json-select-all-btn" class="secondary" type="button">表示中をすべて選択</button>
               <button id="export-json-clear-btn" class="secondary" type="button">表示中の選択を解除</button>
@@ -1095,6 +1096,6 @@
     <script src="./shapes/inline_data.js?v=20260308-inline1"></script>
     <script src="./team_roster_data.js?v=20260805-ts-public1"></script>
     <script src="./grid_reference_data.js?v=20260805-grid2"></script>
-    <script src="./app.js?v=20261013-photo-attachment-count1"></script>
+    <script src="./app.js?v=20261013-json-multi-date1"></script>
   </body>
 </html>
