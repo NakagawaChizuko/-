@@ -1800,6 +1800,12 @@ textarea {
   border-color: var(--danger);
 }
 
+.dir-tab.pending-option.active {
+  background: #a66300;
+  color: #fff;
+  border-color: #a66300;
+}
+
 .level-read-grid {
   display: grid;
   grid-template-columns: repeat(3, max-content);
