@@ -372,7 +372,7 @@ const PHOTO_COMPRESSION_STEPS = [
   { maxLength: 560, quality: 0.46 },
 ];
 const PHOTO_TARGET_JPEG_BYTES = 1024 * 1024;
-const PHOTO_TARGET_MAX_LENGTH = 4096;
+const PHOTO_TARGET_MAX_LENGTH = 2560;
 
 const createInitialState = () => ({
   site: {
@@ -2653,6 +2653,7 @@ async function openBrowserCamera(destination) {
     }
     cameraCaptureVideo.srcObject = activeCameraStream;
     await cameraCaptureVideo.play();
+    await waitForCameraVideoFrame();
     cameraCaptureShutterBtn.disabled = false;
     if (cameraCaptureFocusBtn) {
       cameraCaptureFocusBtn.disabled = !focusModes.some((mode) => mode === "single-shot" || mode === "continuous");
@@ -2691,43 +2692,76 @@ async function focusBrowserCamera() {
   }
 }
 
-async function cameraFrameToFile() {
-  const cameraTrack = activeCameraStream?.getVideoTracks?.()[0];
-  if (cameraTrack && typeof window.ImageCapture === "function") {
-    try {
-      const capture = new window.ImageCapture(cameraTrack);
-      const blob = await capture.takePhoto();
-      if (blob?.size) {
-        const name = `camera-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`;
-        return new File([blob], name, { type: blob.type || "image/jpeg", lastModified: Date.now() });
-      }
-    } catch (_stillCaptureError) {
-      // 静止画API非対応時は高解像度の動画フレームを使用する。
-    }
-  }
+function waitForCameraVideoFrame() {
   return new Promise((resolve, reject) => {
-    if (!cameraCaptureVideo?.videoWidth || !cameraCaptureVideo?.videoHeight) {
-      reject(new Error("Camera image unavailable"));
+    if (!cameraCaptureVideo) {
+      reject(new Error("Camera video unavailable"));
       return;
     }
-    const canvas = document.createElement("canvas");
-    canvas.width = cameraCaptureVideo.videoWidth;
-    canvas.height = cameraCaptureVideo.videoHeight;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      reject(new Error("Canvas context unavailable"));
-      return;
-    }
-    context.drawImage(cameraCaptureVideo, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("Camera capture failed"));
+    const finish = () => {
+      if (typeof cameraCaptureVideo.requestVideoFrameCallback === "function") {
+        cameraCaptureVideo.requestVideoFrameCallback(() => resolve());
         return;
       }
-      const name = `camera-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`;
-      resolve(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
-    }, "image/jpeg", 0.98);
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    };
+    if (cameraCaptureVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && cameraCaptureVideo.videoWidth > 0) {
+      finish();
+      return;
+    }
+    const timeoutId = window.setTimeout(() => reject(new Error("Camera frame timeout")), 5000);
+    cameraCaptureVideo.addEventListener("loadeddata", () => {
+      window.clearTimeout(timeoutId);
+      finish();
+    }, { once: true });
   });
+}
+
+function isCanvasBlackFrame(canvas, context) {
+  try {
+    const sampleWidth = Math.min(16, canvas.width);
+    const sampleHeight = Math.min(16, canvas.height);
+    if (!sampleWidth || !sampleHeight) return true;
+    const sampleCanvas = document.createElement("canvas");
+    sampleCanvas.width = sampleWidth;
+    sampleCanvas.height = sampleHeight;
+    const sampleContext = sampleCanvas.getContext("2d", { willReadFrequently: true });
+    if (!sampleContext) return false;
+    sampleContext.drawImage(canvas, 0, 0, sampleWidth, sampleHeight);
+    const pixels = sampleContext.getImageData(0, 0, sampleWidth, sampleHeight).data;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] > 0 && (pixels[index] > 2 || pixels[index + 1] > 2 || pixels[index + 2] > 2)) {
+        return false;
+      }
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function cameraFrameToFile() {
+  if (!cameraCaptureVideo) throw new Error("Camera image unavailable");
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await waitForCameraVideoFrame();
+    const sourceWidth = Number(cameraCaptureVideo.videoWidth);
+    const sourceHeight = Number(cameraCaptureVideo.videoHeight);
+    if (!sourceWidth || !sourceHeight) continue;
+    const scale = Math.min(1, PHOTO_TARGET_MAX_LENGTH / Math.max(sourceWidth, sourceHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!context) throw new Error("Canvas context unavailable");
+    context.drawImage(cameraCaptureVideo, 0, 0, canvas.width, canvas.height);
+    if (isCanvasBlackFrame(canvas, context)) continue;
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.95));
+    if (blob?.size) {
+      const name = `camera-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`;
+      return new File([blob], name, { type: "image/jpeg", lastModified: Date.now() });
+    }
+  }
+  throw new Error("Camera returned black frames");
 }
 
 function shouldUseNativeStillCamera() {
@@ -16940,6 +16974,10 @@ function resizeDataUrlImage(dataUrl, maxLength, quality = 0.72, mimeType = "imag
         return;
       }
       context.drawImage(image, 0, 0, width, height);
+      if (isCanvasBlackFrame(canvas, context)) {
+        reject(new Error("Canvas produced a black image"));
+        return;
+      }
       resolve(canvas.toDataURL(mimeType, quality));
     };
     image.onerror = () => reject(new Error("Failed to load image"));
@@ -16978,6 +17016,10 @@ function resizeDataUrlImageToTargetJpeg(dataUrl, maxLength, targetBytes) {
           return;
         }
         context.drawImage(image, 0, 0, width, height);
+        if (isCanvasBlackFrame(canvas, context)) {
+          reject(new Error("Canvas produced a black image"));
+          return;
+        }
 
         const highestQuality = canvas.toDataURL("image/jpeg", 0.98);
         const highestBytes = getDataUrlDecodedByteLength(highestQuality);
