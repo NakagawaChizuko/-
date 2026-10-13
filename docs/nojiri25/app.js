@@ -1420,6 +1420,7 @@ function bindEvents() {
       notes: value(formData.get("notes")),
       sectionDiagrams: clonePhotos(currentSectionDiagrams),
       photos: clonePhotos(currentPhotos),
+      photoAttachmentCount: currentPhotos.length,
       models3d,
       createdAt: found?.createdAt || nowIsoValue,
       updatedAt: nowIsoValue,
@@ -2320,6 +2321,7 @@ function syncCurrentPhotosToOpenRecord(successMessage = "") {
   const record = findRecord(openRecordId);
   if (!record) return false;
   record.photos = clonePhotos(currentPhotos);
+  record.photoAttachmentCount = currentPhotos.length;
   record.updatedAt = nowIso();
   persist(successMessage);
   renderRecordTable();
@@ -6604,7 +6606,7 @@ function renderJsonExportControls() {
           .map((record) => {
             const recordId = value(record.id);
             const checked = exportJsonSelectedRecordIds.has(recordId) ? "checked" : "";
-            const photos = normalizePhotos(record.photos).length;
+            const photos = getRecordPhotoAttachmentCount(record);
             const label = `${getRecordDate(record) || "日付なし"} / ${getRecordKuwaku(record) || "区画なし"} / ${value(record.specimenNo) || "標本番号なし"} / ${value(record.nameMemo) || "名称なし"} / 写真${photos}枚`;
             return `<label class="json-export-record-item"><input type="checkbox" data-json-export-record-id="${escapeHtml(recordId)}" ${checked} /><span>${escapeHtml(label)}</span></label>`;
           })
@@ -6617,7 +6619,7 @@ function renderJsonExportControls() {
 function renderJsonExportSummary() {
   if (!exportJsonSummary) return;
   const selectedRecords = getJsonExportSelectedRecords();
-  const photoCount = selectedRecords.reduce((sum, record) => sum + normalizePhotos(record.photos).length, 0);
+  const photoCount = selectedRecords.reduce((sum, record) => sum + getRecordPhotoAttachmentCount(record), 0);
   exportJsonSummary.textContent = `選択: ${selectedRecords.length}件 / 写真: ${photoCount}枚`;
   setAvailabilityClass(exportJsonSummary, selectedRecords.length > 0);
 }
@@ -8160,6 +8162,7 @@ function applyOutputCellEditToRecord(record, editKey, formData) {
   }
   if (editKey === "photos") {
     record.photos = clonePhotos(activeOutputCellEditPhotos);
+    record.photoAttachmentCount = activeOutputCellEditPhotos.length;
     return { ok: true };
   }
   return { ok: false, message: "このセルは直接編集に対応していません" };
@@ -8395,7 +8398,7 @@ function renderListOutput() {
         <td data-col-key="occurrenceSketch" data-cell-edit-key="occurrenceSketch" class="${listCellClass("", sketchMissing)}" ${missingTitle}>${escapeHtml(record.occurrenceSketch || "")}</td>
         <td data-col-key="position" data-cell-edit-key="position" class="${listCellClass("", positionMissing)}" ${missingTitle}>${escapeHtml(formatPlanPosition(record))}</td>
         <td data-col-key="notes" data-cell-edit-key="notes">${escapeHtml(record.notes || "")}</td>
-        <td data-col-key="photos" data-cell-edit-key="photos">${normalizePhotos(record.photos).length ? "添付済み" : "添付なし"}</td>
+        <td data-col-key="photos" data-cell-edit-key="photos">${getRecordPhotoAttachmentCount(record) > 0 ? "添付済み" : "添付なし"}</td>
         <td data-col-key="actions">
           <div class="row-actions">
             <button type="button" data-action="insert-row" data-id="${record.id}" data-kuwaku="${escapeHtml(
@@ -8523,7 +8526,7 @@ function compareOutputRecordsForList(a, b) {
       compared = compareSortText(a?.notes, b?.notes);
       break;
     case "photos":
-      compared = normalizePhotos(a?.photos).length - normalizePhotos(b?.photos).length;
+      compared = getRecordPhotoAttachmentCount(a) - getRecordPhotoAttachmentCount(b);
       break;
     default:
       compared = compareRecordsByKuwakuThenSpecimen(a, b);
@@ -13046,6 +13049,12 @@ function mergeLocalAndDurableStates(localStateRaw, durableStateRaw) {
       ...older,
       ...newer,
       photos: newerPhotos.length ? newerPhotos : normalizePhotos(older.photos),
+      photoAttachmentCount: Math.max(
+        newerPhotos.length,
+        normalizePhotos(older.photos).length,
+        Number(newer.photoAttachmentCount) || 0,
+        Number(older.photoAttachmentCount) || 0
+      ),
       sectionDiagrams: newerDiagrams.length ? newerDiagrams : normalizePhotos(older.sectionDiagrams),
       customLargeImageDataUrl:
         value(newer.customLargeImageDataUrl) || value(older.customLargeImageDataUrl),
@@ -13405,6 +13414,7 @@ function normalizeRecord(item, fallbackSiteRaw = null) {
     }),
     sectionDiagrams: normalizePhotos(item.sectionDiagrams),
     photos: normalizePhotos(item.photos),
+    photoAttachmentCount: Math.max(normalizePhotos(item.photos).length, Number(item.photoAttachmentCount) || 0),
     models3d: model3dMetadata(item.models3d),
     history: normalizeRecordHistory(item.history),
     createdAt: value(item.createdAt) || new Date().toISOString(),
@@ -13634,6 +13644,14 @@ function normalizePhotos(photosRaw) {
       createdAt: value(photo.createdAt) || new Date().toISOString(),
     }))
     .filter((photo) => photo.dataUrl);
+}
+
+function getRecordPhotoAttachmentCount(record) {
+  const storedCount = normalizePhotos(record?.photos).length;
+  const metadataCount = Math.max(0, Number(record?.photoAttachmentCount) || 0);
+  const openRecordId = value(editingRecordId || recordIdInput?.value);
+  const liveCount = openRecordId && openRecordId === value(record?.id) ? currentPhotos.length : 0;
+  return Math.max(storedCount, metadataCount, liveCount);
 }
 
 function findRecord(recordId) {
